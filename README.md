@@ -3,8 +3,8 @@
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Stateful_DAG-1C2C5E?style=for-the-badge)](https://langchain.com)
-[![Groq](https://img.shields.io/badge/Groq_LLM-Llama_3.3_70B-FF4B4B?style=for-the-badge)](https://groq.com)
-[![SQLite](https://img.shields.io/badge/SQLite-Audit_Log-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
+[![Groq](https://img.shields.io/badge/Groq_LLM-GPT-OSS_20B-FF4B4B?style=for-the-badge)](https://groq.com)
+[![SQLite](https://img.shields.io/badge/SQLite-Hash_Chained_Audit-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
 
 **AegisML** is an enterprise-grade, state-checkpointed multi-agent machine learning platform designed to bridge automated AI data science with human governance, algorithmic fairness auditing, and immutable compliance logging.
 
@@ -16,7 +16,8 @@
 - **State Checkpointing & Resumption**: Built on **LangGraph** with a persistent SQLite checkpointer (`pipeline_state.db`), enabling crash-recovery and zero-latency human-in-the-loop interrupts.
 - **Human-in-the-Loop Governance Gates**: Pauses execution before model deployment to present evaluation reports to human auditors with custom prompt directive injection and model candidate exclusion.
 - **3-Loop Resilience System**: Features automated quality retry loops and two interactive human reroute loops.
-- **Immutable Audit Logger**: Every agent execution event, metric evaluation, and human reviewer decision is recorded sequentially in `audit_log.db`.
+- **Tamper-Evident Audit Logger**: Every agent execution event, metric evaluation, and human reviewer decision is appended to `audit_log.db`, each entry SHA-256 hashed together with its predecessor. `verify_audit_chain()` re-derives the chain and reports the exact entry at which any edit, deletion or reordering occurred. See [Audit Chain Guarantees](#-audit-chain-what-is-and-is-not-guaranteed) for what this does and does not prove.
+- **No Train/Test Leakage**: The train/test split is drawn by the Data Agent *before* any parameter is fitted. Imputation fill values, frequency-encoding maps and the feature scaler are all learned from the train rows only; fairness is measured on the held-out rows.
 
 ---
 
@@ -57,10 +58,10 @@ flowchart TD
 ### 6 Pipeline Agent Nodes
 
 1. **`Data Analysis Agent` (`data_analysis_agent.py`)**: Performs initial exploratory data profiling, computing missingness ratios, column summary statistics, IQR outliers, Pearson correlation matrices ($|r| \ge 0.20$), target distributions, and interactive Chart.js visualization payloads.
-2. **`Planner Agent` (`planner_agent.py`)**: Uses Groq LLM (`llama-3.3-70b-versatile`) with prompt schema truncation guardrails (< 1,800 tokens) to analyze schema metadata, identify data quality concerns, and output a structured JSON plan.
-3. **`Data Agent` (`data_agent.py`)**: Executes deterministic data cleaning, missing value imputation (median/mode/mean), frequency encoding, and feature scaling.
+2. **`Planner Agent` (`planner_agent.py`)**: Uses Groq LLM (`openai/gpt-oss-20b` by default; override with the `GROQ_MODEL` env var) in JSON mode at `temperature=0.2`. Only aggregate statistics are sent — never raw rows. Column metadata is capped at 40 representative columns (target, sensitive and high-null columns prioritised) to stay inside the request size limit on wide datasets. The response is validated against 5 required keys, with one retry on parse failure.
+3. **`Data Agent` (`data_agent.py`)**: Executes deterministic data cleaning. Drops columns above 50% missing and rows with a null target, then **draws the train/test split** and fits every subsequent parameter — median/mode imputation, frequency-encoding maps, `StandardScaler` — on the train rows only, applying them to all rows. Returns `train_index` / `test_index` so the Training Agent reuses the identical split.
 4. **`Training Agent` (`training_agent.py`)**: Converts target `y` using `LabelEncoder` (0..N-1) for 100% XGBoost compatibility across binary and multi-class tasks. Fits ensemble models (`RandomForest`, `XGBoost`, `LogisticRegression`/`Ridge`), ranks leaderboards, and extracts top-5 SHAP feature importances.
-5. **`Fairness Agent` (`fairness_agent.py`)**: Evaluates subgroup equity across demographic candidates (gender, race, age) enforcing Disparate Impact ($\ge 0.80$) and Demographic Parity Difference ($\le 0.10$).
+5. **`Fairness Agent` (`fairness_agent.py`)**: Evaluates subgroup equity across demographic candidates (gender, race, age) on the **held-out test rows**, enforcing Disparate Impact ($\ge 0.80$) and Demographic Parity Difference ($\le 0.10$). One-hot-encoded attributes are reconstructed by prefix matching. Regression tasks and runs where no candidate resolves to a usable subgroup column return `overall_fairness_passed = None` with `fairness_evaluated = False` — reported in the dashboard as **NOT EVALUATED**, never as a pass.
 6. **`Governance Gate Node` (`pipeline_graph.py`)**: Calls `interrupt(payload)`, pausing graph execution to present evaluation reports to human auditors on the web dashboard.
 
 ### 3-Loop Resilience System
@@ -118,7 +119,7 @@ Real-time topology status updating as the graph resumes execution following a go
 ---
 
 ### 7. Approved Model Deployment & Disk Serialization
-Formally approves winning model, saves serialized `.joblib` model artifact to `saved_models/`, and displays deployment status banner.
+Formally approves the winning model. `audit_log_node` writes the serialised `.joblib` artifact to `saved_models/<run_id>_<model>.joblib` and records the real path in both the pipeline state and the audit entry; the dashboard displays that path, or an explicit **NOT SAVED** message with the failure reason. Serialisation happens only on the approve path — a model rejected at the gate never reaches disk.
 
 ![Approved Model Saved](images/model_accepted.png)
 
@@ -199,6 +200,38 @@ http://localhost:8000
 
 ---
 
+## 🔐 Audit Chain: What Is and Is Not Guaranteed
+
+Each audit entry stores `entry_hash = SHA-256(canonical(entry) + entry_hash_of_predecessor)`, anchored per run at a genesis constant.
+
+**Detected by `verify_audit_chain(run_id)`:**
+- Any edit to a logged field — summary, details, timestamp, `event_source`.
+- Deletion of an entry from the middle of a run.
+- Insertion of a forged entry, or reordering (the sequence number is hashed).
+
+**NOT detected — stated plainly rather than assumed away:**
+- **Truncation.** Deleting *trailing* entries leaves a shorter but internally consistent chain. Nothing inside the database can prove entries once existed beyond its own head.
+- **Deletion of an entire run.**
+- **Wholesale recomputation.** The chain is unsigned, so anyone who can write to the file can rebuild a valid chain over falsified content.
+
+Closing those requires an anchor *outside* the file — periodically publishing the head hash to an append-only location, or signing entries with a key the database host does not hold. That is the intended next step and is deliberately not claimed here.
+
+---
+
+## 🧪 Tests
+
+```bash
+pytest
+```
+
+The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. It covers the leakage boundary, the audit chain (including tampering and the documented truncation gap), fairness reporting honesty, and an end-to-end graph run through interrupt, resume and both reroute loops.
+
+The `test_*.py` scripts in the repository root are the original manual integration walkthroughs — they download the UCI Adult dataset and call the live Groq API, so they are run by hand and are excluded from `pytest` collection.
+
+---
+
 ## 📜 License & Compliance
 
-Developed for **Academic Review 2 Evaluation**. Built in compliance with EU AI Act, Fair Credit Reporting Act, and corporate audit standards.
+Developed for **Academic Review 2 Evaluation**.
+
+The architecture is designed *against* the control objectives of the EU AI Act (human oversight, logging, technical documentation, data governance), the NIST AI RMF, and comparable corporate audit standards. It has **not** undergone conformity assessment, and no compliance claim is made — the governance controls are demonstrable, the certification is not.

@@ -44,6 +44,8 @@ CHECKPOINTER RATIONALE (SqliteSaver):
 
 from __future__ import annotations
 
+import os
+import re
 import sqlite3
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -65,6 +67,9 @@ from audit_log import log_audit_event
 
 MAX_RETRIES = 2          # maximum planner→data_agent auto-retries
 MAX_HUMAN_REROUTES = 2   # maximum human rejection reroutes before capping
+
+# Directory approved models are serialised into by audit_log_node.
+SAVED_MODELS_DIR = "saved_models"
 
 
 def _get_run_id(config: RunnableConfig | None) -> str:
@@ -140,6 +145,14 @@ def data_agent_node(state: PipelineState, config: RunnableConfig) -> dict:
     cleaned_df = result.pop("cleaned_df")
     cleaned_df_bytes = df_to_bytes(cleaned_df)
 
+    # Lift the split out of `result` before it reaches the audit log: these are
+    # per-row index lists (tens of thousands of ints on a real dataset) and would
+    # swamp every audit entry. They live in their own state key instead.
+    split_index = {
+        "train": result.pop("train_index"),
+        "test": result.pop("test_index"),
+    }
+
     passed = result["quality_check_passed"]
     report = result["quality_report"]
     print(
@@ -160,6 +173,7 @@ def data_agent_node(state: PipelineState, config: RunnableConfig) -> dict:
     return {
         "data_agent_result": result,
         "cleaned_df_bytes": cleaned_df_bytes,
+        "split_index": split_index,
     }
 
 
@@ -217,12 +231,16 @@ def training_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     print(f"[training_node] Training models: {recommended_models}")
 
+    split = state.get("split_index") or {}
+
     try:
         raw = run_training_agent(
             cleaned_df=cleaned_df,
             target_column=state["target_column"],
             task_type=state["task_type"],
             recommended_models=recommended_models,
+            train_index=split.get("train"),
+            test_index=split.get("test"),
         )
     except RuntimeError as exc:
         print(f"[training_node] Training failed entirely: {exc}")
@@ -277,10 +295,11 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
         print("[fairness_node] No fitted model bytes in state — skipping fairness check")
         err_res = {
             "error": "No fitted model in state",
-            "overall_fairness_passed": False,
+            "overall_fairness_passed": None,
+            "fairness_evaluated": False,
             "fairness_report": [],
             "attributes_skipped": [],
-            "actions_taken": ["Skipped: No fitted model bytes in state"],
+            "actions_taken": ["NOT EVALUATED: no fitted model bytes in state"],
         }
         log_audit_event(
             run_id=run_id,
@@ -301,12 +320,15 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
     )
     print(f"[fairness_node] Running fairness check on candidates: {sensitive_candidates}")
 
+    split = state.get("split_index") or {}
+
     result = run_fairness_agent(
         cleaned_df=cleaned_df,
         fitted_model=fitted_model,
         target_column=state["target_column"],
         sensitive_attribute_candidates=sensitive_candidates,
         task_type=state["task_type"],
+        eval_index=split.get("test"),
     )
 
     passed = result.get("overall_fairness_passed", False)
@@ -362,7 +384,8 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
         "selected_model_metrics": train_res.get("selected_model_metrics", {}),
         "leaderboard": train_res.get("leaderboard", []),
         "fairness_report": fair_res.get("fairness_report", []),
-        "overall_fairness_passed": fair_res.get("overall_fairness_passed", False),
+        "overall_fairness_passed": fair_res.get("overall_fairness_passed"),
+        "fairness_evaluated": fair_res.get("fairness_evaluated", False),
         "attributes_skipped": fair_res.get("attributes_skipped", []),
         "unresolved_quality_issue": state.get("unresolved_quality_issue", False),
     }
@@ -401,27 +424,72 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
 
 def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
     """
-    Final node on the approve path. Logs the final successful outcome event.
+    Final node on the approve path. Serialises the approved model to disk and
+    logs the final outcome event.
+
+    The model is written here rather than in training_node because only an
+    approved model is a deployable artifact. A model that was trained but then
+    rejected at the governance gate must not appear on disk as though it had
+    passed review.
     """
     run_id = _get_run_id(config)
-    selected_name = state.get("training_result", {}).get("selected_model_name", "unknown")
-    fairness_passed = state.get("fairness_result", {}).get("overall_fairness_passed", False)
+    training_result = state.get("training_result") or {}
+    fairness_result = state.get("fairness_result") or {}
+    selected_name = training_result.get("selected_model_name", "unknown")
+    fairness_passed = fairness_result.get("overall_fairness_passed")
+
+    # --- Serialise the approved model -------------------------------------
+    # selected_model_bytes was produced by graph_state.model_to_bytes(), which
+    # is a joblib dump — so the bytes are already a valid .joblib payload and can
+    # be written straight out without a deserialise/reserialise round trip.
+    saved_path = None
+    save_error = None
+    model_bytes = state.get("selected_model_bytes")
+
+    if not model_bytes:
+        save_error = "No fitted model bytes in state — nothing to serialise"
+        print(f"[audit_log_node] WARNING: {save_error}")
+    else:
+        try:
+            os.makedirs(SAVED_MODELS_DIR, exist_ok=True)
+            safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", str(selected_name))
+            candidate = os.path.join(
+                SAVED_MODELS_DIR, f"{run_id}_{safe_name}.joblib"
+            )
+            with open(candidate, "wb") as fh:
+                fh.write(model_bytes)
+            saved_path = candidate
+            print(
+                f"[audit_log_node] Saved approved model to '{saved_path}' "
+                f"({len(model_bytes):,} bytes)"
+            )
+        except Exception as exc:
+            save_error = f"{type(exc).__name__}: {exc}"
+            saved_path = None
+            print(f"[audit_log_node] FAILED to save model: {save_error}")
 
     log_audit_event(
         run_id=run_id,
         event_type="final_outcome",
         event_source="automated",
-        summary="Pipeline execution completed successfully with human approval.",
+        summary=(
+            "Pipeline execution completed successfully with human approval."
+            + (f" Model artifact saved to '{saved_path}'." if saved_path
+               else f" Model artifact NOT saved ({save_error}).")
+        ),
         details={
             "status": "APPROVED",
             "selected_model": selected_name,
             "overall_fairness_passed": fairness_passed,
+            "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
+            "model_saved_path": saved_path,
+            "model_save_error": save_error,
             "total_retries_used": state.get("retry_count", 0),
             "total_human_reroutes_used": state.get("rejection_reroute_count", 0),
         },
     )
     print(f"[audit_log_node] Final outcome logged to audit_log.db for run_id='{run_id}'")
-    return {}
+    return {"model_saved_path": saved_path, "model_save_error": save_error}
 
 
 # ---------------------------------------------------------------------------
@@ -630,11 +698,6 @@ def build_graph(db_path: str = "pipeline_state.db"):
     conn = sqlite3.connect(db_path, check_same_thread=False)
     checkpointer = SqliteSaver(conn)
     return builder.compile(checkpointer=checkpointer)
-
-
-# Module-level compiled graph
-graph = build_graph()
-
 
 
 # Module-level compiled graph

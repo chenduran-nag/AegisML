@@ -493,7 +493,7 @@
             The winning algorithm (<strong id="approved-model-title" style="color: #60a5fa;">—</strong>) has been serialized and saved as a production-ready model artifact.
           </div>
           <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px;">
-            Saved Artifact Path: <code id="approved-model-path" style="color: #a7f3d0;">saved_models/...</code> | Event logged to SQLite audit store (<code style="color: #c4b5fd;">audit_log.db</code>).
+            Saved Artifact Path: <code id="approved-model-path" style="color: #a7f3d0;">—</code> | Event logged to SQLite audit store (<code style="color: #c4b5fd;">audit_log.db</code>).
           </div>
         </div>
         <div style="text-align: right;">
@@ -649,7 +649,10 @@
       <div class="card-title">Immutable Governance Audit Log</div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
         Chronological execution log persisted into SQLite audit database (`audit_log.db`).
+        Each entry is SHA-256 hashed together with its predecessor, so any edit,
+        deletion or reordering breaks the chain and is reported below.
       </p>
+      <div id="audit-chain-badge" style="margin-bottom: 16px;"></div>
       <div class="audit-list" id="audit-trail-list">
         <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 40px;">No audit logs registered for this run yet</div>
       </div>
@@ -1039,7 +1042,20 @@
           const approvedBanner = document.getElementById('approved-banner');
           approvedBanner.style.display = 'block';
           document.getElementById('approved-model-title').innerText = payload.selected_model_name || 'Selected Winner Model';
-          document.getElementById('approved-model-path').innerText = data.model_saved_path || vals.model_saved_path || `saved_models/${currentThreadId}_model.joblib`;
+          // Show ONLY the path the backend actually wrote. Falling back to a
+          // constructed string would display an artifact location that does not
+          // exist on disk.
+          const savedPath = data.model_saved_path || vals.model_saved_path;
+          const pathEl = document.getElementById('approved-model-path');
+          if (savedPath) {
+            pathEl.innerText = savedPath;
+            pathEl.style.color = '#a7f3d0';
+          } else {
+            pathEl.innerText = vals.model_save_error
+              ? `NOT SAVED — ${vals.model_save_error}`
+              : 'NOT SAVED';
+            pathEl.style.color = '#fca5a5';
+          }
         }
       }
 
@@ -1125,14 +1141,20 @@
       }
 
       // Render Fairness
+      // Three states, not two. `overall_fairness_passed === null` means fairness
+      // was never measured (regression task, or no resolvable subgroup column).
+      // That is NOT a pass, and must never render as a green badge.
       const fairness = payload.fairness_report || [];
       const overallPassed = payload.overall_fairness_passed;
-      if (fairness.length === 0) {
-        document.getElementById('fairness-status-badge').innerHTML =
-          '<span class="badge" style="background: rgba(107, 114, 128, 0.2); color: #9ca3af; padding: 6px 12px; font-size: 0.85rem;">FAIRNESS ASSESSMENT: NO SENSITIVE ATTRIBUTES EVALUATED</span>';
+      const badgeEl = document.getElementById('fairness-status-badge');
+      if (overallPassed === null || overallPassed === undefined || fairness.length === 0) {
+        badgeEl.innerHTML =
+          '<span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: NOT EVALUATED — no conclusion can be drawn</span>';
+      } else if (overallPassed) {
+        badgeEl.innerHTML =
+          '<span class="badge badge-pass" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: PASSED (ALL ATTRIBUTES CLEARED)</span>';
       } else {
-        document.getElementById('fairness-status-badge').innerHTML = overallPassed ?
-          '<span class="badge badge-pass" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: PASSED (ALL ATTRIBUTES CLEARED)</span>' :
+        badgeEl.innerHTML =
           '<span class="badge badge-fail" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: VIOLATION DETECTED</span>';
       }
 
@@ -1155,13 +1177,36 @@
         const res = await fetch(`/api/pipeline/audit/${threadId}`);
         const data = await res.json();
         const entries = data.entries || [];
+        const chain = data.chain || {};
+
+        // Chain verdict banner
+        const chainEl = document.getElementById('audit-chain-badge');
+        if (chainEl && entries.length) {
+          if (chain.verified) {
+            chainEl.innerHTML = `
+              <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.45); border-radius: 8px; padding: 12px 16px;">
+                <strong style="color: #34d399;">HASH CHAIN VERIFIED</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">${chain.detail || ''}</div>
+                ${chain.head_hash ? `<div style="font-size: 0.72rem; color: var(--text-dark); margin-top: 6px;">Head: <code>${chain.head_hash.slice(0, 32)}...</code></div>` : ''}
+              </div>`;
+          } else {
+            chainEl.innerHTML = `
+              <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 8px; padding: 12px 16px;">
+                <strong style="color: #f87171;">HASH CHAIN BROKEN — AUDIT TRAIL NOT TRUSTWORTHY</strong>
+                <div style="font-size: 0.8rem; color: #fca5a5; margin-top: 4px;">${chain.detail || ''}</div>
+              </div>`;
+          }
+        }
+
+        const brokenSeq = chain.broken_at ? chain.broken_at.seq : null;
         document.getElementById('audit-trail-list').innerHTML = entries.map(e => `
-          <div class="audit-item">
+          <div class="audit-item" ${e.seq === brokenSeq ? 'style="border-color: rgba(239, 68, 68, 0.6);"' : ''}>
             <div class="audit-header">
               <strong>${e.event_source === 'human_reviewer' ? 'User Decision' : 'Agent Event'} — ${e.event_type}</strong>
               <span class="audit-time">${e.timestamp}</span>
             </div>
             <div>${e.summary}</div>
+            ${e.entry_hash ? `<div style="font-size: 0.68rem; color: var(--text-dark); margin-top: 6px; font-family: monospace;">#${e.seq} &nbsp; hash ${String(e.entry_hash).slice(0, 16)}... &nbsp;&larr;&nbsp; prev ${String(e.prev_hash).slice(0, 16)}...</div>` : ''}
           </div>
         `).join('');
       } catch (err) {

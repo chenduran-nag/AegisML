@@ -95,6 +95,16 @@ class PipelineState(TypedDict, total=False):
     cleaned_df_bytes : Optional[bytes]
         The cleaned DataFrame from data_agent_node, pickled.
         Deserialise with bytes_to_df(). Used by training_node.
+    eda_report : Optional[dict]
+        Exploratory profiling report from analyze_raw_dataset(), computed by the
+        server at upload time. Stored in state (not a module-level cache) so it
+        survives a process restart alongside the rest of the run.
+    split_index : Optional[dict]
+        {"train": [...], "test": [...]} — index labels of the train/test split
+        drawn by run_data_agent() BEFORE any preprocessing parameter was fitted.
+        Held here rather than inside data_agent_result so these long lists never
+        reach the audit log. training_node reuses this split verbatim, and
+        fairness_node evaluates on the "test" half.
     last_failure_reason : Optional[dict]
         Populated with quality_report when quality_check_passed = False.
         Passed as failure_context to plan_pipeline() on the next retry.
@@ -125,6 +135,12 @@ class PipelineState(TypedDict, total=False):
     unresolved_human_rejection : bool
         True when rejection_reroute_count >= MAX_HUMAN_REROUTES and human rejects again.
         Prevents infinite human-rejection loops.
+    model_saved_path : Optional[str]
+        Filesystem path the approved model was serialised to by audit_log_node,
+        or None if it was never approved or the write failed. This is the real
+        path on disk — never construct a display path from other fields.
+    model_save_error : Optional[str]
+        Reason the serialisation failed, when model_saved_path is None.
     """
 
     df_bytes: bytes
@@ -133,6 +149,8 @@ class PipelineState(TypedDict, total=False):
     plan: Optional[dict]
     data_agent_result: Optional[dict]
     cleaned_df_bytes: Optional[bytes]
+    split_index: Optional[dict]
+    eda_report: Optional[dict]
     last_failure_reason: Optional[dict]
     retry_count: int
     unresolved_quality_issue: bool
@@ -145,3 +163,5 @@ class PipelineState(TypedDict, total=False):
     business_objective: Optional[str]
     rejected_models: Optional[list[str]]
     human_feedback: Optional[str]
+    model_saved_path: Optional[str]
+    model_save_error: Optional[str]

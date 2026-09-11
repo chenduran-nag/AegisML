@@ -19,8 +19,18 @@ DESIGN PRINCIPLES:
 
 TASK TYPE COVERAGE:
   - Classification: Fully supported.
-  - Regression: Raises NotImplementedError (fairness metrics like Disparate Impact
-    are classification-specific).
+  - Regression: NOT EVALUATED. Disparate Impact and Demographic Parity Difference
+    are defined over a binary positive-prediction rate and have no meaning for a
+    continuous output. Regression runs therefore return
+    overall_fairness_passed=None with fairness_evaluated=False - deliberately NOT
+    True, so that a governance reviewer is never shown a green "fairness passed"
+    badge for a property that was never measured.
+
+EVALUATION SET:
+  Metrics are computed on the held-out test rows when eval_index is supplied by
+  the caller. Measuring subgroup rates on rows the model was fitted on flatters
+  the model, because a sufficiently flexible model reproduces the training
+  distribution's subgroup rates by construction.
 """
 
 from __future__ import annotations
@@ -128,6 +138,7 @@ def run_fairness_agent(
     target_column: str,
     sensitive_attribute_candidates: list[str],
     task_type: str,
+    eval_index: list | None = None,
 ) -> dict:
     """
     Evaluate algorithmic fairness across sensitive attribute candidates.
@@ -144,21 +155,42 @@ def run_fairness_agent(
     sensitive_attribute_candidates : list[str]
         Attribute names recommended by Planner Agent (e.g. ["age", "sex", "race"]).
     task_type : {"classification", "regression"}
+    eval_index : list, optional
+        Index labels of the held-out test rows (from run_data_agent()). When
+        supplied, metrics are computed on these rows only. When omitted, metrics
+        are computed on every row including those the model trained on, and a
+        warning is recorded in actions_taken.
 
     Returns
     -------
     dict:
-        fairness_report         : list[dict] — metrics per evaluated attribute
-        overall_fairness_passed : bool — False if ANY evaluated attribute violates thresholds
-        attributes_skipped      : list[str] — candidate names skipped with reasons
-        actions_taken           : list[str] — human-readable log entries
+        fairness_report         : list[dict] - metrics per evaluated attribute
+        overall_fairness_passed : bool | None - False if ANY evaluated attribute
+                                  violates thresholds; None when fairness was not
+                                  evaluated at all (e.g. regression)
+        fairness_evaluated      : bool - whether any metric was actually computed
+        attributes_skipped      : list[str] - candidate names skipped with reasons
+        actions_taken           : list[str] - human-readable log entries
     """
     if task_type == "regression":
+        # NOT "passed". Disparate Impact and Demographic Parity Difference are
+        # undefined for a continuous target, so nothing was measured. Reporting
+        # True here would show a governance reviewer a green badge for a check
+        # that never ran.
         return {
-            "overall_fairness_passed": True,
+            "overall_fairness_passed": None,
+            "fairness_evaluated": False,
             "fairness_report": [],
-            "attributes_skipped": ["Skipped all attributes (Fairness agent supports classification tasks only)"],
-            "actions_taken": ["Skipped: Regression task (Disparate Impact & DPD are classification-specific metrics)"],
+            "attributes_skipped": [
+                "All attributes (regression task - Disparate Impact and "
+                "Demographic Parity Difference are defined only for classification)"
+            ],
+            "actions_taken": [
+                "NOT EVALUATED: regression task. Disparate Impact and Demographic "
+                "Parity Difference require a binary positive-prediction rate and "
+                "have no definition for a continuous output. No fairness "
+                "conclusion can be drawn about this model."
+            ],
         }
 
     if task_type != "classification":
@@ -174,8 +206,31 @@ def run_fairness_agent(
 
     actions: list[str] = []
 
+    # Restrict to the held-out rows when the caller supplied them. Subgroup rates
+    # measured on training rows understate disparity.
+    if eval_index is not None:
+        eval_idx = pd.Index(eval_index)
+        unknown = len(eval_idx.difference(cleaned_df.index))
+        if unknown:
+            raise ValueError(
+                f"Fairness Agent: {unknown} label(s) in eval_index are absent "
+                f"from cleaned_df."
+            )
+        eval_df = cleaned_df.loc[eval_idx]
+        actions.append(
+            f"Evaluating fairness on the {len(eval_df):,}-row held-out test split "
+            f"(the model was not fitted on these rows)"
+        )
+    else:
+        eval_df = cleaned_df
+        actions.append(
+            f"WARNING: no held-out split supplied - evaluating fairness on all "
+            f"{len(eval_df):,} rows, including rows the model trained on. "
+            f"Measured disparity is likely understated."
+        )
+
     # Prepare feature matrix X for prediction (exclude target column)
-    X = cleaned_df.drop(columns=[target_column])
+    X = eval_df.drop(columns=[target_column])
 
     # Convert boolean columns to int for model prediction compatibility
     bool_cols = [c for c in X.columns if pd.api.types.is_bool_dtype(X[c])]
@@ -192,7 +247,7 @@ def run_fairness_agent(
         ) from exc
 
     actions.append(
-        f"Generated model predictions for {len(cleaned_df):,} rows using {type(fitted_model).__name__}"
+        f"Generated model predictions for {len(eval_df):,} rows using {type(fitted_model).__name__}"
     )
 
     fairness_report: list[dict] = []
@@ -207,7 +262,7 @@ def run_fairness_agent(
 
         # Extract/reconstruct group Series for this candidate
         group_series, skip_reason = _extract_attribute_series(
-            df=cleaned_df,
+            df=eval_df,
             attribute_candidate=cand_clean,
             target_column=target_column,
         )
@@ -276,12 +331,23 @@ def run_fairness_agent(
             },
         })
 
-    # Overall fairness passed if no evaluated attribute has a violation
-    overall_passed = not any(r["violation"] for r in fairness_report)
+    # Overall fairness passed if no evaluated attribute has a violation.
+    # If every candidate was skipped, nothing was measured - report None rather
+    # than True, so an unevaluated run is never displayed as a pass.
+    if not fairness_report:
+        overall_passed = None
+        actions.append(
+            "NOT EVALUATED: no sensitive attribute candidate could be resolved to "
+            "a usable subgroup column. No fairness conclusion can be drawn."
+        )
+    else:
+        overall_passed = not any(r["violation"] for r in fairness_report)
 
     return {
         "fairness_report": fairness_report,
         "overall_fairness_passed": overall_passed,
+        "fairness_evaluated": bool(fairness_report),
+        "evaluated_rows": int(len(eval_df)),
         "attributes_skipped": attributes_skipped,
         "actions_taken": actions,
     }

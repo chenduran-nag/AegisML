@@ -20,6 +20,7 @@ import pandas as pd
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -42,7 +43,7 @@ if "GROQ_API_KEY" not in os.environ:
 from langgraph.types import Command
 from graph_state import df_to_bytes
 from pipeline_graph import graph
-from audit_log import get_audit_trail
+from audit_log import get_audit_trail, verify_audit_chain
 
 app = FastAPI(
     title="AI Multi-Agent Governance API",
@@ -50,10 +51,15 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# NOTE: allow_credentials=True is INVALID alongside allow_origins=["*"] — the
+# spec forbids the wildcard on credentialed requests and browsers reject the
+# response outright. This API uses no cookies or auth headers, so credentials are
+# simply off. If authentication is added later, replace the wildcard with an
+# explicit origin list and only then re-enable credentials.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -75,30 +81,36 @@ def _build_pipeline_response(thread_id: str) -> dict:
     if is_paused and snapshot.tasks and snapshot.tasks[0].interrupts:
         payload = snapshot.tasks[0].interrupts[0].value
 
-    selected_name = snapshot.values.get("training_result", {}).get("selected_model_name", "unknown") if snapshot.values else "unknown"
-    saved_path = snapshot.values.get("model_saved_path") or f"saved_models/{thread_id}_{selected_name.replace(' ', '_')}.joblib"
+    values = snapshot.values or {}
+    fairness_result = values.get("fairness_result") or {}
+
+    # The real path written by audit_log_node, or None. Never synthesise a path
+    # here: showing a reviewer an artifact location that does not exist on disk
+    # is worse than showing nothing.
+    saved_path = values.get("model_saved_path")
 
     return {
         "thread_id": thread_id,
         "status": "paused" if is_paused else ("completed" if not next_nodes else "running"),
         "next_nodes": next_nodes,
         "review_payload": payload,
-        "model_saved_path": saved_path if not is_paused and snapshot.values.get("human_decision") == "approve" else None,
+        "model_saved_path": saved_path,
         "values": {
-            "unresolved_human_rejection": snapshot.values.get("unresolved_human_rejection", False),
-            "unresolved_quality_issue": snapshot.values.get("unresolved_quality_issue", False),
-            "human_decision": snapshot.values.get("human_decision"),
-            "human_feedback": snapshot.values.get("human_feedback"),
-            "retry_count": snapshot.values.get("retry_count", 0),
-            "rejection_reroute_count": snapshot.values.get("rejection_reroute_count", 0),
+            "unresolved_human_rejection": values.get("unresolved_human_rejection", False),
+            "unresolved_quality_issue": values.get("unresolved_quality_issue", False),
+            "human_decision": values.get("human_decision"),
+            "human_feedback": values.get("human_feedback"),
+            "retry_count": values.get("retry_count", 0),
+            "rejection_reroute_count": values.get("rejection_reroute_count", 0),
             "model_saved_path": saved_path,
+            "model_save_error": values.get("model_save_error"),
+            "overall_fairness_passed": fairness_result.get("overall_fairness_passed"),
+            "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
         },
     }
 
 
 from data_analysis_agent import analyze_raw_dataset
-
-_EDA_CACHE: dict[str, dict] = {}
 
 
 @app.post("/api/pipeline/start")
@@ -137,14 +149,19 @@ async def start_pipeline(
     thread_id = f"run-{uuid.uuid4().hex[:8]}"
     config = {"configurable": {"thread_id": thread_id}}
 
-    # Compute EDA analysis report
+    # Compute EDA analysis report. It goes into the graph state rather than a
+    # module-level dict so that it survives a server restart like every other
+    # part of the run — an in-memory cache would silently lose the profiling
+    # report for any run that outlived the process.
     try:
-        _EDA_CACHE[thread_id] = analyze_raw_dataset(df_raw, target_column)
+        eda_report = analyze_raw_dataset(df_raw, target_column)
     except Exception as exc:
         print(f"[server] EDA analysis failed: {exc}")
+        eda_report = {"error": str(exc)}
 
     initial_state = {
         "df_bytes": df_to_bytes(df_raw),
+        "eda_report": eda_report,
         "target_column": target_column,
         "task_type": task_type,
         "business_objective": business_objective or "",
@@ -158,13 +175,17 @@ async def start_pipeline(
         "rejected_models": [],
     }
 
+    # graph.invoke() is synchronous and runs the whole pipeline — model training
+    # included. Calling it directly from an async handler would block the event
+    # loop for its entire duration, freezing every other request (including the
+    # dashboard's own status polls). run_in_threadpool hands it to a worker.
     try:
-        graph.invoke(initial_state, config=config)
+        await run_in_threadpool(graph.invoke, initial_state, config=config)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Pipeline execution error: {exc}")
 
     res = _build_pipeline_response(thread_id)
-    res["eda_report"] = _EDA_CACHE.get(thread_id, {})
+    res["eda_report"] = eda_report
     return res
 
 
@@ -173,9 +194,11 @@ async def get_eda_report(thread_id: str):
     """
     Get Data Analysis Agent EDA report for a given run thread_id.
     """
-    if thread_id not in _EDA_CACHE:
+    snapshot = graph.get_state({"configurable": {"thread_id": thread_id}})
+    report = (snapshot.values or {}).get("eda_report")
+    if not report:
         raise HTTPException(status_code=404, detail="EDA report not found for this run")
-    return _EDA_CACHE[thread_id]
+    return report
 
 
 @app.post("/api/pipeline/resume")
@@ -194,7 +217,9 @@ async def resume_pipeline(req: ResumeRequest):
     }
 
     try:
-        graph.invoke(Command(resume=resume_payload), config=config)
+        await run_in_threadpool(
+            graph.invoke, Command(resume=resume_payload), config=config
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Error resuming graph execution: {exc}")
 
@@ -212,10 +237,12 @@ async def get_pipeline_status(thread_id: str):
 @app.get("/api/pipeline/audit/{thread_id}")
 async def get_audit_log(thread_id: str):
     """
-    Retrieve chronological audit log trail for a given thread_id.
+    Retrieve the chronological audit log trail for a given thread_id, together
+    with the result of re-verifying its hash chain.
     """
     trail = get_audit_trail(thread_id)
-    return {"thread_id": thread_id, "entries": trail}
+    chain = verify_audit_chain(thread_id)
+    return {"thread_id": thread_id, "entries": trail, "chain": chain}
 
 
 # Serve static web frontend

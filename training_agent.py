@@ -16,7 +16,10 @@ DESIGN PRINCIPLES:
     continue training unaffected.
 
 PIPELINE (in order):
-  1. Train/test split: 80/20, stratified for classification, fixed seed
+  1. Train/test split: reuses the split drawn by the Data Agent (passed in as
+     train_index / test_index) so that models are evaluated on rows that had no
+     influence on any fitted preprocessing parameter. Falls back to an internal
+     80/20 stratified split only when called standalone.
   2. Train each recommended model on X_train / y_train
   3. Evaluate each model on X_test / y_test
   4. Build leaderboard sorted by primary metric
@@ -27,11 +30,10 @@ PIPELINE (in order):
      Sample up to SHAP_SAMPLE_SIZE rows from the test set for speed.
   7. Return results dict
 
-TODO (graph wiring, Step 4): When Training Agent is wired into pipeline_graph.py,
-the fitted selected_model object must be serialised for LangGraph state. Options:
-  A. joblib.dump() -> bytes -> store in PipelineState["trained_model_bytes"]
-  B. in-memory cache keyed by thread_id (avoids pickle overhead for large models)
-Decide at wiring time -- do not over-engineer here.
+RESOLVED (graph wiring, Step 4): the fitted model is returned under the private
+key "_fitted_model"; pipeline_graph.training_node serialises it with
+graph_state.model_to_bytes() (joblib) into PipelineState["selected_model_bytes"]
+and strips the key before storing the rest of the result.
 """
 
 from __future__ import annotations
@@ -295,6 +297,8 @@ def run_training_agent(
     target_column: str,
     task_type: str,
     recommended_models: list[str],
+    train_index: list | None = None,
+    test_index: list | None = None,
 ) -> dict:
     """
     Train, evaluate, and rank models recommended by the Planner Agent.
@@ -309,6 +313,13 @@ def run_training_agent(
     task_type : {"classification", "regression"}
     recommended_models : list[str]
         Names from plan["recommended_models"].
+    train_index, test_index : list, optional
+        Index labels of the split drawn by run_data_agent(). When supplied, this
+        exact split is reused, guaranteeing that the rows used to fit imputation
+        / encoding / scaling parameters are precisely the rows the model trains
+        on. When omitted, an internal split is drawn and a warning is recorded in
+        actions_taken, because preprocessing statistics may then have been fitted
+        over rows that end up in the test set.
 
     Returns
     -------
@@ -346,17 +357,40 @@ def run_training_agent(
         X = X.copy()
         X[bool_cols] = X[bool_cols].astype(int)
 
-    stratify_param = y if task_type == "classification" else None
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
-        test_size=TEST_SIZE,
-        random_state=RANDOM_STATE,
-        stratify=stratify_param,
-    )
-    actions.append(
-        f"Train/test split: {len(X_train):,} train / {len(X_test):,} test rows "
-        f"(stratified={task_type == 'classification'})"
-    )
+    if train_index is not None and test_index is not None:
+        train_idx = pd.Index(train_index)
+        test_idx = pd.Index(test_index)
+
+        unknown = len(train_idx.difference(X.index)) + len(test_idx.difference(X.index))
+        if unknown:
+            raise ValueError(
+                f"Training Agent: {unknown} index label(s) supplied in "
+                f"train_index/test_index are absent from cleaned_df. The Data "
+                f"Agent's split and the cleaned frame are out of sync."
+            )
+
+        X_train, X_test = X.loc[train_idx], X.loc[test_idx]
+        y_train, y_test = y.loc[train_idx], y.loc[test_idx]
+        actions.append(
+            f"Train/test split: reused the Data Agent's split "
+            f"({len(X_train):,} train / {len(X_test):,} test rows). Imputation, "
+            f"encoding and scaling parameters were fitted on these train rows only."
+        )
+    else:
+        stratify_param = y if task_type == "classification" else None
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y,
+            test_size=TEST_SIZE,
+            random_state=RANDOM_STATE,
+            stratify=stratify_param,
+        )
+        actions.append(
+            f"WARNING: no split supplied by the Data Agent — drew an internal "
+            f"{len(X_train):,} train / {len(X_test):,} test split "
+            f"(stratified={task_type == 'classification'}). Preprocessing "
+            f"statistics may have been fitted over held-out rows; treat these "
+            f"metrics as optimistic."
+        )
 
     # ------------------------------------------------------------------
     # Steps 2–3 — Train and evaluate each recommended model

@@ -15,12 +15,21 @@ DESIGN PRINCIPLES:
 PREPROCESSING PIPELINE (applied in order):
   1. Drop feature columns with > 50% missing
   2. Drop rows with null target (labels cannot be imputed)
-  3. Impute remaining nulls:  numeric → median, categorical → mode
-  4. Label-encode target column (classification only)
-  5. Encode categoricals:
+  3. COMPUTE THE TRAIN/TEST SPLIT  <-- every step below fits on train rows only
+  4. Impute remaining nulls:  numeric → train median, categorical → train mode
+  5. Label-encode target column (classification only)
+  6. Encode categoricals:
        - One-hot encode if unique values < OHE_CARDINALITY_LIMIT (10)
-       - Frequency encode (value → relative frequency) otherwise
-  6. StandardScale all numeric, non-boolean feature columns
+       - Frequency encode using TRAIN-split frequencies otherwise
+  7. StandardScale all numeric, non-boolean feature columns (scaler fitted on train)
+
+LEAKAGE BOUNDARY:
+  Steps 1-2 are structural (they depend on missingness, not on learned values).
+  The split is drawn immediately after them, and every parameter learned from
+  data thereafter — fill values, frequency maps, scaler mean/std — is fitted on
+  the train rows and merely APPLIED to the test rows. run_data_agent() returns
+  train_index / test_index so the Training Agent reuses this exact split instead
+  of drawing a second, inconsistent one.
 
 QUALITY CHECK LOGIC:
   quality_check_passed = True only if ALL of:
@@ -38,6 +47,7 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 # ---------------------------------------------------------------------------
@@ -49,6 +59,39 @@ COLUMN_HIGH_NULL_WARNING_THRESHOLD = 0.35 # unhandled if null_pct > 35% and not 
 ROW_DROP_RATIO_LIMIT = 0.30         # quality fails if > 30% of original rows dropped
 OHE_CARDINALITY_LIMIT = 10          # OHE if unique < 10, else frequency encode
 NULL_PCT_QUALITY_LIMIT = 5.0        # quality fails if missing_pct >= 5%
+
+# Train/test split — computed HERE, before any statistic is fitted, and reused
+# verbatim by the Training Agent so that the split boundary is identical in both
+# agents. See _split_indices() for why this must happen in the Data Agent.
+TEST_SIZE = 0.20
+SPLIT_RANDOM_STATE = 42
+
+# ---------------------------------------------------------------------------
+# Dtype predicates
+# ---------------------------------------------------------------------------
+
+
+def _is_encodable_categorical(series: pd.Series) -> bool:
+    """
+    True for columns that need encoding before a model can consume them.
+
+    Checking `is_object_dtype` alone is NOT sufficient. Since pandas 2.x the
+    string backend may hand back a dedicated string dtype (``str`` /
+    ``StringDtype``) rather than ``object``, and pandas 3 makes that the default.
+    Under those versions an is_object_dtype-only test matches nothing, so every
+    categorical column silently passes through unencoded and the Training Agent
+    then fails on raw strings. Cover object, string and categorical explicitly.
+    """
+    if pd.api.types.is_numeric_dtype(series) or pd.api.types.is_bool_dtype(series):
+        return False
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return False
+    return (
+        pd.api.types.is_object_dtype(series)
+        or pd.api.types.is_string_dtype(series)
+        or isinstance(series.dtype, pd.CategoricalDtype)
+    )
+
 
 # ---------------------------------------------------------------------------
 # Plan parsing (keyword matching only — no code generation)
@@ -84,6 +127,58 @@ def _parse_plan_steps(steps: list[str], columns: list[str]) -> dict:
 # ---------------------------------------------------------------------------
 # Pre-built preprocessing functions (deterministic, no LLM)
 # ---------------------------------------------------------------------------
+
+
+def _split_indices(
+    df: pd.DataFrame,
+    target_column: str,
+    task_type: str,
+    actions: list[str],
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Compute train/test row indices BEFORE any statistic is fitted.
+
+    WHY THIS LIVES IN THE DATA AGENT:
+      Imputation fill values, frequency-encoding maps and StandardScaler
+      mean/std are all parameters *learned from data*. If they are learned from
+      the full dataset and the split happens later (in the Training Agent), then
+      information from the held-out rows has already been baked into the
+      training features — the model is evaluated on rows that influenced its own
+      preprocessing, and every reported metric is optimistically biased.
+
+      Splitting first, fitting every parameter on the train rows only, and
+      applying those fitted parameters to all rows removes that leakage. The
+      indices are returned so the Training Agent reuses this exact split rather
+      than drawing a second, inconsistent one.
+
+    Returns (train_index, test_index) as arrays of DataFrame index labels.
+    """
+    y = df[target_column]
+    stratify = None
+
+    if task_type == "classification":
+        vc = y.value_counts(dropna=False)
+        if len(vc) >= 2 and int(vc.min()) >= 2:
+            stratify = y
+        else:
+            actions.append(
+                "Split: stratification disabled (target has a class with fewer "
+                "than 2 rows)"
+            )
+
+    train_idx, test_idx = train_test_split(
+        df.index.to_numpy(),
+        test_size=TEST_SIZE,
+        random_state=SPLIT_RANDOM_STATE,
+        stratify=stratify,
+    )
+
+    actions.append(
+        f"Train/test split computed before fitting: {len(train_idx):,} train / "
+        f"{len(test_idx):,} test rows. All imputation, frequency-encoding and "
+        f"scaling parameters below are fitted on the train rows ONLY."
+    )
+    return train_idx, test_idx
 
 
 def _drop_high_null_columns(
@@ -138,11 +233,16 @@ def _impute_columns(
     df: pd.DataFrame,
     target_column: str,
     actions: list[str],
+    fit_index: np.ndarray,
 ) -> pd.DataFrame:
     """
     Fill nulls in all remaining feature columns:
-      - Numeric  → column median
-      - Object   → column mode (most frequent non-null value)
+      - Numeric  → median of the TRAIN rows
+      - Object   → mode of the TRAIN rows
+
+    Fill values are computed from df.loc[fit_index] only, then applied to every
+    row. Computing them from the full frame would leak held-out information into
+    the training features.
     """
     for col in df.columns:
         if col == target_column:
@@ -151,27 +251,36 @@ def _impute_columns(
         if null_count == 0:
             continue
 
+        train_values = df.loc[fit_index, col]
+
         if pd.api.types.is_numeric_dtype(df[col]):
-            fill_val = df[col].median()
+            fill_val = train_values.median()
+            if pd.isna(fill_val):
+                # Guard: every train value for this column is null.
+                actions.append(
+                    f"WARNING: Cannot impute '{col}' — no non-null values in the "
+                    f"train split. Column will have unresolved nulls."
+                )
+                continue
             df[col] = df[col].fillna(fill_val)
             actions.append(
-                f"Imputed '{col}' with median {fill_val:.4g} "
+                f"Imputed '{col}' with train-split median {fill_val:.4g} "
                 f"({null_count:,} nulls filled)"
             )
         else:
-            mode_series = df[col].mode()
+            mode_series = train_values.mode()
             if mode_series.empty:
                 # Guard: column is entirely null below the drop threshold.
                 # Shouldn't occur with 50% drop rule, but log explicitly.
                 actions.append(
-                    f"WARNING: Cannot impute '{col}' — no non-null values found. "
-                    f"Column will have unresolved nulls."
+                    f"WARNING: Cannot impute '{col}' — no non-null values in the "
+                    f"train split. Column will have unresolved nulls."
                 )
                 continue
             fill_val = str(mode_series.iloc[0])
             df[col] = df[col].fillna(fill_val)
             actions.append(
-                f"Imputed '{col}' with mode '{fill_val}' "
+                f"Imputed '{col}' with train-split mode '{fill_val}' "
                 f"({null_count:,} nulls filled)"
             )
     return df
@@ -204,15 +313,24 @@ def _encode_categoricals(
     df: pd.DataFrame,
     target_column: str,
     actions: list[str],
+    fit_index: np.ndarray,
 ) -> pd.DataFrame:
     """
     Encode all object-dtype feature columns:
       - One-hot encoding  if nunique < OHE_CARDINALITY_LIMIT
       - Frequency encoding otherwise (value → relative frequency in [0, 1])
+
+    One-hot encoding is a structural expansion, not a learned statistic, so the
+    category set is taken from the full frame — this is deliberate, and keeps the
+    train and test rows in the same column space.
+
+    Frequency encoding IS a learned statistic, so the value→frequency map is
+    built from the train rows only. Categories that appear exclusively in the
+    test rows are unseen at fit time and map to 0.0.
     """
     object_cols = [
         col for col in df.columns
-        if col != target_column and pd.api.types.is_object_dtype(df[col])
+        if col != target_column and _is_encodable_categorical(df[col])
     ]
 
     ohe_cols = [c for c in object_cols if df[c].nunique() < OHE_CARDINALITY_LIMIT]
@@ -231,11 +349,18 @@ def _encode_categoricals(
             )
 
     for col in freq_cols:
-        freq_map = df[col].value_counts(normalize=True).to_dict()
-        df[col] = df[col].map(freq_map).astype(float)
+        freq_map = df.loc[fit_index, col].value_counts(normalize=True).to_dict()
+        mapped = pd.to_numeric(df[col].map(freq_map), errors="coerce")
+        unseen = int(mapped.isnull().sum())
+        df[col] = mapped.fillna(0.0).astype("float64")
+        unseen_note = (
+            f"; {unseen:,} row(s) held a category unseen in the train split → 0.0"
+            if unseen else ""
+        )
         actions.append(
-            f"Frequency-encoded '{col}' "
+            f"Frequency-encoded '{col}' using train-split frequencies "
             f"({len(freq_map)} unique values → relative frequency [0.0–1.0])"
+            f"{unseen_note}"
         )
 
     return df
@@ -245,10 +370,15 @@ def _scale_numeric_features(
     df: pd.DataFrame,
     target_column: str,
     actions: list[str],
+    fit_index: np.ndarray,
 ) -> pd.DataFrame:
     """
     Apply StandardScaler to all numeric, non-boolean feature columns.
     Skips: target column and boolean OHE columns (True/False — no scaling needed).
+
+    The scaler is FITTED on the train rows only and then used to transform every
+    row. Fitting on the full frame would put held-out means and variances into
+    the training features.
     """
     numeric_feature_cols = [
         col for col in df.columns
@@ -261,10 +391,11 @@ def _scale_numeric_features(
         return df
 
     scaler = StandardScaler()
-    df[numeric_feature_cols] = scaler.fit_transform(df[numeric_feature_cols])
+    scaler.fit(df.loc[fit_index, numeric_feature_cols])
+    df[numeric_feature_cols] = scaler.transform(df[numeric_feature_cols])
     actions.append(
-        f"Applied StandardScaler to {len(numeric_feature_cols)} "
-        f"numeric feature(s): {numeric_feature_cols}"
+        f"Applied StandardScaler (fitted on the train split only) to "
+        f"{len(numeric_feature_cols)} numeric feature(s): {numeric_feature_cols}"
     )
     return df
 
@@ -351,6 +482,10 @@ def run_data_agent(
 ) -> dict:
     """
     Deterministic data cleaning pipeline. Zero LLM calls.
+
+    Returns a dict with cleaned_df, quality_check_passed, quality_report,
+    actions_taken, and the train_index / test_index of the split that every
+    fitted preprocessing parameter was learned from.
     """
     if target_column not in df.columns:
         raise ValueError(
@@ -385,18 +520,24 @@ def run_data_agent(
     # Step 2 — Drop rows with null target
     df, rows_dropped = _drop_null_target_rows(df, target_column, actions)
 
-    # Step 3 — Impute remaining nulls
-    df = _impute_columns(df, target_column, actions)
+    # Step 3 — Draw the train/test split BEFORE fitting anything.
+    # Everything below this line learns its parameters from train_idx only.
+    train_idx, test_idx = _split_indices(df, target_column, task_type, actions)
 
-    # Step 4 — Label-encode target (classification only)
+    # Step 4 — Impute remaining nulls (fill values from the train split)
+    df = _impute_columns(df, target_column, actions, fit_index=train_idx)
+
+    # Step 5 — Label-encode target (classification only).
+    # Deterministic sorted mapping over all observed classes — not a fitted
+    # statistic, and both splits must share one mapping, so it uses the full frame.
     if task_type == "classification":
         df = _label_encode_target(df, target_column, actions)
 
-    # Steps 5 & 6 — Encode categoricals
-    df = _encode_categoricals(df, target_column, actions)
+    # Step 6 — Encode categoricals (frequency maps from the train split)
+    df = _encode_categoricals(df, target_column, actions, fit_index=train_idx)
 
-    # Step 7 — Scale numeric features
-    df = _scale_numeric_features(df, target_column, actions)
+    # Step 7 — Scale numeric features (scaler fitted on the train split)
+    df = _scale_numeric_features(df, target_column, actions, fit_index=train_idx)
 
     # Step 8 — Imbalance note (flag only — SMOTE deferred to Training Agent)
     if task_type == "classification":
@@ -419,10 +560,18 @@ def run_data_agent(
         rows_dropped=rows_dropped,
         columns_dropped=columns_dropped_total,
     )
+    quality_report["train_rows"] = int(len(train_idx))
+    quality_report["test_rows"] = int(len(test_idx))
 
     return {
         "cleaned_df": df,
         "quality_check_passed": quality_check_passed,
         "quality_report": quality_report,
         "actions_taken": actions,
+        # Index labels of the split drawn in step 3. Consumed by
+        # pipeline_graph.data_agent_node, which lifts them out of this dict and
+        # into PipelineState["split_index"] so they never reach the audit log
+        # (a 30k-element list would swamp every audit entry).
+        "train_index": train_idx.tolist(),
+        "test_index": test_idx.tolist(),
     }
