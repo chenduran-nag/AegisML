@@ -26,7 +26,7 @@ protect it.
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-pytest                      # 35 offline tests, no API key or network needed
+pytest                      # 59 offline tests, no API key or network needed
 ```
 
 Running the app needs `GROQ_API_KEY` in a `.env` file at the repo root (gitignored,
@@ -43,7 +43,8 @@ never commit it), then `python server.py` → http://localhost:8000.
 | `training_agent.py` | Model registry, leaderboard, SHAP. Reuses the Data Agent's split |
 | `fairness_agent.py` | Disparate Impact + Demographic Parity Difference on held-out rows |
 | `audit_log.py` | Append-only, SHA-256 hash-chained audit log + `verify_audit_chain()` |
-| `server.py` | FastAPI: `/api/pipeline/{start,resume,status,audit,eda}` |
+| `compliance_artifacts.py` | Model card, AIBOM and Annex IV draft; digests chained into the audit log + `verify_artifacts()` |
+| `server.py` | FastAPI: `/api/pipeline/{start,resume,status,audit,eda,artifacts}` |
 | `static/index.html` | Single-file dashboard (vanilla JS + Chart.js) |
 | `app.py` | Superseded Streamlit UI — do not extend |
 | `test_*.py` (repo root) | Legacy manual scripts; need live Groq + network. Not collected by pytest |
@@ -77,6 +78,12 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
    of the Data Agent result before logging).
 9. **Do not overclaim.** The README states what the audit chain does *not* detect
    and that no compliance certification exists. New features get the same honesty.
+   The generated Annex IV pack names its own gaps (sections 8 and 9) on purpose —
+   do not quietly turn those into claims.
+10. **Compliance artifacts are generated, never authored.** Every field in
+    `compliance_artifacts.py` is read from recorded state. Never let an LLM write
+    a model card, and never emit a plausible blank where a value is missing —
+    use the `NOT_RECORDED` marker.
 
 ## Conventions
 
@@ -89,9 +96,12 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
 ## Testing notes and gotchas
 
 - Fixtures in `tests/conftest.py`: `toy_df`, `toy_regression_df`, `fake_plan`, `audit_db`.
-- Graph tests monkeypatch `pipeline_graph.plan_pipeline`, `pipeline_graph.log_audit_event`
-  (its `db_path` default is bound at import, so redirect the name, not the constant),
-  and `pipeline_graph.SAVED_MODELS_DIR`, and build with `build_graph(db_path=tmp)`.
+- Graph tests repoint four module-level names on `pipeline_graph` — `plan_pipeline`,
+  `AUDIT_DB_PATH`, `SAVED_MODELS_DIR`, `ARTIFACTS_DIR` — and build with
+  `build_graph(db_path=tmp)`. All are read at call time, so `monkeypatch.setattr`
+  is enough; see the `graph` fixture in `tests/test_graph_end_to_end.py`.
+- A `plan_pipeline` stub should populate the `meta_out` dict it is handed, or the
+  AIBOM has no planner provenance to record.
 - Importing `pipeline_graph` builds a module-level graph, creating `pipeline_state.db`
   in the working directory (gitignored).
 - **pandas 3** uses a `str` dtype for text columns, not `object`. Use

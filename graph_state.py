@@ -95,6 +95,18 @@ class PipelineState(TypedDict, total=False):
     cleaned_df_bytes : Optional[bytes]
         The cleaned DataFrame from data_agent_node, pickled.
         Deserialise with bytes_to_df(). Used by training_node.
+    dataset_sha256 : Optional[str]
+        SHA-256 of the raw uploaded file's bytes, computed by the server before
+        parsing. Hashed from the upload rather than from df_bytes because pickle
+        bytes are not stable across pandas/Python versions, so a pickle digest
+        would change without the data changing. Provenance anchor for the AIBOM.
+    planner_meta : Optional[dict]
+        Provenance of the planner LLM call: resolved model id, SHA-256 of the exact
+        prompts sent, and token usage. Kept separate from `plan` so that metadata
+        about the call can never be confused with content from the call.
+    artifacts_manifest : Optional[dict]
+        Result of compliance_artifacts.generate_artifacts(): output directory plus
+        a per-file path/digest map. Set only on the approve path.
     eda_report : Optional[dict]
         Exploratory profiling report from analyze_raw_dataset(), computed by the
         server at upload time. Stored in state (not a module-level cache) so it
@@ -151,6 +163,9 @@ class PipelineState(TypedDict, total=False):
     cleaned_df_bytes: Optional[bytes]
     split_index: Optional[dict]
     eda_report: Optional[dict]
+    dataset_sha256: Optional[str]
+    planner_meta: Optional[dict]
+    artifacts_manifest: Optional[dict]
     last_failure_reason: Optional[dict]
     retry_count: int
     unresolved_quality_issue: bool

@@ -502,6 +502,20 @@
       </div>
     </div>
 
+    <!-- Compliance Artifacts -->
+    <div class="glass-card" id="artifacts-card" style="display: none; margin-bottom: 20px;">
+      <div class="card-title">Compliance Artifacts</div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+        Generated from recorded pipeline state on approval. Each file's SHA-256 is
+        written into the hash-chained audit log, so an edit after the fact is
+        detectable. The Annex IV pack is a <strong>draft</strong> input to technical
+        documentation, not a conformity assessment.
+      </p>
+      <div id="artifacts-integrity" style="margin-bottom: 14px;"></div>
+      <div id="artifacts-list" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+      <pre id="artifact-viewer" style="display: none; margin-top: 16px; max-height: 520px; overflow: auto; background: rgba(0,0,0,0.35); border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; font-size: 0.78rem; line-height: 1.5; white-space: pre-wrap; color: var(--text-main);"></pre>
+    </div>
+
     <!-- Selected Model Winner KPI Block -->
     <div class="kpi-winner" id="kpi-block" style="display: none;">
       <div>
@@ -1035,6 +1049,7 @@
       if (data.status === 'paused') {
         document.getElementById('decision-card').style.display = 'block';
         document.getElementById('approved-banner').style.display = 'none';
+        document.getElementById('artifacts-card').style.display = 'none';
       } else {
         document.getElementById('decision-card').style.display = 'none';
         const vals = data.values || {};
@@ -1056,6 +1071,7 @@
               : 'NOT SAVED';
             pathEl.style.color = '#fca5a5';
           }
+          fetchArtifacts(currentThreadId);
         }
       }
 
@@ -1170,6 +1186,58 @@
 
       // Fetch Audit Log
       fetchAuditTrail(currentThreadId);
+    }
+
+    async function fetchArtifacts(threadId) {
+      const card = document.getElementById('artifacts-card');
+      try {
+        const res = await fetch(`/api/pipeline/artifacts/${threadId}`);
+        if (!res.ok) { card.style.display = 'none'; return; }
+        const data = await res.json();
+        card.style.display = 'block';
+
+        const ok = data.verified === true && data.chain && data.chain.verified;
+        document.getElementById('artifacts-integrity').innerHTML = ok
+          ? `<div style="background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.45); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem;">
+               <strong style="color:#34d399;">INTEGRITY VERIFIED</strong>
+               <span style="color: var(--text-muted);"> — ${data.detail}</span>
+             </div>`
+          : `<div style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.5); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem;">
+               <strong style="color:#f87171;">INTEGRITY CHECK FAILED</strong>
+               <span style="color:#fca5a5;"> — ${data.detail}</span>
+             </div>`;
+
+        document.getElementById('artifacts-list').innerHTML = (data.files || []).map(f => {
+          const bad = f.status !== 'OK';
+          return `<button onclick="viewArtifact('${threadId}', '${f.file}')"
+            style="cursor: pointer; text-align: left; background: rgba(99,102,241,0.12);
+                   border: 1px solid ${bad ? 'rgba(239,68,68,0.5)' : 'rgba(99,102,241,0.4)'};
+                   border-radius: 8px; padding: 10px 14px; color: var(--text-main);
+                   font-size: 0.82rem; font-family: inherit;">
+            <strong>${f.file}</strong>
+            <div style="font-size: 0.7rem; color: ${bad ? '#fca5a5' : 'var(--text-dark)'}; margin-top: 4px; font-family: monospace;">
+              ${f.status} &nbsp; ${f.actual_sha256 ? f.actual_sha256.slice(0, 16) + '...' : 'no digest'}
+            </div></button>`;
+        }).join('') || '<span style="font-size:0.82rem; color: var(--text-muted);">No artifacts recorded.</span>';
+      } catch (err) {
+        console.error('Artifacts error:', err);
+        card.style.display = 'none';
+      }
+    }
+
+    async function viewArtifact(threadId, filename) {
+      const viewer = document.getElementById('artifact-viewer');
+      viewer.style.display = 'block';
+      viewer.textContent = `Loading ${filename}...`;
+      try {
+        const res = await fetch(`/api/pipeline/artifact/${threadId}/${filename}`);
+        const data = await res.json();
+        viewer.textContent = res.ok
+          ? data.content
+          : `Could not load ${filename}: ${data.detail || res.status}`;
+      } catch (err) {
+        viewer.textContent = `Could not load ${filename}: ${err}`;
+      }
     }
 
     async function fetchAuditTrail(threadId) {

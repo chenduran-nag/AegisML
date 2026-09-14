@@ -218,13 +218,42 @@ Closing those requires an anchor *outside* the file — periodically publishing 
 
 ---
 
+## 📄 Compliance Artifacts
+
+Approving a model writes `artifacts/<run_id>/`:
+
+| File | What it is |
+|---|---|
+| `model_card.md` / `.json` | Model details, intended use, training-data characteristics, held-out metrics, fairness results, SHAP features, the full human decision history, and explicit limitations |
+| `aibom.json` | AI Bill of Materials: dataset SHA-256, model SHA-256, Python and library versions, planner model id and prompt hashes, token usage, audit chain head |
+| `technical_documentation.md` | Draft documentation laid out under the nine EU AI Act Annex IV headings |
+
+Every field is read from recorded pipeline state — **nothing in these documents is
+LLM-authored**, so they cannot describe a metric the run never produced. Where a
+value is absent it is marked `not recorded` rather than left plausibly blank.
+
+The SHA-256 of each file is written into the hash-chained audit log as a
+`compliance_artifacts_generated` event, which makes the paperwork itself
+tamper-evident: `verify_artifacts(run_id)` re-hashes the files and compares them
+against the digests recorded in the chain. The dashboard surfaces the result, and
+the API refuses (HTTP 409) to serve an artifact that fails verification.
+
+**Scope, stated plainly.** `technical_documentation.md` follows the Annex IV
+*headings* so a reviewer can see which obligations the system holds evidence for
+and which it does not. It is a draft input to technical documentation, not a
+conformity assessment. Sections 8 (EU declaration of conformity) and 9 (post-market
+monitoring) are reported as out of scope and not implemented respectively, because
+they are.
+
+---
+
 ## 🧪 Tests
 
 ```bash
 pytest
 ```
 
-The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. It covers the leakage boundary, the audit chain (including tampering and the documented truncation gap), fairness reporting honesty, and an end-to-end graph run through interrupt, resume and both reroute loops.
+The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. 59 tests covering the leakage boundary, the audit chain (including tampering and the documented truncation gap), fairness reporting honesty, compliance artifact generation and integrity verification, and an end-to-end graph run through interrupt, resume and both reroute loops.
 
 The `test_*.py` scripts in the repository root are the original manual integration walkthroughs — they download the UCI Adult dataset and call the live Groq API, so they are run by hand and are excluded from `pytest` collection.
 

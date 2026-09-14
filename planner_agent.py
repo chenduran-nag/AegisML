@@ -28,6 +28,7 @@ Optional override:
                        - llama-3.1-8b-instant
 """
 
+import hashlib
 import json
 import os
 import textwrap
@@ -265,10 +266,14 @@ def _call_groq(
     user_prompt: str,
     model: str,
     client: Groq,
-) -> str:
+) -> tuple[str, dict]:
     """
     Call the Groq chat completion endpoint with JSON mode enabled.
-    Returns the raw content string.
+
+    Returns (raw_content, token_usage). Token usage is captured rather than
+    discarded because it is provenance for the AI Bill of Materials and the cost
+    column of the governance evaluation — both need to know what the planner
+    actually consumed.
     """
     response = client.chat.completions.create(
         model=model,
@@ -280,7 +285,16 @@ def _call_groq(
         temperature=0.2,  # low temperature for deterministic structured output
         max_tokens=2048,
     )
-    return response.choices[0].message.content
+
+    usage: dict = {}
+    raw_usage = getattr(response, "usage", None)
+    if raw_usage is not None:
+        for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
+            value = getattr(raw_usage, field, None)
+            if value is not None:
+                usage[field] = int(value)
+
+    return response.choices[0].message.content, usage
 
 
 def _parse_and_validate(raw: str) -> dict:
@@ -330,6 +344,7 @@ def plan_pipeline(
     failure_context: Optional[dict] = None,
     business_objective: str = "",
     human_feedback: Optional[str] = None,
+    meta_out: Optional[dict] = None,
 ) -> dict:
     """
     Generate a validated, JSON-serialisable pipeline plan for a dataset.
@@ -349,6 +364,12 @@ def plan_pipeline(
     business_objective : str, optional
         Optional user-defined business objective or domain constraint (e.g.
         "Maximize recall on high income", "Ensure strict fairness across gender/race").
+    meta_out : dict, optional
+        If provided, populated in place with call provenance: the resolved
+        model id, SHA-256 of the exact prompts sent, and token usage. Passed as an
+        out-parameter rather than added to the return value so that the plan dict
+        stays exactly what the LLM produced — provenance about the call must not
+        be mistakable for content from the call.
 
     Returns
     -------
@@ -444,8 +465,21 @@ def plan_pipeline(
 
     for attempt in range(1, 3):  # attempts 1 and 2
         try:
-            raw = _call_groq(system_prompt, user_prompt, model, client)
+            raw, usage = _call_groq(system_prompt, user_prompt, model, client)
             plan = _parse_and_validate(raw)
+            if meta_out is not None:
+                meta_out.update({
+                    "model_id": model,
+                    # Hash the prompts actually sent, after every injection
+                    # (business objective, human feedback, retry note), so the
+                    # digest identifies this call and not just the template.
+                    "system_prompt_sha256": hashlib.sha256(
+                        system_prompt.encode("utf-8")).hexdigest(),
+                    "user_prompt_sha256": hashlib.sha256(
+                        user_prompt.encode("utf-8")).hexdigest(),
+                    "token_usage": usage,
+                    "attempts": attempt,
+                })
             return plan
         except Exception as exc:
             last_error = exc

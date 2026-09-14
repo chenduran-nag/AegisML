@@ -6,10 +6,12 @@
 >
 > Reviewed at commit `01c8c7d` (`docs: Add interactive GitHub Mermaid DAG flowchart`).
 >
-> **Update — branch `fix/tier0-repairs-and-audit-chain`:** all of Tier 0 and item
-> 1.1 (hash-chained audit log) are implemented, plus two Medium-severity items
-> (#5, #8) that fell out of the same refactor. See
-> [Implementation status](#implementation-status). 35 offline tests pass.
+> **Update — branch `fix/tier0-repairs-and-audit-chain`:** all of Tier 0, item 1.1
+> (hash-chained audit log) and item 1.2 (compliance artifact generation) are
+> implemented, plus two Medium-severity items (#5, #8) that fell out of the same
+> refactor. See [Implementation status](#implementation-status). 59 offline tests
+> pass. Live verification against the real Groq planner (Step 0 in `NEXT_STEPS.md`)
+> is still outstanding and needs an API key.
 
 ---
 
@@ -29,7 +31,7 @@
 | #5 Fairness measured on held-out rows | Done (fell out of 0.3) |
 | #8 EDA report moved into checkpointed state | Done (fell out of 0.5) |
 | #16 **New:** categorical encoding silently no-op on pandas 3 | Done — see below |
-| 1.2 Compliance artifact generation | Not started |
+| 1.2 Compliance artifact generation | **Done** — model card, AIBOM, Annex IV draft, digests chained |
 | 1.3 Policy-as-code | Not started |
 | 1.4 Reviewer identity | Not started |
 | Tier 2 / Tier 3 | Not started |

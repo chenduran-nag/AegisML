@@ -23,6 +23,9 @@ __pycache__/
 .~*.pptx
 saved_models/
 
+# Generated compliance artifacts (model cards, AIBOM, Annex IV drafts)
+artifacts/
+
 # IDE & System files
 .DS_Store
 .vscode/

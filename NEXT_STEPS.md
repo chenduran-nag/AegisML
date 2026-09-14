@@ -14,22 +14,24 @@ reasoning behind this ordering.
 
 ## Where things stand
 
-Done: every Tier 0 repair, the hash-chained audit log, and an offline pytest suite
-(35 tests). In detail:
+Done: every Tier 0 repair, the hash-chained audit log, compliance artifact
+generation, and an offline pytest suite (59 tests). In detail:
 
 - The train/test split is drawn before any preprocessing parameter is fitted.
 - Approved models are actually written to `saved_models/`.
 - Fairness is measured on held-out rows. Unevaluated fairness reports `None`, shown
   as NOT EVALUATED.
 - Categorical encoding works on pandas 3.
+- Approval generates a model card, an AIBOM and an Annex IV draft, with their
+  digests chained into the audit log and re-verified on the dashboard.
 - `requirements.txt` is complete, and the README matches the code.
 
-Not done, in recommended order:
+Remaining, in recommended order:
 
 | Step | Item | Why this order |
 |---|---|---|
-| 0 | Live verification with a real Groq key | Nothing since the fixes has run against the real LLM or in a browser |
-| 1 | Compliance artifact generation | The project's main differentiator |
+| 0 | Live verification with a real Groq key | **STILL OPEN** — needs your API key; see below |
+| 1 | Compliance artifact generation | **DONE** — `compliance_artifacts.py`, 24 new tests |
 | 2 | Quantitative governance evaluation | Turns the demo into a measurable result |
 | 3 | Fairness metrics + mitigation | Closes the loop the thesis promises |
 | 4 | Policy-as-code | Cheap, big framing gain |
@@ -73,7 +75,25 @@ re-verifies. Build it from the fixtures in `tests/test_graph_end_to_end.py` plus
 
 ---
 
-## Step 1 — Compliance artifact generation
+## Step 1 — Compliance artifact generation — DONE
+
+Implemented in `compliance_artifacts.py`. On approval a run now writes
+`artifacts/<run_id>/` containing `model_card.md`, `model_card.json`, `aibom.json`
+and `technical_documentation.md`; their SHA-256 digests are logged as a chained
+`compliance_artifacts_generated` audit event, `verify_artifacts()` re-checks them,
+and the dashboard shows an integrity badge with an inline viewer. Supporting
+changes: `dataset_sha256` hashed from the raw upload, `planner_meta` (model id,
+prompt hashes, token usage) captured via a `meta_out` out-parameter on
+`plan_pipeline`, and `pipeline_graph.AUDIT_DB_PATH` so the graph and the artifact
+generator agree on one audit database.
+
+Still open from this step, deliberately deferred:
+
+- The AIBOM `approver` and `policy_version` fields read `not recorded` until
+  Steps 5 and 4 land.
+- Artifacts are regenerated per run; there is no cross-run model registry.
+
+The original specification follows, for reference.
 
 **Goal.** On approval, generate a Model Card, a technical-documentation pack
 structured on the EU AI Act Annex IV headings, and an AI Bill of Materials. Tie

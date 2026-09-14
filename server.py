@@ -13,6 +13,7 @@ Provides RESTful API endpoints for:
 
 from __future__ import annotations
 
+import hashlib
 import os
 import uuid
 import io
@@ -44,6 +45,7 @@ from langgraph.types import Command
 from graph_state import df_to_bytes
 from pipeline_graph import graph
 from audit_log import get_audit_trail, verify_audit_chain
+from compliance_artifacts import verify_artifacts
 
 app = FastAPI(
     title="AI Multi-Agent Governance API",
@@ -89,12 +91,15 @@ def _build_pipeline_response(thread_id: str) -> dict:
     # is worse than showing nothing.
     saved_path = values.get("model_saved_path")
 
+    manifest = values.get("artifacts_manifest") or {}
+
     return {
         "thread_id": thread_id,
         "status": "paused" if is_paused else ("completed" if not next_nodes else "running"),
         "next_nodes": next_nodes,
         "review_payload": payload,
         "model_saved_path": saved_path,
+        "artifacts": sorted((manifest.get("files") or {}).keys()),
         "values": {
             "unresolved_human_rejection": values.get("unresolved_human_rejection", False),
             "unresolved_quality_issue": values.get("unresolved_quality_issue", False),
@@ -104,6 +109,7 @@ def _build_pipeline_response(thread_id: str) -> dict:
             "rejection_reroute_count": values.get("rejection_reroute_count", 0),
             "model_saved_path": saved_path,
             "model_save_error": values.get("model_save_error"),
+            "dataset_sha256": values.get("dataset_sha256"),
             "overall_fairness_passed": fairness_result.get("overall_fairness_passed"),
             "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
         },
@@ -129,6 +135,12 @@ async def start_pipeline(
         raise HTTPException(status_code=400, detail="Only CSV files are supported")
 
     contents = await file.read()
+
+    # Hash the uploaded bytes, not the parsed frame. This digest is the dataset's
+    # provenance anchor in the AI Bill of Materials, so it has to identify the file
+    # the user actually supplied.
+    dataset_sha256 = hashlib.sha256(contents).hexdigest()
+
     try:
         df_raw = pd.read_csv(io.BytesIO(contents))
     except Exception as exc:
@@ -161,6 +173,7 @@ async def start_pipeline(
 
     initial_state = {
         "df_bytes": df_to_bytes(df_raw),
+        "dataset_sha256": dataset_sha256,
         "eda_report": eda_report,
         "target_column": target_column,
         "task_type": task_type,
@@ -232,6 +245,47 @@ async def get_pipeline_status(thread_id: str):
     Get current snapshot status for a given thread_id.
     """
     return _build_pipeline_response(thread_id)
+
+
+@app.get("/api/pipeline/artifacts/{thread_id}")
+async def get_artifacts(thread_id: str):
+    """
+    List the compliance artifacts generated for a run and re-verify their digests
+    against the hash-chained audit log.
+    """
+    result = verify_artifacts(thread_id)
+    if result["verified"] is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No compliance artifacts were generated for this run "
+                   "(they are produced only on the approve path).",
+        )
+    return {"thread_id": thread_id, **result}
+
+
+@app.get("/api/pipeline/artifact/{thread_id}/{filename}")
+async def get_artifact_file(thread_id: str, filename: str):
+    """
+    Return the text of one generated artifact.
+
+    Only names appearing in the audit-logged manifest for this run are served, so
+    the path cannot be steered outside the run's own artifact directory.
+    """
+    result = verify_artifacts(thread_id)
+    match = next((f for f in result["files"] if f["file"] == filename), None)
+    if match is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"'{filename}' is not a recorded artifact for this run.",
+        )
+    if match["status"] != "OK":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Artifact '{filename}' failed integrity verification "
+                   f"({match['status']}); refusing to serve it.",
+        )
+    with open(match["path"], encoding="utf-8") as fh:
+        return {"thread_id": thread_id, "filename": filename, "content": fh.read()}
 
 
 @app.get("/api/pipeline/audit/{thread_id}")

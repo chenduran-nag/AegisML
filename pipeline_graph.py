@@ -63,13 +63,24 @@ from planner_agent import plan_pipeline
 from data_agent import run_data_agent
 from training_agent import run_training_agent
 from fairness_agent import run_fairness_agent
-from audit_log import log_audit_event
+from audit_log import DEFAULT_AUDIT_DB, log_audit_event
+from compliance_artifacts import ARTIFACT_EVENT_TYPE, generate_artifacts
 
 MAX_RETRIES = 2          # maximum planner→data_agent auto-retries
 MAX_HUMAN_REROUTES = 2   # maximum human rejection reroutes before capping
 
 # Directory approved models are serialised into by audit_log_node.
 SAVED_MODELS_DIR = "saved_models"
+
+# Root directory for generated compliance artifacts (one subdirectory per run).
+ARTIFACTS_DIR = "artifacts"
+
+# Audit database this graph writes to. Passed explicitly to every
+# log_audit_event() call and to generate_artifacts(), rather than relying on the
+# default bound into log_audit_event's signature — the artifact generator has to
+# READ the same log back to hash-chain its digests, so "which audit db" must be a
+# single knob both paths agree on (and one a test can repoint).
+AUDIT_DB_PATH = DEFAULT_AUDIT_DB
 
 
 def _get_run_id(config: RunnableConfig | None) -> str:
@@ -104,6 +115,7 @@ def planner_node(state: PipelineState, config: RunnableConfig) -> dict:
     else:
         print("[planner_node] First run — calling plan_pipeline()...")
 
+    planner_meta: dict = {}
     plan = plan_pipeline(
         df=df,
         target_column=state["target_column"],
@@ -111,18 +123,23 @@ def planner_node(state: PipelineState, config: RunnableConfig) -> dict:
         failure_context=failure_context,
         business_objective=state.get("business_objective", "") or "",
         human_feedback=state.get("human_feedback", "") or "",
+        meta_out=planner_meta,
     )
 
     models_str = ", ".join(plan.get("recommended_models", []))
     log_audit_event(
         run_id=run_id,
+        db_path=AUDIT_DB_PATH,
         event_type="planner_run",
         event_source="automated",
         summary=f"Planner Agent generated plan ({len(plan.get('recommended_models', []))} recommended models: {models_str})",
         details=plan,
     )
 
-    return {"plan": plan}
+    # planner_meta records which model produced the plan and a hash of the exact
+    # prompt sent. The AI Bill of Materials needs it, and on a reroute it evidences
+    # that the revised plan came from a genuinely different prompt.
+    return {"plan": plan, "planner_meta": planner_meta}
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +181,7 @@ def data_agent_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     log_audit_event(
         run_id=run_id,
+        db_path=AUDIT_DB_PATH,
         event_type="data_agent_run",
         event_source="automated",
         summary=f"Data Agent cleaned dataset (quality_passed={passed}, missing_pct={report.get('missing_pct_after_cleaning')}%, rows_dropped={report.get('rows_dropped')})",
@@ -247,6 +265,7 @@ def training_node(state: PipelineState, config: RunnableConfig) -> dict:
         err_res = {"error": str(exc), "leaderboard": []}
         log_audit_event(
             run_id=run_id,
+            db_path=AUDIT_DB_PATH,
             event_type="training_run",
             event_source="automated",
             summary=f"Training Agent failed: {exc}",
@@ -269,6 +288,7 @@ def training_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     log_audit_event(
         run_id=run_id,
+        db_path=AUDIT_DB_PATH,
         event_type="training_run",
         event_source="automated",
         summary=f"Training Agent evaluated {len(raw.get('leaderboard', []))} models; selected '{selected_name}' (AUC={metrics.get('auc_roc')})",
@@ -303,6 +323,7 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
         }
         log_audit_event(
             run_id=run_id,
+            db_path=AUDIT_DB_PATH,
             event_type="fairness_run",
             event_source="automated",
             summary="Fairness Agent skipped (no fitted model in state)",
@@ -341,6 +362,7 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     log_audit_event(
         run_id=run_id,
+        db_path=AUDIT_DB_PATH,
         event_type="fairness_run",
         event_source="automated",
         summary=f"Fairness Agent evaluated {n_evaluated} sensitive attribute(s) (overall_passed={passed}, violations={n_violations})",
@@ -404,6 +426,7 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     log_audit_event(
         run_id=run_id,
+        db_path=AUDIT_DB_PATH,
         event_type="human_decision",
         event_source="human_reviewer",
         summary=f"Human reviewer submitted decision: '{decision}'" + (f" (Feedback: '{human_feedback}')" if human_feedback else ""),
@@ -470,6 +493,7 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     log_audit_event(
         run_id=run_id,
+        db_path=AUDIT_DB_PATH,
         event_type="final_outcome",
         event_source="automated",
         summary=(
@@ -489,7 +513,62 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
         },
     )
     print(f"[audit_log_node] Final outcome logged to audit_log.db for run_id='{run_id}'")
-    return {"model_saved_path": saved_path, "model_save_error": save_error}
+
+    # --- Compliance artifacts ---------------------------------------------
+    # Generated AFTER the final_outcome event, so the audit chain head recorded
+    # inside the AIBOM covers the whole run. The resulting digests are then logged
+    # as their own chained event, and that is what makes the artifacts themselves
+    # tamper-evident: editing a model card afterwards leaves its hash disagreeing
+    # with the one recorded here. verify_artifacts() performs the comparison.
+    artifacts = None
+    try:
+        artifacts = generate_artifacts(
+            state={**state, "model_saved_path": saved_path},
+            run_id=run_id,
+            out_root=ARTIFACTS_DIR,
+            audit_db_path=AUDIT_DB_PATH,
+        )
+        log_audit_event(
+            run_id=run_id,
+            db_path=AUDIT_DB_PATH,
+            event_type=ARTIFACT_EVENT_TYPE,
+            event_source="automated",
+            summary=(
+                f"Generated {len(artifacts['files'])} compliance artifact(s) in "
+                f"'{artifacts['directory']}': {', '.join(sorted(artifacts['files']))}"
+                + (f" (errors: {'; '.join(artifacts['errors'])})"
+                   if artifacts["errors"] else "")
+            ),
+            details={
+                "directory": artifacts["directory"],
+                "files": artifacts["files"],
+                "errors": artifacts["errors"],
+            },
+        )
+        print(
+            f"[audit_log_node] Compliance artifacts written to "
+            f"'{artifacts['directory']}' ({len(artifacts['files'])} files)"
+        )
+    except Exception as exc:
+        # Never fail an approved run because paperwork generation broke: the model
+        # and the audit trail are the load-bearing outputs. Record the failure in
+        # the log instead, so a missing artifact set is itself auditable.
+        print(f"[audit_log_node] Compliance artifact generation FAILED: "
+              f"{type(exc).__name__}: {exc}")
+        log_audit_event(
+            run_id=run_id,
+            db_path=AUDIT_DB_PATH,
+            event_type=ARTIFACT_EVENT_TYPE,
+            event_source="automated",
+            summary=f"Compliance artifact generation FAILED: {type(exc).__name__}: {exc}",
+            details={"directory": None, "files": {}, "errors": [str(exc)]},
+        )
+
+    return {
+        "model_saved_path": saved_path,
+        "model_save_error": save_error,
+        "artifacts_manifest": artifacts,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -560,6 +639,7 @@ def _mark_cap_failure(state: PipelineState, config: RunnableConfig) -> dict:
     print("[mark_cap_failure] Setting unresolved_quality_issue=True")
     log_audit_event(
         run_id=run_id,
+        db_path=AUDIT_DB_PATH,
         event_type="final_outcome",
         event_source="automated",
         summary="Pipeline execution terminated: Data Agent retry cap reached.",
@@ -608,6 +688,7 @@ def _mark_human_cap_failure(state: PipelineState, config: RunnableConfig) -> dic
     print("[mark_human_cap_failure] Setting unresolved_human_rejection=True")
     log_audit_event(
         run_id=run_id,
+        db_path=AUDIT_DB_PATH,
         event_type="final_outcome",
         event_source="automated",
         summary="Pipeline execution terminated: Human rejection cap reached.",
