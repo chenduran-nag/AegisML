@@ -30,3 +30,7 @@ artifacts/
 .DS_Store
 .vscode/
 .idea/
+
+# Local test fixtures (downloaded, not part of the repo)
+adult_income.csv
+static/adult_*.csv

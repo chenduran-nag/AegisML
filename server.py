@@ -110,6 +110,7 @@ def _build_pipeline_response(thread_id: str) -> dict:
             "model_saved_path": saved_path,
             "model_save_error": values.get("model_save_error"),
             "dataset_sha256": values.get("dataset_sha256"),
+            "selected_model_name": (values.get("training_result") or {}).get("selected_model_name"),
             "overall_fairness_passed": fairness_result.get("overall_fairness_passed"),
             "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
         },

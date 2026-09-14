@@ -10,8 +10,9 @@
 > (hash-chained audit log) and item 1.2 (compliance artifact generation) are
 > implemented, plus two Medium-severity items (#5, #8) that fell out of the same
 > refactor. See [Implementation status](#implementation-status). 59 offline tests
-> pass. Live verification against the real Groq planner (Step 0 in `NEXT_STEPS.md`)
-> is still outstanding and needs an API key.
+> pass, and the system has now been verified end to end against the live Groq
+> planner through the real dashboard, which surfaced three further UI defects
+> (#17, #18 and a lost model name) — all fixed.
 
 ---
 
@@ -32,6 +33,9 @@
 | #8 EDA report moved into checkpointed state | Done (fell out of 0.5) |
 | #16 **New:** categorical encoding silently no-op on pandas 3 | Done — see below |
 | 1.2 Compliance artifact generation | **Done** — model card, AIBOM, Annex IV draft, digests chained |
+| Step 0 live verification against real Groq + browser | **Done** — 3 UI bugs found and fixed |
+| #17 **New:** terminated runs rendered as "approved" in the dashboard | Fixed |
+| #18 **New:** temporal dead zone aborted the approved-path render | Fixed |
 | 1.3 Policy-as-code | Not started |
 | 1.4 Reviewer identity | Not started |
 | Tier 2 / Tier 3 | Not started |

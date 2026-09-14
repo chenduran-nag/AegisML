@@ -315,6 +315,35 @@ def test_data_quality_rejection_reroutes_to_planner(graph, toy_df):
     assert values["human_feedback"] == "Drop the notes column entirely."
 
 
+def test_rejection_cap_terminates_without_approval_or_artifacts(graph, toy_df):
+    """
+    Three rejections hit MAX_HUMAN_REROUTES and end the run.
+
+    The run then reports status "completed" with human_decision set to a
+    *rejection* — which is exactly the state the dashboard used to render as
+    "Model Formally Approved & Saved to Disk". Nothing about a capped run may
+    look like an approval: no model on disk, no compliance artifacts.
+    """
+    config = _run_to_gate(graph, toy_df, "t-cap")
+
+    for _ in range(3):
+        graph.g.invoke(
+            Command(resume={"decision": "reject_model_or_fairness",
+                            "human_feedback": "not acceptable"}),
+            config=config,
+        )
+
+    values = graph.g.get_state(config).values
+    assert graph.g.get_state(config).next == (), "run should have ended"
+    assert values["unresolved_human_rejection"] is True
+    assert values["rejection_reroute_count"] == 2
+    assert values["human_decision"] != "approve"
+
+    assert values.get("model_saved_path") is None
+    assert values.get("artifacts_manifest") is None
+    assert not os.path.isdir(os.path.join(graph.artifacts_dir, "t-cap"))
+
+
 # ---------------------------------------------------------------------------
 # Audit trail of a full run
 # ---------------------------------------------------------------------------

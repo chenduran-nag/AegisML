@@ -482,6 +482,25 @@
   <!-- PAGE 3: GOVERNANCE RESULTS & REVIEW PAGE -->
   <div class="page-view-full" id="page-results">
     
+    <!-- Terminated Run Banner (retry cap / rejection cap reached) -->
+    <div class="glass-card" id="terminated-banner" style="display: none; border-color: rgba(239, 68, 68, 0.5); background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(153, 27, 27, 0.04) 100%); margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 1.15rem; font-weight: 800; color: #f87171; margin-bottom: 4px;">
+            Pipeline Terminated Without Approval
+          </div>
+          <div style="font-size: 0.88rem; color: var(--text-main);" id="terminated-reason">—</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px;">
+            No model artifact was saved and no compliance artifacts were generated.
+            This run produced <strong>no approved model</strong>.
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <span class="badge badge-fail" style="font-size: 0.85rem; padding: 8px 16px;">STATUS: NOT APPROVED</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Approved Model Saved Success Banner -->
     <div class="glass-card" id="approved-banner" style="display: none; border-color: rgba(16, 185, 129, 0.5); background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.04) 100%); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1046,17 +1065,45 @@
 
       updateDAGTopologyNodes(data);
 
+      // Declared before first use. This is a `const`, so reading it earlier in the
+      // function hits the temporal dead zone and throws a ReferenceError, which
+      // aborted the whole render on the approved path (banner shown, artifact path
+      // and artifacts panel silently never populated).
+      const payload = data.review_payload || {};
+
       if (data.status === 'paused') {
         document.getElementById('decision-card').style.display = 'block';
         document.getElementById('approved-banner').style.display = 'none';
+        document.getElementById('terminated-banner').style.display = 'none';
         document.getElementById('artifacts-card').style.display = 'none';
       } else {
         document.getElementById('decision-card').style.display = 'none';
         const vals = data.values || {};
-        if (vals.human_decision === 'approve' || data.status === 'completed') {
+
+        // A completed run is NOT necessarily an approved one. A run that hit the
+        // data-quality retry cap or the human-rejection cap also reports
+        // status === 'completed', and previously fell into the branch below and
+        // rendered "Model Formally Approved & Saved to Disk" — presenting a run
+        // that was rejected and terminated as a successful deployment.
+        const terminated = vals.unresolved_human_rejection || vals.unresolved_quality_issue;
+        const approved = vals.human_decision === 'approve' && !terminated;
+
+        document.getElementById('terminated-banner').style.display = terminated ? 'block' : 'none';
+        if (terminated) {
+          document.getElementById('approved-banner').style.display = 'none';
+          document.getElementById('artifacts-card').style.display = 'none';
+          document.getElementById('terminated-reason').innerText = vals.unresolved_quality_issue
+            ? 'The Data Agent quality gate never passed and the automatic retry cap was reached. Training data the pipeline itself flagged as deficient was never approved for deployment.'
+            : 'The human reviewer rejected the model and the rejection reroute cap was reached. Execution stopped without an approved model.';
+        }
+
+        if (approved) {
           const approvedBanner = document.getElementById('approved-banner');
           approvedBanner.style.display = 'block';
-          document.getElementById('approved-model-title').innerText = payload.selected_model_name || 'Selected Winner Model';
+          // review_payload is null once the run completes, so fall back to the
+          // value carried in `values` rather than a generic placeholder.
+          document.getElementById('approved-model-title').innerText =
+            payload.selected_model_name || vals.selected_model_name || 'Selected Winner Model';
           // Show ONLY the path the backend actually wrote. Falling back to a
           // constructed string would display an artifact location that does not
           // exist on disk.
@@ -1079,7 +1126,6 @@
         renderEDAReport(data.eda_report);
       }
 
-      const payload = data.review_payload || {};
       const plan = payload.plan_summary || {};
       const quality = payload.quality_report || {};
 

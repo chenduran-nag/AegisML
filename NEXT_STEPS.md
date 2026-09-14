@@ -30,7 +30,7 @@ Remaining, in recommended order:
 
 | Step | Item | Why this order |
 |---|---|---|
-| 0 | Live verification with a real Groq key | **STILL OPEN** — needs your API key; see below |
+| 0 | Live verification with a real Groq key | **DONE** — 3 bugs found and fixed |
 | 1 | Compliance artifact generation | **DONE** — `compliance_artifacts.py`, 24 new tests |
 | 2 | Quantitative governance evaluation | Turns the demo into a measurable result |
 | 3 | Fairness metrics + mitigation | Closes the loop the thesis promises |
@@ -43,7 +43,50 @@ ends with `pytest` green, plus new tests for the new behaviour.**
 
 ---
 
-## Step 0 — Live verification (do this first, about 30 min)
+## Step 0 — Live verification — DONE
+
+Run against the live Groq planner (`openai/gpt-oss-20b`) on a 10,000-row UCI Adult
+sample, driven through the real dashboard. XGBoost won with AUC 0.908, and the
+Fairness Agent found genuine violations on `sex` (DI 0.260), `race` (DI 0.235) and
+`marital-status` (DI 0.000) — all well documented for this dataset.
+
+Verified end to end: target auto-detection, the governance gate, approval writing a
+real model plus all four compliance artifacts, the hash chain (7 entries) and
+artifact integrity badges, a regression run reporting NOT EVALUATED in amber, the
+rejection cap, and the human-feedback loop — a reviewer directive to drop `fnlwgt`
+reached the planner, came back as "Drop the 'fnlwgt' column...", and the Data Agent
+acted on it (`columns_dropped: ['fnlwgt']`).
+
+**Three bugs found and fixed, all in `static/index.html`:**
+
+1. **Terminated runs rendered as approved.** A run that hit the rejection cap
+   reports `status: "completed"`, fell into the approved branch, and displayed
+   "Model Formally Approved & Saved to Disk!" — presenting a rejected, terminated
+   run as a successful deployment. The worst possible failure for a governance
+   dashboard. There is now a separate red "Pipeline Terminated Without Approval"
+   banner, the approved banner requires an actual approval, and
+   `test_rejection_cap_terminates_without_approval_or_artifacts` pins it down.
+2. **Temporal dead zone in `renderPipelineResults`.** `payload` was read before its
+   `const` declaration, throwing a `ReferenceError` that silently aborted the
+   render on the approve path — the banner appeared but the artifact path and the
+   artifacts panel never populated. Declaration hoisted.
+3. **Model name lost after completion.** `review_payload` is `null` once a run
+   finishes, so the banner showed a placeholder. `selected_model_name` is now
+   exposed in `values`.
+
+**Known issues left open (see Steps 3 and 6):**
+
+- Frequency-encoded categoricals are skipped by the Fairness Agent with the
+  *inaccurate* reason "is a continuous numeric feature". `occupation` (14
+  categories, above the one-hot limit of 10) becomes a float and is silently
+  dropped from the fairness audit. The verdict stays honest — it reports skipped,
+  not passed — but the reason is wrong and a real sensitive attribute goes
+  unaudited. Step 3.
+- A completed run's evaluation tabs render empty, because `review_payload` is
+  `null` once the graph ends. The banners are correct; the detail panes are not.
+- The regression KPI header reads "ACCURACY N/A" instead of showing RMSE.
+
+The original checklist follows, for re-running after future changes.
 
 The planner was stubbed in every test and the dashboard was never clicked through
 after the fixes. Confirm the real thing works before building on it.
@@ -308,6 +351,13 @@ Both identities appear in the audit trail and the model card.
       lists in `planner_agent._build_prompts`, or implement it.
 - [ ] Target is label-encoded twice (Data Agent, then Training Agent). Harmless;
       tidy up if touching that code anyway.
+- [ ] Fairness Agent: distinguish "frequency-encoded categorical" from "continuous
+      numeric" when skipping an attribute; the current message is inaccurate. Ideally
+      pass the Data Agent's encoding map through so such columns can be audited.
+- [ ] UI: a completed run's evaluation tabs are empty (`review_payload` is `null`
+      after the graph ends). Either persist the last payload in state or rebuild the
+      tabs from `values`.
+- [ ] UI: the KPI header shows "ACCURACY N/A" on regression runs; show RMSE instead.
 - [ ] `server.py`: call `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`
       at startup so `→` in log prints can't crash the server when stdout is
       redirected to a file on Windows.
