@@ -9,7 +9,7 @@
 > **Update — branch `fix/tier0-repairs-and-audit-chain`:** all of Tier 0, item 1.1
 > (hash-chained audit log) and item 1.2 (compliance artifact generation) are
 > implemented, plus two Medium-severity items (#5, #8) that fell out of the same
-> refactor. See [Implementation status](#implementation-status). 119 offline tests
+> refactor. See [Implementation status](#implementation-status). 165 offline tests
 > pass, and the system has now been verified end to end against the live Groq
 > planner through the real dashboard, which surfaced three further UI defects
 > (#17, #18 and a lost model name) — all fixed.
@@ -38,6 +38,9 @@
 | #18 **New:** temporal dead zone aborted the approved-path render | Fixed |
 | EDA-driven pipeline: routed findings, proxy + leakage detection, linkage | **Done** — see `NEXT_STEPS.md` |
 | #19 **New:** plan-step matcher dropped both columns of a redundant pair | Fixed — clause / hedge / scope rules |
+| #20 **New:** XGBoost silently failed on every fit where category values contain `[`, `]` or `<` (German Credit) | Fixed — one-hot names sanitised |
+| #21 **New:** a run with no trained model reached the gate, was approved, and received a model card | Fixed — `route_after_training` ends the run |
+| 3.1 Quantitative governance evaluation: 4 datasets × 3 arms × 5 seeds, replay-verified exact | **Done** — no arm approved a fairness-compliant model; see `experiments/results/summary.md` |
 | 1.3 Policy-as-code | Not started |
 | 1.4 Reviewer identity | Not started |
 | Tier 2 / Tier 3 | Not started |

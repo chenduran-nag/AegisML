@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import textwrap
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -272,6 +273,120 @@ def _build_prompts(summary: dict) -> tuple[str, str]:
     return system_prompt, user_prompt
 
 
+# ---------------------------------------------------------------------------
+# Planner response cache (record / replay)
+# ---------------------------------------------------------------------------
+#
+# Off by default: the dashboard always calls the LLM. The governance evaluation
+# (experiments/run_governance_eval.py) turns it on so its results are reproducible.
+#
+#   record   On a miss, call the LLM and store the response; on a hit, reuse it.
+#   replay   Never call the LLM. A miss raises PlannerCacheMiss instead of falling
+#            back to a live call, so a "replayed" result can never silently contain
+#            a fresh and different plan. Replay needs no GROQ_API_KEY.
+#
+# The key is a SHA-256 over the model id and the exact system and user prompts, so
+# any change to the data summary, EDA findings, human feedback or a retry note is a
+# different key. Entries store the prompts themselves. Those contain only the
+# aggregate summary the LLM was sent — never raw rows (invariant 2) — so the cache
+# is safe to commit alongside the results it reproduces.
+
+PLANNER_CACHE_MODES = ("off", "record", "replay")
+_PLANNER_CACHE: dict = {"mode": "off", "dir": None}
+
+
+class PlannerCacheMiss(RuntimeError):
+    """Raised in replay mode when no recorded response exists for a prompt."""
+
+
+def configure_planner_cache(mode: str = "off", cache_dir: Optional[str] = None) -> None:
+    """Enable or disable the planner response cache for this process."""
+    if mode not in PLANNER_CACHE_MODES:
+        raise ValueError(
+            f"planner cache mode must be one of {PLANNER_CACHE_MODES}, got {mode!r}"
+        )
+    if mode != "off":
+        if not cache_dir:
+            raise ValueError("cache_dir is required when the planner cache is enabled")
+        os.makedirs(cache_dir, exist_ok=True)
+    _PLANNER_CACHE["mode"] = mode
+    _PLANNER_CACHE["dir"] = cache_dir if mode != "off" else None
+
+
+def planner_cache_key(model: str, system_prompt: str, user_prompt: str) -> str:
+    payload = json.dumps(
+        {"model": model, "system": system_prompt, "user": user_prompt},
+        sort_keys=True, ensure_ascii=False,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _planner_call(
+    system_prompt: str,
+    user_prompt: str,
+    model: str,
+    client: Optional[Groq],
+) -> tuple[str, dict, str]:
+    """
+    Route one planner request through the cache.
+
+    Returns (content, token_usage, cache_status) with cache_status "off", "hit" or
+    "miss". On a hit, token_usage is what the ORIGINAL recorded call consumed — no
+    new tokens are spent.
+    """
+    mode = _PLANNER_CACHE["mode"]
+    if mode == "off":
+        content, usage = _call_groq(system_prompt, user_prompt, model, client)
+        return content, usage, "off"
+
+    key = planner_cache_key(model, system_prompt, user_prompt)
+    path = os.path.join(_PLANNER_CACHE["dir"], f"{key}.json")
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as fh:
+            entry = json.load(fh)
+        return entry["content"], entry.get("usage") or {}, "hit"
+
+    if mode == "replay":
+        raise PlannerCacheMiss(
+            f"No recorded planner response for key {key[:12]}... (model {model}). "
+            f"Replay mode never calls the LLM; run the evaluation with --mode record "
+            f"to capture it."
+        )
+
+    content, usage = _call_groq(system_prompt, user_prompt, model, client)
+    return content, usage, "miss"
+
+
+def _planner_cache_store(
+    model: str, system_prompt: str, user_prompt: str, content: str, usage: dict,
+) -> None:
+    """
+    Persist a response in record mode.
+
+    Called only AFTER the response parsed and validated, so a malformed generation
+    is never stored and replayed as though it were the plan.
+    """
+    if _PLANNER_CACHE["mode"] != "record":
+        return
+    key = planner_cache_key(model, system_prompt, user_prompt)
+    path = os.path.join(_PLANNER_CACHE["dir"], f"{key}.json")
+    if os.path.isfile(path):
+        return
+    entry = {
+        "key": key,
+        "model": model,
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "usage": usage,
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "content": content,
+    }
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(entry, fh, indent=2, ensure_ascii=False)
+    os.replace(tmp_path, path)
+
+
 def _call_groq(
     system_prompt: str,
     user_prompt: str,
@@ -407,14 +522,16 @@ def plan_pipeline(
         )
 
     api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
+    replaying = _PLANNER_CACHE["mode"] == "replay"
+    if not api_key and not replaying:
         raise ValueError(
             "GROQ_API_KEY environment variable is not set. "
             "Please add GROQ_API_KEY to your .env file or environment."
         )
 
     model = os.environ.get("GROQ_MODEL", DEFAULT_GROQ_MODEL)
-    client = Groq(api_key=api_key)
+    # Replay never sends a request, so it needs neither a client nor a key.
+    client = None if replaying else Groq(api_key=api_key)
 
     # --- Build compact summary (no raw data) ---
     summary = _build_dataset_summary(
@@ -498,8 +615,10 @@ def plan_pipeline(
 
     for attempt in range(1, 3):  # attempts 1 and 2
         try:
-            raw, usage = _call_groq(system_prompt, user_prompt, model, client)
+            raw, usage, cache_status = _planner_call(
+                system_prompt, user_prompt, model, client)
             plan = _parse_and_validate(raw)
+            _planner_cache_store(model, system_prompt, user_prompt, raw, usage)
             if meta_out is not None:
                 meta_out.update({
                     "model_id": model,
@@ -512,8 +631,13 @@ def plan_pipeline(
                         user_prompt.encode("utf-8")).hexdigest(),
                     "token_usage": usage,
                     "attempts": attempt,
+                    "cache": cache_status,
                 })
             return plan
+        except PlannerCacheMiss:
+            # Not retryable: a second attempt would miss identically, and wrapping
+            # it in the generic "failed to obtain a plan" error hides the cause.
+            raise
         except Exception as exc:
             last_error = exc
             if attempt == 1:

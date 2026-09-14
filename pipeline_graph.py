@@ -18,7 +18,7 @@ Graph structure:
       ▼
   [route_after_data_agent]  ← conditional edge
       │
-      ├─ quality OK  ► training_node
+      ├─ quality OK  ► training_node ── no model trained ──► mark_training_failure ──► END
       │                       │
       │                       ▼
       │                 fairness_node
@@ -234,6 +234,7 @@ def data_agent_node(state: PipelineState, config: RunnableConfig) -> dict:
         target_column=state["target_column"],
         task_type=state["task_type"],
         eda_findings=state.get("eda_findings") or [],
+        split_seed=state.get("split_seed"),
     )
 
     cleaned_df = result.pop("cleaned_df")
@@ -376,6 +377,52 @@ def training_node(state: PipelineState, config: RunnableConfig) -> dict:
         "training_result": raw,
         "selected_model_bytes": selected_model_bytes,
     }
+
+
+# ---------------------------------------------------------------------------
+# Conditional edge: route after training_node
+# ---------------------------------------------------------------------------
+
+
+def route_after_training(state: PipelineState) -> str:
+    """
+    Continue to fairness and the gate only if training produced a model.
+
+    Without this edge, a run whose remaining candidates all failed to train still
+    reached the approval gate. A reviewer could "approve" it, and compliance
+    artifacts were then generated for a model that did not exist. Found by the
+    governance evaluation on German Credit: the reviewer rejected every model that
+    trained, leaving only one that could not.
+    """
+    if state.get("selected_model_bytes") is None:
+        print("[router] Training produced no model → ending the run without a gate")
+        return "training_failure"
+    return "fairness_node"
+
+
+def _mark_training_failure(state: PipelineState, config: RunnableConfig) -> dict:
+    """Terminal node: record that nothing was presented for approval, and why."""
+    run_id = _get_run_id(config)
+    training_result = state.get("training_result") or {}
+    error = training_result.get("error")
+    log_audit_event(
+        run_id=run_id,
+        db_path=AUDIT_DB_PATH,
+        event_type="final_outcome",
+        event_source="automated",
+        summary=(
+            "Pipeline execution terminated: no model could be trained"
+            + (f" ({error})" if error else "")
+            + ". Nothing was presented for approval."
+        ),
+        details={
+            "status": "TRAINING_FAILED",
+            "error": error,
+            "rejected_models": state.get("rejected_models") or [],
+            "rejection_reroute_count": state.get("rejection_reroute_count", 0),
+        },
+    )
+    return {"unresolved_training_failure": True}
 
 
 # ---------------------------------------------------------------------------
@@ -822,6 +869,7 @@ def build_graph(db_path: str = "pipeline_state.db"):
     builder.add_node("increment_human_reroute_planner", _increment_human_reroute_planner)
     builder.add_node("increment_human_reroute_training", _increment_human_reroute_training)
     builder.add_node("mark_human_cap_failure", _mark_human_cap_failure)
+    builder.add_node("mark_training_failure", _mark_training_failure)
 
     # Fixed edges
     builder.add_edge(START, "data_analysis_node")
@@ -842,7 +890,13 @@ def build_graph(db_path: str = "pipeline_state.db"):
     builder.add_edge("mark_cap_failure", END)
 
     # Training → Fairness → Human Approval
-    builder.add_edge("training_node", "fairness_node")
+    # A run with no trained model ends here: there is nothing to audit or approve.
+    builder.add_conditional_edges(
+        "training_node",
+        route_after_training,
+        {"fairness_node": "fairness_node", "training_failure": "mark_training_failure"},
+    )
+    builder.add_edge("mark_training_failure", END)
     builder.add_edge("fairness_node", "human_approval_node")
 
     # Conditional routing after human approval

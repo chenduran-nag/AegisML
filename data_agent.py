@@ -197,6 +197,7 @@ def _split_indices(
     target_column: str,
     task_type: str,
     actions: list[str],
+    random_state: int = SPLIT_RANDOM_STATE,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Compute train/test row indices BEFORE any statistic is fitted.
@@ -232,12 +233,13 @@ def _split_indices(
     train_idx, test_idx = train_test_split(
         df.index.to_numpy(),
         test_size=TEST_SIZE,
-        random_state=SPLIT_RANDOM_STATE,
+        random_state=random_state,
         stratify=stratify,
     )
 
     actions.append(
-        f"Train/test split computed before fitting: {len(train_idx):,} train / "
+        f"Train/test split (seed {random_state}) computed before fitting: "
+        f"{len(train_idx):,} train / "
         f"{len(test_idx):,} test rows. All imputation, frequency-encoding and "
         f"scaling parameters below are fitted on the train rows ONLY."
     )
@@ -449,6 +451,54 @@ def _label_encode_target(
     return df
 
 
+# XGBoost refuses feature names containing these. One-hot encoding copies category
+# VALUES into column names, and real data has values such as "<0" and "0<=X<200"
+# (German Credit). Unsanitised, XGBoost failed on every fit for such a dataset and
+# dropped silently out of the leaderboard. "<=" is listed before "<" so it maps first.
+_FEATURE_NAME_REPLACEMENTS = {"<=": "le", "<": "lt", "[": "(", "]": ")"}
+_UNSAFE_FEATURE_NAME_CHARS = "[]<"
+
+
+def _sanitize_feature_names(
+    df: pd.DataFrame,
+    columns: list[str],
+    actions: list[str],
+) -> pd.DataFrame:
+    """
+    Rename one-hot columns whose names XGBoost cannot accept.
+
+    Only the generated dummy columns are renamed, never an original column, so a
+    sensitive attribute keeps the prefix the Fairness Agent uses to reconstruct its
+    groups. Renaming stays unique: a clash gets a numeric suffix rather than
+    silently merging two different categories into one column.
+    """
+    taken = set(df.columns)
+    renames: dict[str, str] = {}
+    for col in columns:
+        if not any(ch in col for ch in _UNSAFE_FEATURE_NAME_CHARS):
+            continue
+        new = col
+        for bad, good in _FEATURE_NAME_REPLACEMENTS.items():
+            new = new.replace(bad, good)
+        base, suffix = new, 2
+        while new in taken:
+            new = f"{base}_{suffix}"
+            suffix += 1
+        taken.discard(col)
+        taken.add(new)
+        renames[col] = new
+
+    if renames:
+        df = df.rename(columns=renames)
+        shown = ", ".join(f"'{a}' → '{b}'" for a, b in list(renames.items())[:4])
+        more = f" and {len(renames) - 4} more" if len(renames) > 4 else ""
+        actions.append(
+            f"Renamed {len(renames)} one-hot column(s) to remove characters XGBoost "
+            f"cannot accept in feature names ('[', ']', '<'): {shown}{more}"
+        )
+    return df
+
+
 def _encode_categoricals(
     df: pd.DataFrame,
     target_column: str,
@@ -480,6 +530,7 @@ def _encode_categoricals(
     ohe_nunique = {col: df[col].nunique() for col in ohe_cols}
 
     if ohe_cols:
+        columns_before = set(df.columns)
         df = pd.get_dummies(df, columns=ohe_cols, drop_first=False, dtype=bool)
         for col in ohe_cols:
             n = ohe_nunique[col]
@@ -487,6 +538,9 @@ def _encode_categoricals(
                 f"One-hot encoded '{col}' "
                 f"({n} unique values → {n} new boolean columns)"
             )
+        df = _sanitize_feature_names(
+            df, [c for c in df.columns if c not in columns_before], actions,
+        )
 
     for col in freq_cols:
         freq_map = df.loc[fit_index, col].value_counts(normalize=True).to_dict()
@@ -620,6 +674,7 @@ def run_data_agent(
     target_column: str,
     task_type: str,
     eda_findings: list[dict] | None = None,
+    split_seed: int | None = None,
 ) -> dict:
     """
     Deterministic data cleaning pipeline. Zero LLM calls.
@@ -671,7 +726,13 @@ def run_data_agent(
 
     # Step 3 — Draw the train/test split BEFORE fitting anything.
     # Everything below this line learns its parameters from train_idx only.
-    train_idx, test_idx = _split_indices(df, target_column, task_type, actions)
+    # The seed is a run parameter rather than a constant so that an evaluation can
+    # repeat a run over several partitions. It is recorded in the quality report,
+    # so every result states which partition produced it.
+    split_seed = SPLIT_RANDOM_STATE if split_seed is None else int(split_seed)
+    train_idx, test_idx = _split_indices(
+        df, target_column, task_type, actions, random_state=split_seed,
+    )
 
     # Step 4 — Impute remaining nulls (fill values from the train split)
     df = _impute_columns(df, target_column, actions, fit_index=train_idx)
@@ -716,6 +777,7 @@ def run_data_agent(
     )
     quality_report["train_rows"] = int(len(train_idx))
     quality_report["test_rows"] = int(len(test_idx))
+    quality_report["split_seed"] = split_seed
 
     return {
         "cleaned_df": df,

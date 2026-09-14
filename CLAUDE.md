@@ -26,7 +26,9 @@ protect it.
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-pytest                      # 119 offline tests, no API key or network needed
+pytest                      # 165 offline tests, no API key or network needed
+python experiments/run_governance_eval.py                  # reproduce the evaluation from the committed cache, no Groq key
+python experiments/run_governance_eval.py --summarise-only # rebuild its tables + figure from the saved CSVs
 ```
 
 Running the app needs `GROQ_API_KEY` in a `.env` file at the repo root (gitignored,
@@ -51,6 +53,8 @@ never commit it), then `python server.py` → http://localhost:8000.
 | `app.py` | Superseded Streamlit UI — do not extend |
 | `test_*.py` (repo root) | Legacy manual scripts; need live Groq + network. Not collected by pytest |
 | `tests/` | The real, offline pytest suite |
+| `experiments/run_governance_eval.py` | Governance evaluation: the real graph with a scripted reviewer, arms A/B/C × datasets × split seeds |
+| `experiments/planner_cache/`, `experiments/results/` | **Committed.** Recorded planner responses, and the results they reproduce |
 
 Loops: **1** data-quality auto-retry → planner (max 2). **2** human "reject data
 quality" → planner with feedback injected into the prompt (max 2). **3** human
@@ -82,21 +86,25 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
    and that no compliance certification exists. New features get the same honesty.
    The generated Annex IV pack names its own gaps (sections 8 and 9) on purpose —
    do not quietly turn those into claims.
-11. **EDA findings are routed, and reviewer findings never reach the LLM.** Suspected
+10. **EDA findings are routed, and reviewer findings never reach the LLM.** Suspected
     target leakage and proxy variables (`route == "reviewer"`) are shown at the gate
     only. If the planner saw "X is a proxy for sex" it could write "Drop column X",
     and the Data Agent would execute it — an automated fairness decision nobody
     approved. `compact_findings_for_planner()` enforces this; a test captures the
     real prompt to prove it. A reviewer who wants to act uses Loop 2.
-12. **The Data Agent executes only unconditional instructions.** `_parse_plan_steps`
+11. **The Data Agent executes only unconditional instructions.** `_parse_plan_steps`
     reads each `;` clause separately, ignores hedged clauses ("consider", "if ..."),
     applies a verb only before a scope terminator ("keep", "redundant with", "("),
     and matches column names longest-first via `columns_named_in()`. Each rule
     fixes a misreading of a real planner step; the phrasings are pinned in tests.
-10. **Compliance artifacts are generated, never authored.** Every field in
+12. **Compliance artifacts are generated, never authored.** Every field in
     `compliance_artifacts.py` is read from recorded state. Never let an LLM write
     a model card, and never emit a plausible blank where a value is missing —
     use the `NOT_RECORDED` marker.
+13. **A run with no trained model never reaches the gate.** `route_after_training`
+    ends it at `mark_training_failure`. Without that edge, a run whose remaining
+    candidates all failed to fit was approved and received a model card for a model
+    that did not exist.
 
 ## Conventions
 
@@ -134,3 +142,16 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
   verification, stop the server, start it **without** `--reload`, and confirm the
   process serving port 8000 started after your last edit. A passing test suite does
   not prove the running server has the same code.
+- **Planner cache is process-global.** `planner_agent.configure_planner_cache(mode, dir)`
+  with `off` (default), `record` or `replay`. Always reset it to `off` afterwards; the
+  eval tests do this with an autouse fixture. Replay raises `PlannerCacheMiss` rather
+  than silently calling the LLM.
+- **Smoke-test the evaluation with `--quick --cache-dir <scratch>`.** Quick runs subsample
+  the data, which changes the planner prompts; recording them into the committed
+  `experiments/planner_cache/` would pollute it. `--quick` output goes to the
+  gitignored `experiments/results_quick/`.
+- **Fix evaluation presentation with `--summarise-only`**, which rebuilds the tables and
+  figure from `runs.csv` in seconds. Never re-run 60 pipelines for a formatting change.
+- **One-hot column names are sanitised for XGBoost** (`[`, `]`, `<` → `(`, `)`, `lt`/`le`).
+  Only the generated dummy columns are renamed, so a sensitive attribute keeps the
+  prefix the Fairness Agent reconstructs groups from.

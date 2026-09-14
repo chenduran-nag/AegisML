@@ -26,5 +26,8 @@ python-multipart>=0.0.6
 # --- Legacy Streamlit UI (app.py) — optional ---
 streamlit>=1.30.0
 
+# --- Evaluation (experiments/run_governance_eval.py) ---
+matplotlib>=3.8.0
+
 # --- Tests ---
 pytest>=8.0.0

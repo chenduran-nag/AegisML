@@ -34,3 +34,9 @@ artifacts/
 # Local test fixtures (downloaded, not part of the repo)
 adult_income.csv
 static/adult_*.csv
+
+# Evaluation: downloaded OpenML datasets, and throwaway --quick smoke-test output.
+# experiments/results/ and experiments/planner_cache/ ARE committed: together they
+# reproduce the published numbers without a Groq key.
+experiments/.data_cache/
+experiments/results_quick/

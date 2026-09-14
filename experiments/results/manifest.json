@@ -1,0 +1,76 @@
+{
+  "generated_at": "2026-09-14T13:52:04.643377+00:00",
+  "mode": "record",
+  "quick": false,
+  "git_commit": "91544dc38cf5cd4f9702185123550f1cb89be74c",
+  "python": "3.13.9",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "seeds": [
+    42,
+    7,
+    19,
+    73,
+    128
+  ],
+  "max_rows": null,
+  "arms": {
+    "A": {
+      "label": "governance off",
+      "description": "No automatic data-quality retry; approve at the first gate.",
+      "max_retries": 0
+    },
+    "B": {
+      "label": "auto-retry",
+      "description": "Automatic data-quality retry at the default cap; approve at the first gate.",
+      "max_retries": 2
+    },
+    "C": {
+      "label": "fairness reviewer",
+      "description": "Automatic retry; reject the model while a fairness violation remains and reroutes remain, otherwise approve.",
+      "max_retries": 2
+    }
+  },
+  "max_human_reroutes": 2,
+  "datasets": {
+    "adult": {
+      "label": "UCI Adult Income",
+      "openml_id": 1590,
+      "target": "class",
+      "rows": 48842,
+      "csv_sha256": "d273d956c28eba72241f69dcbb78e37e93862248503a1873fb44b9fc2a6ae00b",
+      "note": "48,842 rows (OpenML v2 combines the original train and test files). Positive class '>50K' is the favourable outcome."
+    },
+    "credit_g": {
+      "label": "German Credit",
+      "openml_id": 31,
+      "target": "class",
+      "rows": 1000,
+      "csv_sha256": "9888fb06e7bf42963f4db2c8fd57666d5426c0a3692d10b51571de49518a105a",
+      "note": "1,000 rows. Positive class 'good' is the favourable outcome. The main protected attribute in this dataset, age, is continuous and is not audited by the Fairness Agent, so fairness may be reported as not evaluated."
+    },
+    "bank_marketing": {
+      "label": "Bank Marketing",
+      "openml_id": 46910,
+      "target": "SubscribeTermDeposit",
+      "rows": 45211,
+      "csv_sha256": "faae5c9c76ebb7ef2e672c2569d2c8a78662cc9b02ed4fa118a67a90b4621faa",
+      "note": "OpenML v10 (46910), the only version with named columns: v1 (1461) and v9 (45065) use anonymised V1..V16. 45,211 rows. Positive class 'yes' (subscribed)."
+    },
+    "compas": {
+      "label": "COMPAS (two-year recidivism)",
+      "openml_id": 42192,
+      "target": "two_year_recid",
+      "rows": 5278,
+      "csv_sha256": "3c68c92a9954283f778e68d2ac48c027a9222b1afa55272ad79c27a96f33f32e",
+      "note": "OpenML v3 (42192). Race, age category and charge degree arrive pre-one-hot-encoded and are collapsed back into single columns by the loader. Positive class 1 is the ADVERSE outcome (predicted recidivism): disparate impact still flags imbalance between groups, but a higher rate is worse, not better."
+    }
+  },
+  "planner_models": [
+    "openai/gpt-oss-20b"
+  ],
+  "planner_calls": 60,
+  "planner_cache_hits": 56,
+  "runs": 60,
+  "errors": 0,
+  "wall_clock_s": 1238.2
+}

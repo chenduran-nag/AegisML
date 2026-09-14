@@ -103,6 +103,7 @@ def _build_pipeline_response(thread_id: str) -> dict:
         "values": {
             "unresolved_human_rejection": values.get("unresolved_human_rejection", False),
             "unresolved_quality_issue": values.get("unresolved_quality_issue", False),
+            "unresolved_training_failure": values.get("unresolved_training_failure", False),
             "human_decision": values.get("human_decision"),
             "human_feedback": values.get("human_feedback"),
             "retry_count": values.get("retry_count", 0),

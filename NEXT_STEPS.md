@@ -15,7 +15,7 @@ reasoning behind this ordering.
 ## Where things stand
 
 Done: every Tier 0 repair, the hash-chained audit log, compliance artifact
-generation, and an offline pytest suite (119 tests). In detail:
+generation, and an offline pytest suite (165 tests). In detail:
 
 - The train/test split is drawn before any preprocessing parameter is fitted.
 - Approved models are actually written to `saved_models/`.
@@ -33,7 +33,7 @@ Remaining, in recommended order:
 | 0 | Live verification with a real Groq key | **DONE** — 3 bugs found and fixed |
 | 1 | Compliance artifact generation | **DONE** — `compliance_artifacts.py`, 24 new tests |
 | — | EDA-driven pipeline | **DONE** — findings routed to Data Agent / Planner / reviewer |
-| 2 | Quantitative governance evaluation | Turns the demo into a measurable result |
+| 2 | Quantitative governance evaluation | **DONE** — no arm approved a compliant model; replay-verified |
 | 3 | Fairness metrics + mitigation | Closes the loop the thesis promises |
 | 4 | Policy-as-code | Cheap, big framing gain |
 | 5 | Reviewer identity + dual sign-off | An approval with no approver identity is not an audit trail |
@@ -263,7 +263,65 @@ process's start time did.
 
 ---
 
-## Step 2 — Quantitative governance evaluation
+## Step 2 — Quantitative governance evaluation — DONE
+
+`experiments/run_governance_eval.py` runs **4 datasets × 3 arms × 5 split seeds = 60 runs**
+through the real graph with a scripted reviewer. The results are committed in
+`experiments/results/`, and the README has the headline table.
+
+**How it works.**
+
+- The planner has a **record/replay cache**. Record mode calls the LLM on a miss and stores
+  the response. Replay never calls it and raises `PlannerCacheMiss` on a miss, so a replayed
+  result can never silently contain a fresh plan.
+- The split seed is a real `PipelineState["split_seed"]` parameter, recorded in the quality
+  report.
+- Datasets are round-tripped through CSV, exactly like an upload, and each run records the
+  SHA-256 of the bytes.
+- `--summarise-only` rebuilds the tables and figure from the saved CSVs in seconds.
+
+**Verified reproducible.** A full replay with an invalid `GROQ_API_KEY` served all 60
+planner calls from cache, with 0 errors, and matched the recording exactly: 25 columns × 60
+runs and 9 columns × 200 gate rows, excluding only wall clock and cache-hit counts.
+
+**Findings.**
+
+1. **No arm approved a fairness-compliant model** — all 60 approved models violated.
+2. **Loop 3 is not a fairness intervention.** Across 20 rerouted runs, violations were fewer
+   in 0, the same in 18 and more in 2, at an AUC cost on every dataset (Adult −0.049, COMPAS
+   −0.051, Bank Marketing −0.032, German Credit −0.019). COMPAS magnitudes improved (min DI
+   0.19 → 0.46, max parity difference 0.64 → 0.32) but still violated; Adult's min DI fell
+   0.043 → 0.030.
+3. **Loop 1 never engaged.** Arms A and B were identical on every run, because benchmark
+   data passes the quality gate first time.
+
+**Caveats that change how to read those numbers.**
+
+- **Adult's minimum DI is a tiny-group artifact.** The minimum group is
+  `marital-status = "Married-AF-spouse"`, 4 people in the test split, all predicted
+  negative. The real disparity is `sex` (DI ≈ 0.31, groups of 6,490 and 3,279).
+- **The audited attributes are the planner's choice**, and several are not protected:
+  German Credit audited only `job`; Bank Marketing audited `education` and `marital`.
+- **`age` was never audited on any dataset**, because it is continuous. Adult `occupation`
+  was skipped with the inaccurate reason "continuous numeric feature": it was
+  frequency-encoded.
+
+**Defects found by running it, fixed before the final results.**
+
+- XGBoost rejected one-hot column names containing `[`, `]` or `<` and silently failed on
+  every German Credit fit. The names are now sanitised.
+- A run whose remaining candidates all failed to train reached the gate, was approved, and
+  got a model card. `route_after_training` now ends such a run.
+- Found by inspecting the chart: the legend overprinted the subtitle, coincident arm means
+  overprinted each other, and labels overprinted points. Mean labels now sit in a
+  leader-line column, and an absent arm is explained in its panel.
+
+**Provenance.** Recorded on top of `91544dc` with the evaluation code uncommitted. Its
+manifest predates the `git_dirty` flag that now records this.
+
+The original specification follows, for reference.
+
+### Original specification
 
 **Goal.** Measure whether the governance loops actually change outcomes. Today
 the answer is a screenshot. A results table is what makes this defensible in a
@@ -309,6 +367,20 @@ publishable finding — it is also the motivation for Step 3.
 ---
 
 ## Step 3 — Fairness metrics and mitigation
+
+**Re-prioritised by the Step 2 evidence.** Do these in this order:
+
+1. **A minimum group size** for DI and DPD. Without it, Adult's headline DI is set by a
+   4-person group, and the metric is not fit to report.
+2. **Bucket continuous protected attributes**, starting with `age`, which Step 2 never
+   audited on any dataset. Also fix the misleading skip reason for frequency-encoded
+   categoricals.
+3. **Real mitigation** (arm D). Step 2 showed that switching to the next-best model never
+   reduced the violation count.
+4. Consider restricting audits to attributes that are actually protected, rather than
+   whatever the planner proposes.
+
+The original plan follows.
 
 **Goal.** Move from *detecting* bias to being able to *act* on it, and measure it
 properly.

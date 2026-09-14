@@ -1172,7 +1172,8 @@
         // status === 'completed', and previously fell into the branch below and
         // rendered "Model Formally Approved & Saved to Disk" — presenting a run
         // that was rejected and terminated as a successful deployment.
-        const terminated = vals.unresolved_human_rejection || vals.unresolved_quality_issue;
+        const terminated = vals.unresolved_human_rejection || vals.unresolved_quality_issue
+          || vals.unresolved_training_failure;
         const approved = vals.human_decision === 'approve' && !terminated;
 
         document.getElementById('terminated-banner').style.display = terminated ? 'block' : 'none';
@@ -1181,7 +1182,9 @@
           document.getElementById('artifacts-card').style.display = 'none';
           document.getElementById('terminated-reason').innerText = vals.unresolved_quality_issue
             ? 'The Data Agent quality gate never passed and the automatic retry cap was reached. Training data the pipeline itself flagged as deficient was never approved for deployment.'
-            : 'The human reviewer rejected the model and the rejection reroute cap was reached. Execution stopped without an approved model.';
+            : vals.unresolved_training_failure
+              ? 'No model could be trained: every remaining candidate failed to fit, so there was nothing to present for approval.'
+              : 'The human reviewer rejected the model and the rejection reroute cap was reached. Execution stopped without an approved model.';
         }
 
         if (approved) {

@@ -315,6 +315,48 @@ def test_data_quality_rejection_reroutes_to_planner(graph, toy_df):
     assert values["human_feedback"] == "Drop the notes column entirely."
 
 
+def test_training_failure_ends_the_run_without_a_gate(graph, toy_df, monkeypatch, fake_plan):
+    """A run with no trained model must never reach the approval gate."""
+    from audit_log import get_audit_trail
+
+    monkeypatch.setattr(pipeline_graph, "plan_pipeline",
+                        lambda **kw: {**fake_plan, "recommended_models": ["FakeBoost"]})
+    config = _run_to_gate(graph, toy_df, "t-train-fail")
+    snapshot = graph.g.get_state(config)
+
+    assert snapshot.next == ()
+    assert snapshot.values["unresolved_training_failure"] is True
+    assert snapshot.values.get("human_decision") is None
+    assert snapshot.values.get("artifacts_manifest") is None
+    trail = get_audit_trail("t-train-fail", db_path=graph.audit_db)
+    assert not any(e["event_type"] == "human_decision" for e in trail)
+    assert trail[-1]["details"]["status"] == "TRAINING_FAILED"
+
+
+def test_rejecting_the_last_trainable_model_ends_instead_of_offering_nothing(
+        graph, toy_df, monkeypatch, fake_plan):
+    """
+    The German Credit path. The reviewer rejects the only model that trained; the
+    one left cannot train. Previously the run reached the gate with no model, was
+    approved, and produced a model card for a model that did not exist.
+    """
+    monkeypatch.setattr(
+        pipeline_graph, "plan_pipeline",
+        lambda **kw: {**fake_plan, "recommended_models": ["LogisticRegression", "FakeBoost"]})
+    config = _run_to_gate(graph, toy_df, "t-last-model")
+    assert "human_approval_node" in graph.g.get_state(config).next
+
+    graph.g.invoke(Command(resume={"decision": "reject_model_or_fairness",
+                                   "human_feedback": ""}), config=config)
+    snapshot = graph.g.get_state(config)
+
+    assert snapshot.next == (), "must not present an empty approval gate"
+    assert snapshot.values["unresolved_training_failure"] is True
+    assert snapshot.values["rejected_models"] == ["LogisticRegression"]
+    assert snapshot.values.get("artifacts_manifest") is None
+    assert snapshot.values.get("model_saved_path") is None
+
+
 def test_rejection_cap_terminates_without_approval_or_artifacts(graph, toy_df):
     """
     Three rejections hit MAX_HUMAN_REROUTES and end the run.

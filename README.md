@@ -192,11 +192,96 @@ http://localhost:8000
 ├── training_agent.py           # LabelEncoding, ensemble training, leaderboard & SHAP agent
 ├── fairness_agent.py           # Demographic subgroup equity auditing agent
 ├── audit_log.py                # Immutable SQLite audit logger (audit_log.db)
+├── experiments/
+│   ├── run_governance_eval.py  # Governance evaluation harness (record / replay / --summarise-only)
+│   ├── planner_cache/          # Recorded planner responses — makes the results reproducible without a key
+│   └── results/                # Committed results: runs, per-gate trajectory, summary, figure
 ├── static/
 │   └── index.html              # Dark slate glassmorphism web UI with Chart.js
 ├── images/                     # Screenshot documentation assets
 └── saved_models/               # Serialized joblib production model artifacts
 ```
+
+---
+
+## 📊 Evaluation: Do the Governance Loops Change Outcomes?
+
+`experiments/run_governance_eval.py` drives the real pipeline end to end with a scripted
+reviewer: **4 datasets × 3 arms × 5 train/test split seeds = 60 runs**.
+
+| Arm | Reviewer |
+|---|---|
+| **A** governance off | No automatic data-quality retry; approve at the first gate |
+| **B** auto-retry | Automatic retry enabled; approve at the first gate |
+| **C** fairness reviewer | Reject the model while a fairness violation remains (up to 2 reroutes), otherwise approve |
+
+Means over 5 seeds. Arms A and B were identical on every run, so they share a column.
+
+| Dataset | AUC A/B → C | Violated attributes A/B → C | Min disparate impact A/B → C | Max parity difference A/B → C |
+|---|---|---|---|---|
+| UCI Adult (48,842) | 0.927 → 0.878 | 3.0 → 3.0 | 0.043 → 0.030 † | 0.384 → 0.327 |
+| German Credit (1,000) | 0.781 → 0.762 | 1.0 → 1.0 | 0.771 → 0.759 | 0.209 → 0.200 |
+| Bank Marketing (45,211) | 0.753 → 0.721 | 1.6 → 2.0 | 0.376 → 0.430 | 0.043 → 0.040 |
+| COMPAS (5,278) | 0.724 → 0.673 | 2.0 → 2.0 | 0.194 → 0.459 | 0.636 → 0.319 |
+
+**Findings.**
+
+1. **No arm ever approved a fairness-compliant model.** All 60 approved models carried at
+   least one violation by the Fairness Agent's own thresholds.
+2. **Rejecting a model and taking the next best is not a fairness intervention.** Over 20
+   rerouted runs, the approved model had fewer violated attributes in **0**, the same in 18,
+   and more in 2. It cost AUC on every dataset (−0.019 to −0.051). The underlying magnitudes
+   moved inconsistently: COMPAS improved substantially yet still violated, while Adult's
+   minimum DI got slightly worse.
+3. **The automatic data-quality retry never engaged.** Benchmark data passes the quality
+   gate first time, so arms A and B coincide. That loop is exercised only by the synthetic
+   tests.
+4. **The evaluation found two pipeline defects**, both fixed before these results: XGBoost
+   silently failed wherever category values contain `[`, `]` or `<` (German Credit), and a
+   run with no trained model could reach the gate, be approved, and receive a model card.
+
+**Read these numbers with their caveats.**
+
+- † **Adult's minimum DI is a tiny-group artifact.** It is set by `marital-status =
+  "Married-AF-spouse"`: 4 people in a 9,769-row test split, all predicted negative. The
+  substantive Adult disparity is `sex`, DI ≈ 0.31 across groups of 6,490 and 3,279. The
+  metric needs a minimum group size — now the first item of Step 3.
+- **The planner chooses which attributes are audited, and some are not protected
+  attributes**: German Credit audited only `job`; Bank Marketing audited `education` and
+  `marital`. **`age` was never audited on any dataset**, because it is continuous.
+- Seeds vary the train/test partition only. Model seeds are fixed, and the planner is held
+  fixed per prompt, so arm differences reflect the governance loops, not LLM sampling
+  variance.
+- For COMPAS the positive class is the *adverse* outcome (predicted recidivism).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="experiments/results/fairness_vs_auc_dark.png">
+  <img alt="Minimum disparate impact against AUC for each governance arm, one panel per dataset" src="experiments/results/fairness_vs_auc.png">
+</picture>
+
+Full tables with standard deviations, the per-gate trajectory and the run manifest:
+[`experiments/results/summary.md`](experiments/results/summary.md).
+
+**Reproduce it — no Groq key needed.** The planner's responses are recorded in
+`experiments/planner_cache/`. This command re-runs all 60 pipelines against them (about
+20 minutes; datasets are fetched from OpenML on first use):
+
+```bash
+python experiments/run_governance_eval.py
+```
+
+This was verified: a full replay with a deliberately invalid `GROQ_API_KEY` served all 60
+planner calls from cache and reproduced `runs.csv` and `fairness_trajectory.csv`
+**exactly**, on every deterministic column. To rebuild only the tables and figure from the
+saved CSVs, in seconds:
+
+```bash
+python experiments/run_governance_eval.py --summarise-only
+```
+
+The results were recorded on top of commit `91544dc`, with the evaluation code not yet
+committed (their manifest predates the `git_dirty` flag); that code is committed alongside
+them.
 
 ---
 
@@ -255,7 +340,7 @@ they are.
 pytest
 ```
 
-The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. 119 tests covering the EDA finding routes (including a captured-prompt check that proxy and leakage findings never reach the LLM), plan-step parsing against real planner phrasings, the leakage boundary, the audit chain (including tampering and the documented truncation gap), fairness reporting honesty, compliance artifact generation and integrity verification, and an end-to-end graph run through interrupt, resume and both reroute loops.
+The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. 165 tests covering the governance evaluation (the record/replay planner cache, the scripted reviewer, and CSV round-tripping), feature-name sanitisation, the no-model termination route, the EDA finding routes (including a captured-prompt check that proxy and leakage findings never reach the LLM), plan-step parsing against real planner phrasings, the leakage boundary, the audit chain (including tampering and the documented truncation gap), fairness reporting honesty, compliance artifact generation and integrity verification, and an end-to-end graph run through interrupt, resume and both reroute loops.
 
 The `test_*.py` scripts in the repository root are the original manual integration walkthroughs — they download the UCI Adult dataset and call the live Groq API, so they are run by hand and are excluded from `pytest` collection.
 

@@ -107,6 +107,10 @@ class PipelineState(TypedDict, total=False):
     artifacts_manifest : Optional[dict]
         Result of compliance_artifacts.generate_artifacts(): output directory plus
         a per-file path/digest map. Set only on the approve path.
+    split_seed : Optional[int]
+        Seed for the train/test split drawn by the Data Agent. None means the
+        default (data_agent.SPLIT_RANDOM_STATE). Set per run by the governance
+        evaluation to repeat a run over several partitions.
     eda_findings : Optional[list]
         Structured findings from eda_insights.derive_eda_findings(), each carrying a
         `route` ("data_agent", "planner" or "reviewer") that decides which stage may
@@ -151,6 +155,9 @@ class PipelineState(TypedDict, total=False):
     unresolved_human_rejection : bool
         True when rejection_reroute_count >= MAX_HUMAN_REROUTES and human rejects again.
         Prevents infinite human-rejection loops.
+    unresolved_training_failure : bool
+        True when training produced no model — every remaining candidate failed to
+        fit. The run ends without reaching the approval gate.
     model_saved_path : Optional[str]
         Filesystem path the approved model was serialised to by audit_log_node,
         or None if it was never approved or the write failed. This is the real
@@ -168,6 +175,7 @@ class PipelineState(TypedDict, total=False):
     split_index: Optional[dict]
     eda_report: Optional[dict]
     eda_findings: Optional[list]
+    split_seed: Optional[int]
     dataset_sha256: Optional[str]
     planner_meta: Optional[dict]
     artifacts_manifest: Optional[dict]
@@ -180,6 +188,7 @@ class PipelineState(TypedDict, total=False):
     human_decision: Optional[str]
     rejection_reroute_count: int
     unresolved_human_rejection: bool
+    unresolved_training_failure: bool
     business_objective: Optional[str]
     rejected_models: Optional[list[str]]
     human_feedback: Optional[str]
