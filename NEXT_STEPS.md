@@ -15,7 +15,8 @@ reasoning behind this ordering.
 ## Where things stand
 
 Done: every Tier 0 repair, the hash-chained audit log, compliance artifact
-generation, and an offline pytest suite (165 tests). In detail:
+generation, trustworthy fairness metrics, and an offline pytest suite (183 tests). In
+detail:
 
 - The train/test split is drawn before any preprocessing parameter is fitted.
 - Approved models are actually written to `saved_models/`.
@@ -34,7 +35,8 @@ Remaining, in recommended order:
 | 1 | Compliance artifact generation | **DONE** — `compliance_artifacts.py`, 24 new tests |
 | — | EDA-driven pipeline | **DONE** — findings routed to Data Agent / Planner / reviewer |
 | 2 | Quantitative governance evaluation | **DONE** — no arm approved a compliant model; replay-verified |
-| 3 | Fairness metrics + mitigation | Closes the loop the thesis promises |
+| 3a | Trustworthy fairness metrics | **DONE** — re-run showed the first run *understated* disparity |
+| 3b | Verdict coverage + real mitigation (arm D) | Closes the loop the thesis promises |
 | 4 | Policy-as-code | Cheap, big framing gain |
 | 5 | Reviewer identity + dual sign-off | An approval with no approver identity is not an audit trail |
 | 6 | Small cleanups | Anytime |
@@ -82,7 +84,7 @@ acted on it (`columns_dropped: ['fnlwgt']`).
   categories, above the one-hot limit of 10) becomes a float and is silently
   dropped from the fairness audit. The verdict stays honest — it reports skipped,
   not passed — but the reason is wrong and a real sensitive attribute goes
-  unaudited. Step 3.
+  unaudited. **Fixed in Step 3a** — groups now come from raw values.
 - A completed run's evaluation tabs render empty, because `review_payload` is
   `null` once the graph ends. The banners are correct; the detail panes are not.
 - The regression KPI header reads "ACCURACY N/A" instead of showing RMSE.
@@ -295,7 +297,9 @@ runs and 9 columns × 200 gate rows, excluding only wall clock and cache-hit cou
 3. **Loop 1 never engaged.** Arms A and B were identical on every run, because benchmark
    data passes the quality gate first time.
 
-**Caveats that change how to read those numbers.**
+**Caveats that change how to read those numbers.** These describe the *first* run. The
+Fairness Agent was then corrected and the evaluation re-run — see Step 3a, which supersedes
+the numbers above and corrects the first caveat.
 
 - **Adult's minimum DI is a tiny-group artifact.** The minimum group is
   `marital-status = "Married-AF-spouse"`, 4 people in the test split, all predicted
@@ -366,21 +370,78 @@ publishable finding — it is also the motivation for Step 3.
 
 ---
 
-## Step 3 — Fairness metrics and mitigation
+## Step 3a — Trustworthy fairness metrics — DONE
 
-**Re-prioritised by the Step 2 evidence.** Do these in this order:
+Step 2 showed the Fairness Agent was not fit to report. It was corrected in
+`fairness_agent.py` (18 new tests in `tests/test_fairness_groups.py`) and the whole
+evaluation re-run from the planner cache.
 
-1. **A minimum group size** for DI and DPD. Without it, Adult's headline DI is set by a
-   4-person group, and the metric is not fit to report.
-2. **Bucket continuous protected attributes**, starting with `age`, which Step 2 never
-   audited on any dataset. Also fix the misleading skip reason for frequency-encoded
-   categoricals.
-3. **Real mitigation** (arm D). Step 2 showed that switching to the next-best model never
-   reduced the violation count.
-4. Consider restricting audits to attributes that are actually protected, rather than
-   whatever the planner proposes.
+**What changed.**
 
-The original plan follows.
+- **Groups come from raw uploaded values** (`raw_frame`, aligned on the shared index
+  labels), not the cleaned frame. Missing values form a `(missing)` group. The old
+  one-hot reconstruction remains as a fallback when no raw frame is supplied.
+- **`MIN_GROUP_SIZE = 30`**: smaller groups are excluded from DI and parity difference and
+  listed with their sizes. Fewer than two groups left means the attribute is skipped.
+- **`age` is banded** <25 / 25–59 / 60+. Other continuous attributes are skipped with the
+  accurate reason "only age has a banding rule".
+- **Protected attributes are audited even when the planner omits them** (`source: auto`),
+  detected by name through `eda_insights.is_protected_attribute`.
+- **Equal-opportunity and equalized-odds differences** are reported per attribute. They are
+  not part of the verdict.
+- The dashboard fairness table shows the new columns, the group sizes compared, excluded
+  groups and a "Not audited" list with reasons; the model card and Annex IV draft say the
+  same.
+
+**Re-run, verified.** 60 runs, 0 errors, 60/60 planner calls from cache. Arms A and B
+chose the same model with the same AUC on all 40 runs, so every change is in the
+measurement.
+
+| Dataset | Violated attributes (A) | Min DI (A) | Newly audited |
+|---|---|---|---|
+| Adult | 3.0 → 5.0 | 0.043 → 0.004 | `age`, `occupation` |
+| German Credit | 1.0 → 1.0 | 0.771 → 0.798 | `age` (3 of 5 splits) |
+| Bank Marketing | 1.6 → 2.6 | 0.376 → 0.128 | `age` |
+| COMPAS | 2.0 → 4.0 | 0.194 → 0.179 | `age`, `sex` |
+
+- **The first run understated disparity.** Bank Marketing's minimum is now `age` on every
+  split; COMPAS `sex` (DI ≈ 0.30) had simply never been audited.
+- **Correction to the Step 2 write-up.** Step 2 expected a minimum group size to make
+  Adult's headline DI meaningful. It removed the 4-person artifact, but the minimum stayed
+  near zero for genuine reasons: `occupation = "Priv-house-serv"` (about 50 test rows, no
+  positive predictions) on 4 of 5 splits, and `age` under 25 (about 1,700 rows, positive
+  rate under 1%) on the fifth.
+- **Loop 3 is still not a fairness intervention**: 19 of 20 runs rerouted; fewer violated
+  attributes in 2, the same in 14, more in 3.
+- **COMPAS `sex` coding is undocumented** on OpenML. Value 1 is 80.5% of rows, consistent
+  with the known male share, but that is an inference, so groups are reported as "0"/"1".
+
+**Found by the re-run, open (#26):** 3 of 60 approvals "passed", all German Credit seed 19,
+whose audit covered only `job` — age bands were too small to compare there. A skipped
+protected attribute does not stop a pass.
+
+---
+
+## Step 3b — Verdict coverage and mitigation
+
+Do these in this order:
+
+1. **Verdict coverage (#26).** If a protected attribute present in the data could not be
+   audited, the verdict must not read "passed". Either `None` (not fully evaluated) or a
+   distinct "passed on partial coverage" state, rendered amber like NOT EVALUATED
+   (invariant 4). Decide which, and pin German Credit seed 19's shape in a test.
+2. **Separate protected from unprotected violations in the verdict.** Today a violation on
+   `occupation` or `job` counts exactly like one on `sex`. Keep auditing planner-proposed
+   attributes, but consider basing the pass/fail on protected attributes only, and report
+   the rest.
+3. **Real mitigation (arm D).** Step 2 and the 3a re-run both showed that switching to the
+   next-best model does not reduce violations.
+4. Protected-attribute detection is by column name only (misses German Credit's
+   `personal_status`). Consider a reviewer-declared list at run start.
+5. Intersectional subgroups (`sex × race`) with the same minimum group size.
+
+The original plan follows. Its metric items are done in 3a; the mitigation design still
+applies.
 
 **Goal.** Move from *detecting* bias to being able to *act* on it, and measure it
 properly.
@@ -483,9 +544,9 @@ Both identities appear in the audit trail and the model card.
       lists in `planner_agent._build_prompts`, or implement it.
 - [ ] Target is label-encoded twice (Data Agent, then Training Agent). Harmless;
       tidy up if touching that code anyway.
-- [ ] Fairness Agent: distinguish "frequency-encoded categorical" from "continuous
-      numeric" when skipping an attribute; the current message is inaccurate. Ideally
-      pass the Data Agent's encoding map through so such columns can be audited.
+- [x] Fairness Agent: distinguish "frequency-encoded categorical" from "continuous
+      numeric" when skipping an attribute. Done in Step 3a — groups now come from raw
+      values, so such columns are audited rather than skipped.
 - [ ] UI: a completed run's evaluation tabs are empty (`review_payload` is `null`
       after the graph ends). Either persist the last payload in state or rebuild the
       tabs from `values`.

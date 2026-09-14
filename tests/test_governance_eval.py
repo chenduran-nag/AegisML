@@ -271,8 +271,11 @@ def test_unevaluated_fairness_is_never_recorded_as_zero(toy_df, monkeypatch, fak
         return {**fake_plan, "sensitive_attribute_candidates": ["no_such_column"]}
 
     monkeypatch.setattr(pipeline_graph, "plan_pipeline", _stub)
-    row, trajectory = ev.run_single(ev.prepare_frame(TOY_SPEC, toy_df),
-                                    ev.ARMS["C"], seed=42)
+    # Protected columns (sex, race, and age, which is now banded) are audited even when
+    # the planner names none of them, so remove all of them to leave nothing to evaluate.
+    row, trajectory = ev.run_single(
+        ev.prepare_frame(TOY_SPEC, toy_df.drop(columns=["sex", "race", "age"])),
+        ev.ARMS["C"], seed=42)
 
     assert row["status"] == "approved"
     assert row["fairness_evaluated"] is False

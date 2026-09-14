@@ -475,6 +475,9 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
         task_type=state["task_type"],
         eval_index=split.get("test"),
         proxy_findings=findings_for_route(state.get("eda_findings"), "reviewer"),
+        # Group membership is read from the raw upload: scaling and encoding in the
+        # cleaned frame destroy it (a 0/1 sex column becomes a float).
+        raw_frame=bytes_to_df(state["df_bytes"]),
     )
 
     passed = result.get("overall_fairness_passed", False)
@@ -541,6 +544,7 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
             state.get("eda_findings") or [], plan, data_res, fair_res,
         ),
         "proxy_warnings": fair_res.get("proxy_warnings", []),
+        "fairness_min_group_size": fair_res.get("min_group_size"),
     }
 
     print("[human_approval_node] Interrupting execution for Human Approval...")

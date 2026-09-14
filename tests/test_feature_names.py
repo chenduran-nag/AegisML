@@ -87,5 +87,7 @@ def test_fairness_still_reconstructs_renamed_groups(credit_like_df):
         cleaned_df=cleaned["cleaned_df"], fitted_model=trained["_fitted_model"],
         target_column="class", sensitive_attribute_candidates=["checking_status"],
         task_type="classification", eval_index=cleaned["test_index"],
+        # A 60-row test split: lower the group minimum so the prefix rule is tested.
+        min_group_size=5,
     )
     assert [r["attribute"] for r in fairness["fairness_report"]] == ["checking_status"]

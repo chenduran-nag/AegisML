@@ -187,11 +187,12 @@ def build_model_card(
     # Limitations are stated unconditionally where they are properties of the
     # implementation, and conditionally where they depend on this run.
     limitations = [
-        "Fairness metrics cover only categorical or one-hot-encoded subgroups. "
-        "Continuous sensitive attributes (e.g. age) are skipped unless bucketed.",
-        "Disparate Impact and Demographic Parity Difference measure outcome rates "
-        "only. They say nothing about error-rate parity (equalized odds) or "
-        "calibration across groups.",
+        "Age is audited in fixed bands (<25, 25-59, 60+); other continuous "
+        "attributes are not audited. Groups with fewer evaluation rows than the "
+        "minimum group size are excluded from the comparison and listed separately.",
+        "The verdict uses outcome rates only (disparate impact and demographic parity "
+        "difference). Equal-opportunity and equalized-odds differences are reported "
+        "but do not affect it, and calibration across groups is not measured.",
         "Sensitive attributes remain in the feature matrix; the model may use them "
         "directly as predictors.",
         "The leaderboard reports a single 80/20 hold-out split, not "
@@ -266,6 +267,7 @@ def build_model_card(
             "thresholds": {
                 "disparate_impact_min": 0.80,
                 "demographic_parity_difference_max": 0.10,
+                "min_group_size": fair_res.get("min_group_size"),
             },
             "report": fair_res.get("fairness_report", []),
             "attributes_skipped": fair_res.get("attributes_skipped", []),
@@ -313,12 +315,19 @@ def render_model_card_md(card: dict) -> str:
          e.get("skip_reason", "")]
         for e in md.get("leaderboard", [])
     ]
+    def _groups_compared(f: dict) -> str:
+        gd = f.get("group_details") or {}
+        return (f"{gd.get('group_a')} (n={gd.get('group_a_n', '?')}) vs "
+                f"{gd.get('group_b')} (n={gd.get('group_b_n', '?')})")
+
     fairness_rows = [
-        [f.get("attribute"), f.get("disparate_impact"),
+        [f.get("attribute"),
+         {True: "yes", False: "no"}.get(f.get("protected"), NOT_RECORDED),
+         f.get("disparate_impact"),
          f.get("demographic_parity_difference"),
+         f.get("equal_opportunity_difference"),
          "VIOLATION" if f.get("violation") else "passed",
-         f"{(f.get('group_details') or {}).get('group_a')} vs "
-         f"{(f.get('group_details') or {}).get('group_b')}"]
+         _groups_compared(f)]
         for f in fair.get("report", [])
     ]
     shap_rows = [[e.get("feature"), e.get("importance")]
@@ -412,9 +421,9 @@ proxy variables to the human reviewer only.
 {fair['thresholds']['disparate_impact_min']}, Demographic Parity Difference <= \
 {fair['thresholds']['demographic_parity_difference_max']}.
 
-Measured on {fair['evaluated_rows']} held-out rows.
+Measured on {fair['evaluated_rows']} held-out rows. Groups with fewer than {fair['thresholds'].get('min_group_size')} rows are excluded from the comparison. Equal-opportunity difference is reported but does not affect the verdict.
 
-{_md_table(["Attribute", "Disparate impact", "Parity difference", "Status", "Groups compared"], fairness_rows)}
+{_md_table(["Attribute", "Protected", "Disparate impact", "Parity difference", "Equal opportunity difference", "Status", "Groups compared"], fairness_rows)}
 
 **Candidates proposed by the planner:** {', '.join(fair['candidates_proposed']) or 'none'}
 
@@ -648,9 +657,11 @@ Classification is ranked by AUC-ROC with accuracy and F1 also recorded; regressi
 by RMSE with MAE and R². Fairness uses Disparate Impact (four-fifths rule, >= 0.80)
 and Demographic Parity Difference (<= 0.10).
 
-**Known inadequacy:** these fairness metrics compare outcome *rates* only. They do
-not capture error-rate parity (equalized odds) or calibration across groups, so a
-"{fair['verdict']}" verdict here is narrower than the everyday meaning of "fair".
+**Known inadequacy:** the verdict compares outcome *rates* only. Equal-opportunity and
+equalized-odds differences are reported per attribute but do not affect it, and
+calibration across groups is not measured, so a "{fair['verdict']}" verdict here is
+narrower than the everyday meaning of "fair". Groups with fewer evaluation rows than the
+minimum group size are excluded from the comparison.
 
 ---
 

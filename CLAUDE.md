@@ -26,7 +26,7 @@ protect it.
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-pytest                      # 165 offline tests, no API key or network needed
+pytest                      # 183 offline tests, no API key or network needed
 python experiments/run_governance_eval.py                  # reproduce the evaluation from the committed cache, no Groq key
 python experiments/run_governance_eval.py --summarise-only # rebuild its tables + figure from the saved CSVs
 ```
@@ -45,7 +45,7 @@ never commit it), then `python server.py` → http://localhost:8000.
 | `planner_agent.py` | The ONLY LLM call (Groq, JSON mode). Sends aggregate stats only |
 | `data_agent.py` | Deterministic cleaning. Draws the train/test split, fits everything on train |
 | `training_agent.py` | Model registry, leaderboard, SHAP. Reuses the Data Agent's split |
-| `fairness_agent.py` | Disparate Impact + Demographic Parity Difference on held-out rows |
+| `fairness_agent.py` | DI + parity difference (the verdict) and TPR/FPR gaps (reported only) on held-out rows. Groups from raw values; age banded; groups under 30 rows excluded |
 | `audit_log.py` | Append-only, SHA-256 hash-chained audit log + `verify_audit_chain()` |
 | `compliance_artifacts.py` | Model card, AIBOM and Annex IV draft; digests chained into the audit log + `verify_artifacts()` |
 | `server.py` | FastAPI: `/api/pipeline/{start,resume,status,audit,eda,artifacts}` |
@@ -105,6 +105,13 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
     ends it at `mark_training_failure`. Without that edge, a run whose remaining
     candidates all failed to fit was approved and received a model card for a model
     that did not exist.
+14. **Fairness groups come from raw uploaded values, not the cleaned frame.**
+    `fairness_node` passes `raw_frame`; scaling and encoding destroy group membership
+    (COMPAS 0/1 `sex` became a float, Adult `occupation` a frequency). Groups under
+    `MIN_GROUP_SIZE` (30) evaluation rows are excluded and listed, `age` is banded,
+    and protected attributes present in the data are audited even if the planner omits
+    them. Equal-opportunity and equalized-odds gaps are reported but never change the
+    verdict: that rule is a policy decision (Step 4).
 
 ## Conventions
 
@@ -153,5 +160,10 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
 - **Fix evaluation presentation with `--summarise-only`**, which rebuilds the tables and
   figure from `runs.csv` in seconds. Never re-run 60 pipelines for a formatting change.
 - **One-hot column names are sanitised for XGBoost** (`[`, `]`, `<` → `(`, `)`, `lt`/`le`).
-  Only the generated dummy columns are renamed, so a sensitive attribute keeps the
-  prefix the Fairness Agent reconstructs groups from.
+  Only the generated dummy columns are renamed, so the Fairness Agent's one-hot
+  fallback still finds an attribute by its prefix (with a raw frame it reads raw values).
+- **`toy_df` is 1,000 rows on purpose.** A 200-row test split is the smallest in which the
+  main groups clear `MIN_GROUP_SIZE`. A test that calls `run_fairness_agent` on a smaller
+  frame must pass `min_group_size=` explicitly, or its attributes are skipped. And since
+  protected columns are audited automatically, a test that needs "nothing auditable"
+  must drop `sex`, `race` and `age` from the frame, not just leave them out of the plan.

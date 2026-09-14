@@ -645,11 +645,12 @@
               <th>Status</th>
               <th>Disparate Impact (≥0.80)</th>
               <th>Demographic Parity Diff (≤0.10)</th>
-              <th>Group Rate Gap</th>
+              <th>Equal Opportunity Diff</th>
+              <th>Groups Compared</th>
             </tr>
           </thead>
           <tbody id="fairness-tbody">
-            <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No sensitive attribute violations evaluated</td></tr>
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No attribute has been audited yet</td></tr>
           </tbody>
         </table>
         <div style="margin-top: 14px; font-size: 0.8rem; color: var(--text-muted);" id="fairness-skipped"></div>
@@ -1310,15 +1311,39 @@
           '<span class="badge badge-fail" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: VIOLATION DETECTED</span>';
       }
 
-      document.getElementById('fairness-tbody').innerHTML = fairness.length ? fairness.map(f => `
-        <tr>
-          <td><strong>${f.attribute}</strong></td>
+      const minGroupSize = payload.fairness_min_group_size ?? 30;
+      document.getElementById('fairness-tbody').innerHTML = fairness.length ? fairness.map(f => {
+        const gd = f.group_details || {};
+        const tags = [
+          f.protected === true ? 'protected attribute' : (f.protected === false ? 'not a protected attribute' : ''),
+          f.source === 'auto' ? 'added automatically' : (f.source === 'planner' ? 'proposed by planner' : ''),
+          f.grouping || '',
+        ].filter(Boolean).map(escHtml).join(' · ');
+        const excluded = Object.entries(f.excluded_groups || {});
+        const excludedNote = excluded.length
+          ? `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">Excluded (under ${escHtml(minGroupSize)} rows): ${excluded.map(([g, n]) => `${escHtml(g)} (${escHtml(n)})`).join(', ')}</div>`
+          : '';
+        const eod = (f.equal_opportunity_difference === null || f.equal_opportunity_difference === undefined)
+          ? 'n/a' : f.equal_opportunity_difference;
+        return `<tr>
+          <td><strong>${escHtml(f.attribute)}</strong><div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">${tags}</div></td>
           <td><span class="badge ${f.violation ? 'badge-fail' : 'badge-pass'}">${f.violation ? 'VIOLATION' : 'PASSED'}</span></td>
-          <td>${f.disparate_impact}</td>
-          <td>${f.demographic_parity_difference}</td>
-          <td>${f.group_details ? `Max: ${f.group_details.group_a} vs Min: ${f.group_details.group_b}` : 'N/A'}</td>
-        </tr>
-      `).join('') : '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No sensitive attribute violations evaluated</td></tr>';
+          <td>${escHtml(f.disparate_impact)}</td>
+          <td>${escHtml(f.demographic_parity_difference)}</td>
+          <td>${escHtml(eod)}</td>
+          <td>Max: ${escHtml(gd.group_a)} (n=${escHtml(gd.group_a_n ?? '?')}) vs Min: ${escHtml(gd.group_b)} (n=${escHtml(gd.group_b_n ?? '?')})${excludedNote}</td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No attribute could be audited — see the reasons below</td></tr>';
+
+      // Attributes that were proposed or detected but could not be audited, and why.
+      // Previously computed but never shown.
+      const skipped = payload.attributes_skipped || [];
+      const skippedEl = document.getElementById('fairness-skipped');
+      if (skippedEl) {
+        skippedEl.innerHTML = skipped.length
+          ? `<strong>Not audited:</strong><ul style="margin: 6px 0 0 18px;">${skipped.map(s => `<li>${escHtml(s)}</li>`).join('')}</ul>`
+          : '';
+      }
 
       // EDA findings, each annotated with how every stage used it
       const insights = payload.eda_findings || [];

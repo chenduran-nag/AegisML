@@ -219,36 +219,70 @@ Means over 5 seeds. Arms A and B were identical on every run, so they share a co
 
 | Dataset | AUC A/B → C | Violated attributes A/B → C | Min disparate impact A/B → C | Max parity difference A/B → C |
 |---|---|---|---|---|
-| UCI Adult (48,842) | 0.927 → 0.878 | 3.0 → 3.0 | 0.043 → 0.030 † | 0.384 → 0.327 |
-| German Credit (1,000) | 0.781 → 0.762 | 1.0 → 1.0 | 0.771 → 0.759 | 0.209 → 0.200 |
-| Bank Marketing (45,211) | 0.753 → 0.721 | 1.6 → 2.0 | 0.376 → 0.430 | 0.043 → 0.040 |
-| COMPAS (5,278) | 0.724 → 0.673 | 2.0 → 2.0 | 0.194 → 0.459 | 0.636 → 0.319 |
+| UCI Adult (48,842) | 0.927 → 0.878 | 5.0 → 5.0 | 0.004 → 0.011 † | 0.493 → 0.419 |
+| German Credit (1,000) | 0.781 → 0.763 | 1.0 → 1.0 | 0.798 → 0.801 | 0.166 → 0.162 |
+| Bank Marketing (45,211) | 0.753 → 0.721 | 2.6 → 3.0 | 0.128 → 0.153 | 0.203 → 0.206 |
+| COMPAS (5,278) | 0.724 → 0.673 | 4.0 → 3.8 | 0.179 → 0.328 | 0.647 → 0.397 |
 
 **Findings.**
 
-1. **No arm ever approved a fairness-compliant model.** All 60 approved models carried at
-   least one violation by the Fairness Agent's own thresholds.
-2. **Rejecting a model and taking the next best is not a fairness intervention.** Over 20
-   rerouted runs, the approved model had fewer violated attributes in **0**, the same in 18,
-   and more in 2. It cost AUC on every dataset (−0.019 to −0.051). The underlying magnitudes
-   moved inconsistently: COMPAS improved substantially yet still violated, while Adult's
-   minimum DI got slightly worse.
+1. **No approved model passed an audit that covered the protected attributes in its data.**
+   57 of 60 approved models carried at least one violation by the Fairness Agent's own
+   thresholds. The 3 that passed are a single German Credit split (seed 19) under all three
+   arms, and that audit covered only `job`: the split's age bands were too small to compare,
+   so the dataset's main protected attribute went unaudited while the verdict read "passed".
+   That is an open defect, not a compliant model (see the caveats).
+2. **Rejecting a model and taking the next best is not a fairness intervention.** Arm C
+   rerouted 19 of 20 runs; the approved model had fewer violated attributes in 2, the same in
+   14, and more in 3. It cost AUC on every dataset (−0.018 to −0.051). COMPAS magnitudes
+   improved (min DI 0.18 → 0.33, max parity difference 0.65 → 0.40) but every run still
+   violated.
 3. **The automatic data-quality retry never engaged.** Benchmark data passes the quality
    gate first time, so arms A and B coincide. That loop is exercised only by the synthetic
    tests.
-4. **The evaluation found two pipeline defects**, both fixed before these results: XGBoost
-   silently failed wherever category values contain `[`, `]` or `<` (German Credit), and a
-   run with no trained model could reach the gate, be approved, and receive a model card.
+4. **The evaluation found pipeline defects**, all fixed before these results: XGBoost
+   silently failed wherever category values contain `[`, `]` or `<` (German Credit); a run
+   with no trained model could reach the gate, be approved, and receive a model card; and the
+   Fairness Agent itself was not fit to report (next section).
+
+**The first run understated disparity.** The evaluation was first run with a Fairness Agent
+that read groups from the *cleaned* frame and had no minimum group size. It was corrected and
+the evaluation re-run from the same planner cache; arms A and B selected the same model with
+the same AUC on all 40 runs, so every change is in the measurement, not the models.
+
+- Groups now come from raw uploaded values. COMPAS `sex` (0/1, standardised by the Data
+  Agent) and Adult `occupation` (frequency-encoded) had been skipped as "continuous"; both
+  are now audited.
+- `age` is audited in bands (<25, 25–59, 60+). It was never audited before, on any dataset.
+- Groups with fewer than 30 evaluation rows are excluded from the comparison and listed.
+- Protected attributes present in the data are audited even when the planner omits them.
+- The equal-opportunity difference (true-positive-rate gap) is reported alongside, but is
+  not part of the verdict.
+
+Violated attributes per run rose from 3.0 to 5.0 on Adult, 2.0 to 4.0 on COMPAS and 1.6 to
+2.6 on Bank Marketing, and minimum DI fell on all three. German Credit's minimum DI rose
+slightly (0.771 → 0.798) once a 5-row `job` group was excluded.
 
 **Read these numbers with their caveats.**
 
-- † **Adult's minimum DI is a tiny-group artifact.** It is set by `marital-status =
-  "Married-AF-spouse"`: 4 people in a 9,769-row test split, all predicted negative. The
-  substantive Adult disparity is `sex`, DI ≈ 0.31 across groups of 6,490 and 3,279. The
-  metric needs a minimum group size — now the first item of Step 3.
-- **The planner chooses which attributes are audited, and some are not protected
-  attributes**: German Credit audited only `job`; Bank Marketing audited `education` and
-  `marital`. **`age` was never audited on any dataset**, because it is continuous.
+- † **Adult's minimum DI is still near zero, and this time it is not a small-group artifact.**
+  The first run's 0.043 came from a 4-person `marital-status` group, now excluded. Excluding
+  it did not lift the minimum, because substantial groups sit below it: on 4 of 5 splits,
+  `occupation = "Priv-house-serv"` (about 50 test rows, no positive predictions); on the
+  fifth, `age` under 25 (about 1,700 rows, a positive rate under 1% against about 25% for
+  ages 25–59). `occupation` is not a protected attribute. Among protected attributes, Adult's
+  lowest DI is `age` (0.02), then `race` (0.28) and `sex` (0.31).
+- **A protected attribute that cannot be audited does not stop a "passed" verdict.** German
+  Credit could compare age bands on only 3 of 5 splits; seed 19 passed on `job` alone.
+- **The verdict mixes protected and unprotected attributes.** The planner still proposes
+  `occupation`, `job`, `education` and `marital`, and their violations count toward the
+  verdict exactly as `sex` or `age` do. Each attribute is labelled protected or not in the
+  dashboard and the results.
+- **Protected attributes are recognised by column name.** German Credit's `personal_status`
+  combines sex and marital status, and is not recognised.
+- **COMPAS `sex` is coded 0/1, and OpenML does not document which value is which.** Value 1
+  is 80.5% of rows, which matches the dataset's known male share, but that is an inference.
+  The groups are reported as "0" and "1".
 - Seeds vary the train/test partition only. Model seeds are fixed, and the planner is held
   fixed per prompt, so arm differences reflect the governance loops, not LLM sampling
   variance.
@@ -279,9 +313,9 @@ saved CSVs, in seconds:
 python experiments/run_governance_eval.py --summarise-only
 ```
 
-The results were recorded on top of commit `91544dc`, with the evaluation code not yet
-committed (their manifest predates the `git_dirty` flag); that code is committed alongside
-them.
+These results were re-run on top of commit `363ce53` with the corrected Fairness Agent not
+yet committed (`git_dirty: true` in the manifest); that code is committed alongside them. The
+first run's results remain in git history at `363ce53`.
 
 ---
 

@@ -98,6 +98,9 @@ def test_pipeline_pauses_at_the_governance_gate(graph, toy_df):
     }
     assert payload["selected_model_name"] in ("LogisticRegression", "RandomForest")
     assert "fairness_evaluated" in payload
+    assert payload["fairness_min_group_size"] == 30
+    # The graph passes raw values, so every audited attribute says how it was grouped.
+    assert all(r["grouping"].startswith("raw values") for r in payload["fairness_report"])
 
 
 def test_split_is_carried_through_state(graph, toy_df):

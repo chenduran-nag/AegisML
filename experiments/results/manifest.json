@@ -1,8 +1,9 @@
 {
-  "generated_at": "2026-09-14T13:52:04.643377+00:00",
-  "mode": "record",
+  "generated_at": "2026-09-14T17:53:38.786197+00:00",
+  "mode": "replay",
   "quick": false,
-  "git_commit": "91544dc38cf5cd4f9702185123550f1cb89be74c",
+  "git_commit": "363ce536f828997ebc08446eb804d6da769b8bc8",
+  "git_dirty": true,
   "python": "3.13.9",
   "platform": "Windows-10-10.0.19045-SP0",
   "seeds": [
@@ -31,6 +32,7 @@
     }
   },
   "max_human_reroutes": 2,
+  "min_group_size": 30,
   "datasets": {
     "adult": {
       "label": "UCI Adult Income",
@@ -69,8 +71,8 @@
     "openai/gpt-oss-20b"
   ],
   "planner_calls": 60,
-  "planner_cache_hits": 56,
+  "planner_cache_hits": 60,
   "runs": 60,
   "errors": 0,
-  "wall_clock_s": 1238.2
+  "wall_clock_s": 1099.5
 }

@@ -15,7 +15,9 @@ import pandas as pd
 import pytest
 
 
-N_ROWS = 400
+# 1,000 rows gives a 200-row test split: large enough that the main groups clear the
+# Fairness Agent's minimum group size (30), small enough that a minority group does not.
+N_ROWS = 1000
 
 
 @pytest.fixture
@@ -58,8 +60,8 @@ def toy_df() -> pd.DataFrame:
     # Scattered nulls. `notes` sits at 25% — high enough to exercise imputation,
     # below the Data Agent's 35% "unhandled high null" bar so the quality gate
     # passes and the run reaches the governance gate.
-    df.loc[rng.choice(N_ROWS, 20, replace=False), "hours"] = np.nan
-    df.loc[rng.choice(N_ROWS, 100, replace=False), "notes"] = np.nan
+    df.loc[rng.choice(N_ROWS, N_ROWS // 20, replace=False), "hours"] = np.nan
+    df.loc[rng.choice(N_ROWS, N_ROWS // 4, replace=False), "notes"] = np.nan
     return df
 
 

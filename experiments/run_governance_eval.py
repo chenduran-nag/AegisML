@@ -73,6 +73,7 @@ if str(REPO_ROOT) not in sys.path:
 import pandas as pd  # noqa: E402
 from langgraph.types import Command  # noqa: E402
 
+import fairness_agent  # noqa: E402
 import pipeline_graph  # noqa: E402
 import planner_agent  # noqa: E402
 from graph_state import df_to_bytes  # noqa: E402
@@ -97,6 +98,7 @@ RUN_FIELDS = [
     "accuracy", "f1", "auc_roc",
     "fairness_evaluated", "overall_fairness_passed", "attributes_evaluated",
     "n_violations", "min_disparate_impact", "max_parity_difference",
+    "max_equal_opportunity_difference", "protected_attributes_evaluated",
     "retries", "reroutes", "eda_findings", "columns_dropped",
     "train_rows", "test_rows", "split_seed_recorded",
     "planner_calls", "planner_cache_hits", "planner_tokens_recorded", "planner_model",
@@ -106,7 +108,8 @@ RUN_FIELDS = [
 TRAJECTORY_FIELDS = [
     "dataset", "arm", "seed", "gate_index", "model", "auc_roc", "accuracy",
     "overall_fairness_passed", "attribute", "disparate_impact",
-    "demographic_parity_difference", "violation", "decision", "decision_reason",
+    "demographic_parity_difference", "equal_opportunity_difference", "protected",
+    "excluded_groups", "violation", "decision", "decision_reason",
 ]
 
 
@@ -175,10 +178,11 @@ DATASETS: dict[str, DatasetSpec] = {
     ),
     "credit_g": DatasetSpec(
         key="credit_g", label="German Credit", openml_id=31, target="class",
-        note=("1,000 rows. Positive class 'good' is the favourable outcome. The main "
-              "protected attribute in this dataset, age, is continuous and is not "
-              "audited by the Fairness Agent, so fairness may be reported as not "
-              "evaluated."),
+        note=("1,000 rows. Positive class 'good' is the favourable outcome. Age is "
+              "audited in bands, but a 200-row test split often leaves fewer than two "
+              "bands with 30 rows, so age goes unaudited on some seeds. "
+              "`personal_status` combines sex and marital status and is not recognised "
+              "as protected, because protected attributes are detected by column name."),
     ),
     "bank_marketing": DatasetSpec(
         key="bank_marketing", label="Bank Marketing", openml_id=46910,
@@ -358,10 +362,16 @@ def _gate_rows(dataset: str, arm: Arm, seed: int, gate_index: int,
     report = payload.get("fairness_report") or []
     if not report:
         return [{**base, "attribute": None, "disparate_impact": None,
-                 "demographic_parity_difference": None, "violation": None}]
+                 "demographic_parity_difference": None,
+                 "equal_opportunity_difference": None, "protected": None,
+                 "excluded_groups": None, "violation": None}]
     return [{**base, "attribute": r.get("attribute"),
              "disparate_impact": r.get("disparate_impact"),
              "demographic_parity_difference": r.get("demographic_parity_difference"),
+             "equal_opportunity_difference": r.get("equal_opportunity_difference"),
+             "protected": r.get("protected"),
+             "excluded_groups": ";".join(f"{k}={v}" for k, v in
+                                         (r.get("excluded_groups") or {}).items()) or None,
              "violation": r.get("violation")} for r in report]
 
 
@@ -405,6 +415,10 @@ def _final_metrics(values: dict, gates: int) -> dict:
                                       if r.get("demographic_parity_difference") is not None)
                                   if any(r.get("demographic_parity_difference") is not None
                                          for r in report) else None),
+        "max_equal_opportunity_difference": _max(
+            r.get("equal_opportunity_difference") for r in report),
+        "protected_attributes_evaluated": (sum(1 for r in report if r.get("protected"))
+                                           if report else None),
         "retries": values.get("retry_count", 0),
         "reroutes": values.get("rejection_reroute_count", 0),
         "eda_findings": len(values.get("eda_findings") or []),
@@ -579,8 +593,9 @@ def summarise(runs: list[dict], trajectory: list[dict],
             md.append(f"{meta.get('note', '')}\n")
         md.append("| Arm | Approved | AUC | Accuracy | Fairness evaluated | "
                   "Approved with a violation | Min disparate impact | Max parity difference | "
+                  "Max equal-opportunity difference | Protected attributes audited | "
                   "Violated attributes | Reroutes | Retries | Seconds / run |")
-        md.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+        md.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 
         for arm_key in arm_keys:
             ar = [r for r in runs if r["dataset"] == ds and r["arm"] == arm_key]
@@ -596,6 +611,8 @@ def summarise(runs: list[dict], trajectory: list[dict],
                 "accuracy": mean_std(r.get("accuracy") for r in approved),
                 "min_di": mean_std(r.get("min_disparate_impact") for r in evaluated),
                 "max_dpd": mean_std(r.get("max_parity_difference") for r in evaluated),
+                "max_eod": mean_std(r.get("max_equal_opportunity_difference") for r in evaluated),
+                "protected": mean_std(r.get("protected_attributes_evaluated") for r in evaluated),
                 "violations": mean_std(r.get("n_violations") for r in evaluated),
                 "reroutes": mean_std(r.get("reroutes") for r in ar),
                 "retries": mean_std(r.get("retries") for r in ar),
@@ -615,6 +632,7 @@ def summarise(runs: list[dict], trajectory: list[dict],
                 f"{len(evaluated)}/{len(approved)} | "
                 f"{len(violating)}/{len(evaluated) if evaluated else 0} | "
                 f"{fmt_mean_std(stats['min_di'])} | {fmt_mean_std(stats['max_dpd'])} | "
+                f"{fmt_mean_std(stats['max_eod'])} | {fmt_mean_std(stats['protected'], 1)} | "
                 f"{fmt_mean_std(stats['violations'], 2)} | "
                 f"{fmt_mean_std(stats['reroutes'], 2)} | {fmt_mean_std(stats['retries'], 2)} | "
                 f"{fmt_mean_std(stats['seconds'], 1)} |"
@@ -981,12 +999,14 @@ _INT_FIELDS = {
     "seed", "gates", "retries", "reroutes", "eda_findings", "train_rows", "test_rows",
     "split_seed_recorded", "planner_calls", "planner_cache_hits",
     "planner_tokens_recorded", "dataset_rows", "gate_index", "n_violations",
+    "protected_attributes_evaluated",
 }
 _FLOAT_FIELDS = {
     "accuracy", "f1", "auc_roc", "min_disparate_impact", "max_parity_difference",
     "wall_clock_s", "disparate_impact", "demographic_parity_difference",
+    "max_equal_opportunity_difference", "equal_opportunity_difference",
 }
-_BOOL_FIELDS = {"fairness_evaluated", "overall_fairness_passed", "violation"}
+_BOOL_FIELDS = {"fairness_evaluated", "overall_fairness_passed", "violation", "protected"}
 
 
 def _coerce(field: str, value):
@@ -1028,7 +1048,10 @@ def write_report(out_dir: Path, runs: list[dict], trajectory: list[dict],
     saved CSVs (--summarise-only) in seconds instead of re-running every pipeline.
     """
     out_dir = Path(out_dir)
-    dataset_meta = manifest.get("datasets") or {}
+    # Notes are explanatory prose from DATASETS, not measurements: take the current
+    # wording so a correction reaches --summarise-only. Rows and hashes stay as recorded.
+    dataset_meta = {ds: {**meta, "note": DATASETS[ds].note} if ds in DATASETS else meta
+                    for ds, meta in (manifest.get("datasets") or {}).items()}
     arm_keys = ([k for k in (manifest.get("arms") or {}) if k in ARMS]
                 or [k for k in ARMS if any(r["arm"] == k for r in runs)])
     arms = {k: ARMS[k] for k in arm_keys}
@@ -1071,6 +1094,11 @@ def write_report(out_dir: Path, runs: list[dict], trajectory: list[dict],
   difference. An attribute is violated when DI < 0.80 **or** parity difference > 0.10,
   so a run can clear the DI threshold and still carry violations. Runs where fairness
   was not evaluated are excluded from every fairness column, never counted as fair.
+- **Groups** come from raw uploaded values; age is banded (<25, 25-59, 60+); groups
+  with fewer than {manifest.get('min_group_size', 30)} evaluation rows are excluded from
+  the comparison; protected attributes present in the data are audited even when the
+  planner does not propose them. **Max equal-opportunity difference** is the largest
+  true-positive-rate gap between groups; it is reported, but it does not affect the verdict.
 - Runs: {manifest.get('runs', len(runs))} · errors: {manifest.get('errors', '?')} · wall
   clock: {manifest.get('wall_clock_s', '?')} s{quick_note}.
 
@@ -1201,6 +1229,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "arms": {k: {"label": ARMS[k].label, "description": ARMS[k].description,
                      "max_retries": ARMS[k].max_retries} for k in arm_keys},
         "max_human_reroutes": pipeline_graph.MAX_HUMAN_REROUTES,
+        "min_group_size": fairness_agent.MIN_GROUP_SIZE,
         "datasets": dataset_meta,
         "planner_models": planner_models,
         "planner_calls": sum(r.get("planner_calls") or 0 for r in runs),
