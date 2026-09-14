@@ -53,6 +53,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from audit_log import DEFAULT_AUDIT_DB, get_audit_trail, verify_audit_chain
+from eda_insights import build_eda_linkage
 
 # Artifacts are written to <ARTIFACT_ROOT>/<run_id>/.
 ARTIFACT_ROOT = "artifacts"
@@ -271,6 +272,12 @@ def build_model_card(
             "candidates_proposed": plan.get("sensitive_attribute_candidates", []),
         },
 
+        "data_insights": {
+            "findings": build_eda_linkage(
+                state.get("eda_findings") or [], plan, data_res, fair_res,
+            ),
+        },
+
         "explainability": {
             "method": "SHAP (TreeExplainer / LinearExplainer)",
             "top_features": train_res.get("shap_summary", []),
@@ -318,6 +325,12 @@ def render_model_card_md(card: dict) -> str:
                  for e in expl.get("top_features", [])]
     decision_rows = [[d.get("timestamp"), d.get("decision"), d.get("feedback")]
                      for d in gov.get("decision_history", [])]
+    insight_rows = [
+        [f.get("severity"), f.get("type"), ", ".join(f.get("columns") or []),
+         f.get("evidence"),
+         "; ".join(f"{o.get('stage')}: {o.get('status')}" for o in f.get("outcomes", []))]
+        for f in (card.get("data_insights") or {}).get("findings", [])
+    ]
 
     return f"""# Model Card — {md['selected_model']}
 
@@ -374,6 +387,14 @@ def render_model_card_md(card: dict) -> str:
 ### Preprocessing applied
 
 {_bullets(data['preprocessing_applied'])}
+
+### Findings from exploratory analysis
+
+Each finding is routed to the stage allowed to act on it: structural issues to the
+Data Agent, judgement-light ones to the Planner, and suspected target leakage or
+proxy variables to the human reviewer only.
+
+{_md_table(["Severity", "Finding", "Column(s)", "Evidence", "How it was used"], insight_rows)}
 
 ---
 
@@ -517,6 +538,9 @@ def build_technical_documentation(state: dict, card: dict, aibom: dict) -> str:
     fair = card["fairness"]
     gov = card["human_governance"]
     libs = aibom["runtime"]["libraries"]
+    insights = (card.get("data_insights") or {}).get("findings", [])
+    n_insights = len(insights)
+    n_reviewer_insights = sum(1 for f in insights if f.get("route") == "reviewer")
 
     lib_rows = [[name, ver] for name, ver in sorted(libs.items())]
 
@@ -574,6 +598,10 @@ Generated: {card['generated_at']}
   `{aibom['dataset']['sha256']}`; {data['rows_total']} rows x {data['columns_total']} columns;
   {data['missing_cells_pct']}% missing cells; split {data['train_rows']} train /
   {data['test_rows']} test. Preprocessing applied is itemised in the model card.
+  Exploratory analysis derived {n_insights} structured finding(s), of which
+  {n_reviewer_insights} (suspected target leakage or proxy variables for protected
+  attributes) were held for the human reviewer rather than acted on automatically;
+  each is listed with how it was used in the model card.
   **Provenance, lawful basis and labelling methodology of the uploaded dataset are
   OUT OF SCOPE for this tool** — they are properties of the data supplier.
 - **(e) Human oversight measures.** Execution suspends at a governance gate before

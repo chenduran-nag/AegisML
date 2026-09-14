@@ -47,6 +47,36 @@ DISPARATE_IMPACT_THRESHOLD = 0.80        # standard 80% rule (4/5ths rule)
 DEMOGRAPHIC_PARITY_DIFF_THRESHOLD = 0.10 # max 10% rate gap allowed
 
 
+def _proxy_warnings(
+    proxy_findings: list[dict] | None,
+    candidates: list[str] | None,
+    evaluated: list[str] | None,
+) -> list[dict]:
+    """
+    Surface EDA proxy-variable findings alongside the fairness audit.
+
+    Deliberately INFORMATIONAL: a proxy warning never changes
+    overall_fairness_passed. The verdict is a measurement of this model's
+    outcomes; a proxy is a property of the data that explains why a disparity can
+    persist. Folding one into the other would make the verdict mean two things.
+    """
+    audited = {str(c).strip() for c in (candidates or [])} | set(evaluated or [])
+    warnings = []
+    for finding in proxy_findings or []:
+        cols = finding.get("columns") or []
+        if finding.get("type") != "proxy_variable" or len(cols) < 2:
+            continue
+        warnings.append({
+            "id": finding["id"],
+            "proxy": cols[0],
+            "protected_attribute": cols[1],
+            "metric": finding.get("metric"),
+            "severity": finding.get("severity"),
+            "protected_attribute_audited": cols[1] in audited,
+        })
+    return warnings
+
+
 # ---------------------------------------------------------------------------
 # Group Reconstruction Helpers
 # ---------------------------------------------------------------------------
@@ -139,6 +169,7 @@ def run_fairness_agent(
     sensitive_attribute_candidates: list[str],
     task_type: str,
     eval_index: list | None = None,
+    proxy_findings: list | None = None,
 ) -> dict:
     """
     Evaluate algorithmic fairness across sensitive attribute candidates.
@@ -180,6 +211,8 @@ def run_fairness_agent(
         return {
             "overall_fairness_passed": None,
             "fairness_evaluated": False,
+            "proxy_warnings": _proxy_warnings(
+                proxy_findings, sensitive_attribute_candidates, []),
             "fairness_report": [],
             "attributes_skipped": [
                 "All attributes (regression task - Disparate Impact and "
@@ -343,7 +376,24 @@ def run_fairness_agent(
     else:
         overall_passed = not any(r["violation"] for r in fairness_report)
 
+    proxy_warnings = _proxy_warnings(
+        proxy_findings,
+        sensitive_attribute_candidates,
+        [r["attribute"] for r in fairness_report],
+    )
+    for warning in proxy_warnings:
+        metric = warning.get("metric") or {}
+        actions.append(
+            f"PROXY WARNING: exploratory analysis found '{warning['proxy']}' "
+            f"associated with '{warning['protected_attribute']}' "
+            f"({metric.get('name')} {metric.get('value')}). Disparities by "
+            f"'{warning['protected_attribute']}' can persist through "
+            f"'{warning['proxy']}' even if '{warning['protected_attribute']}' were "
+            f"removed. Informational: the verdict above is unchanged."
+        )
+
     return {
+        "proxy_warnings": proxy_warnings,
         "fairness_report": fairness_report,
         "overall_fairness_passed": overall_passed,
         "fairness_evaluated": bool(fairness_report),

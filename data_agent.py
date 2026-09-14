@@ -50,6 +50,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+from eda_insights import columns_named_in
+
 # ---------------------------------------------------------------------------
 # Module-level thresholds — easy to tune without hunting through logic
 # ---------------------------------------------------------------------------
@@ -65,6 +67,38 @@ NULL_PCT_QUALITY_LIMIT = 5.0        # quality fails if missing_pct >= 5%
 # agents. See _split_indices() for why this must happen in the Data Agent.
 TEST_SIZE = 0.20
 SPLIT_RANDOM_STATE = 42
+
+# Winsorization — applied only to columns a plan step names explicitly. Percentile
+# bounds rather than 1.5xIQR fences: on UCI Adult, IQR fences would zero out
+# capital-gain (IQR = 0, 92% zeros) and flatten hours-per-week (27.7% of values
+# outside the fences around a spike at 40). Percentile bounds touch ~2% of rows by
+# construction and are recomputed on the train split.
+WINSOR_LOWER_QUANTILE = 0.01
+WINSOR_UPPER_QUANTILE = 0.99
+
+# Verbs that mark a plan step as a clipping instruction. Bare "cap" is excluded
+# because it matches inside "capital-gain".
+CLIP_KEYWORDS = ("winsor", "clip", "capping", "cap outlier", "cap extreme")
+DROP_KEYWORDS = ("drop", "remove", "exclude")
+
+# Phrases that end the part of a clause a verb applies to. What follows them names
+# what to keep, or why: "Drop education-num and keep education", "Drop column
+# education-num (redundant with education)". Without the cut, the column the step
+# says to keep is dropped along with the one it says to drop.
+SCOPE_TERMINATORS = (
+    " keep ", " keeping ", " retain", " preserve", "redundant with",
+    "in favour of", "in favor of", "instead of", "rather than", "(",
+)
+
+# Words that make a clause advice rather than an instruction. The Data Agent
+# executes only unconditional steps: "consider winsorizing X if extreme values are
+# errors" is a suggestion for a human, not an order to clip X. Conservative by
+# design — a benign "if present" also blocks the action, which errs toward keeping
+# data rather than deleting it.
+HEDGE_MARKERS = (
+    "consider", "optionally", "optional", " if ", " may ", " might ", " could ",
+    " as is", " as-is", " leave ", "where appropriate",
+)
 
 # ---------------------------------------------------------------------------
 # Dtype predicates
@@ -98,16 +132,37 @@ def _is_encodable_categorical(series: pd.Series) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def _instruction_scope(clause: str) -> str:
+    """The part of a clause before its first scope terminator."""
+    cut = min((i for i in (clause.find(t) for t in SCOPE_TERMINATORS) if i != -1),
+              default=len(clause))
+    return clause[:cut]
+
+
 def _parse_plan_steps(steps: list[str], columns: list[str]) -> dict:
     """
-    Extract processing hints from the plan's free-text preprocessing steps
-    via keyword matching.
+    Extract processing hints from the plan's free-text preprocessing steps via
+    keyword matching. Nothing here generates or executes code.
+
+    Only UNCONDITIONAL instructions become actions. Each step is split into
+    clauses on ";" and every clause is read on its own:
+      - a hedged clause ("consider", "optionally", "if ...") is ignored;
+      - a drop or clip verb counts only if it appears BEFORE any scope terminator,
+        and applies only to columns named there;
+      - column names are matched longest first, so "education-num" is not also
+        read as "education".
+
+    Every rule exists because the live planner wrote a step that the earlier
+    substring matcher misread — dropping both columns of a redundant pair, or
+    winsorizing a column the step said to keep as is. The exact phrasings are
+    pinned in tests/test_eda_insights.py.
     """
     hints = {
         "smote_mentioned": False,
         "class_weight_mentioned": False,
         "frequency_encoding_mentioned": False,
         "explicit_drop_columns": [],
+        "winsorize_columns": [],
     }
     for step in steps:
         sl = step.lower()
@@ -117,10 +172,18 @@ def _parse_plan_steps(steps: list[str], columns: list[str]) -> dict:
             hints["class_weight_mentioned"] = True
         if "frequency" in sl:
             hints["frequency_encoding_mentioned"] = True
-        if any(kw in sl for kw in ("drop", "remove", "exclude")):
-            for col in columns:
-                if col.lower() in sl:
-                    hints["explicit_drop_columns"].append(col)
+
+        for clause in sl.split(";"):
+            padded = f" {clause.strip()} "
+            if any(marker in padded for marker in HEDGE_MARKERS):
+                continue
+            scope = _instruction_scope(padded)
+            # Clip before drop: if a clause somehow names both verbs, take the
+            # non-destructive reading.
+            if any(kw in scope for kw in CLIP_KEYWORDS):
+                hints["winsorize_columns"].extend(columns_named_in(scope, columns))
+            elif any(kw in scope for kw in DROP_KEYWORDS):
+                hints["explicit_drop_columns"].extend(columns_named_in(scope, columns))
     return hints
 
 
@@ -179,6 +242,83 @@ def _split_indices(
         f"scaling parameters below are fitted on the train rows ONLY."
     )
     return train_idx, test_idx
+
+
+def _drop_eda_structural_columns(
+    df: pd.DataFrame,
+    target_column: str,
+    eda_findings: list[dict] | None,
+    actions: list[str],
+    eda_actions: list[dict],
+) -> tuple[pd.DataFrame, list[str]]:
+    """
+    Drop columns that exploratory analysis routed to the Data Agent.
+
+    Only structural findings are routed here (per-row identifiers, constant
+    columns). These are decided from missingness-like properties of the data, not
+    from any learned parameter, so like the >50%-null rule they run before the
+    train/test split. Each drop is recorded against its finding id so the
+    governance gate can show exactly which EDA insight caused it.
+    """
+    dropped: list[str] = []
+    for finding in eda_findings or []:
+        if finding.get("route") != "data_agent":
+            continue
+        for col in finding.get("columns") or []:
+            if col == target_column or col not in df.columns or col in dropped:
+                continue
+            action = (f"Dropped column '{col}' (EDA finding {finding['type']}: "
+                      f"{finding.get('evidence', '')})")
+            actions.append(action)
+            eda_actions.append({"finding_id": finding["id"], "column": col,
+                                "action": action})
+            dropped.append(col)
+    return (df.drop(columns=dropped) if dropped else df), dropped
+
+
+def _winsorize_columns(
+    df: pd.DataFrame,
+    target_column: str,
+    columns: list[str],
+    actions: list[str],
+    fit_index: np.ndarray,
+) -> tuple[pd.DataFrame, list[str]]:
+    """
+    Clip plan-named numeric columns to percentile bounds fitted on the train rows.
+
+    Bounds are LEARNED FROM DATA, so they come from df.loc[fit_index] and are only
+    applied to the held-out rows (invariant 3). A column whose train percentiles
+    coincide — e.g. one that is zero throughout the train split — is skipped,
+    because clipping would collapse it to a constant.
+    """
+    done: list[str] = []
+    for col in dict.fromkeys(columns):
+        if col == target_column or col not in df.columns:
+            continue
+        if not pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_bool_dtype(df[col]):
+            actions.append(f"Skipped winsorizing '{col}': not a numeric column")
+            continue
+        train_values = df.loc[fit_index, col].dropna()
+        if train_values.empty:
+            actions.append(f"Skipped winsorizing '{col}': no non-null values in the train split")
+            continue
+        lower, upper = (float(v) for v in train_values.quantile(
+            [WINSOR_LOWER_QUANTILE, WINSOR_UPPER_QUANTILE]))
+        if not lower < upper:
+            actions.append(
+                f"Skipped winsorizing '{col}': the train-split "
+                f"{WINSOR_LOWER_QUANTILE:.0%} and {WINSOR_UPPER_QUANTILE:.0%} "
+                f"percentiles coincide ({lower:.4g}), so clipping would collapse the column"
+            )
+            continue
+        n_clipped = int(((df[col] < lower) | (df[col] > upper)).sum())
+        df[col] = df[col].astype(float).clip(lower=lower, upper=upper)
+        actions.append(
+            f"Winsorized '{col}' to train-split percentiles [{lower:.4g}, {upper:.4g}] "
+            f"(plan instruction; {n_clipped:,} value(s) clipped)"
+        )
+        done.append(col)
+    return df, done
 
 
 def _drop_high_null_columns(
@@ -479,6 +619,7 @@ def run_data_agent(
     plan: dict,
     target_column: str,
     task_type: str,
+    eda_findings: list[dict] | None = None,
 ) -> dict:
     """
     Deterministic data cleaning pipeline. Zero LLM calls.
@@ -500,6 +641,7 @@ def run_data_agent(
     df = df.copy()
     original_df = df.copy()
     actions: list[str] = []
+    eda_actions: list[dict] = []
     columns_dropped_total: list[str] = []
 
     # Step 0 — Parse plan hints (keyword matching; no code generation)
@@ -507,6 +649,13 @@ def run_data_agent(
         plan.get("recommended_preprocessing_steps", []),
         list(df.columns),
     )
+
+    # Step 0b — Drop columns exploratory analysis routed to the Data Agent
+    # (identifiers, constants). Structural, so it precedes the split.
+    df, eda_dropped = _drop_eda_structural_columns(
+        df, target_column, eda_findings, actions, eda_actions,
+    )
+    columns_dropped_total.extend(eda_dropped)
 
     # Step 1 — Drop columns > 50% missing or explicitly dropped by plan
     df, dropped = _drop_high_null_columns(
@@ -526,6 +675,11 @@ def run_data_agent(
 
     # Step 4 — Impute remaining nulls (fill values from the train split)
     df = _impute_columns(df, target_column, actions, fit_index=train_idx)
+
+    # Step 4b — Winsorize columns a plan step explicitly named (train-fitted bounds)
+    df, winsorized = _winsorize_columns(
+        df, target_column, hints["winsorize_columns"], actions, fit_index=train_idx,
+    )
 
     # Step 5 — Label-encode target (classification only).
     # Deterministic sorted mapping over all observed classes — not a fitted
@@ -568,6 +722,11 @@ def run_data_agent(
         "quality_check_passed": quality_check_passed,
         "quality_report": quality_report,
         "actions_taken": actions,
+        # Which EDA findings this agent acted on, and which columns it winsorized.
+        # Read by eda_insights.build_eda_linkage() to show the reviewer how each
+        # exploratory insight was used.
+        "eda_actions": eda_actions,
+        "winsorized_columns": winsorized,
         # Index labels of the split drawn in step 3. Consumed by
         # pipeline_graph.data_agent_node, which lifts them out of this dict and
         # into PipelineState["split_index"] so they never reach the audit log

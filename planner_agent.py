@@ -38,6 +38,8 @@ from typing import Literal, Optional
 import pandas as pd
 from groq import Groq
 
+from eda_insights import compact_findings_for_planner
+
 # ---------------------------------------------------------------------------
 # Environment loader (single source of truth for local execution)
 # ---------------------------------------------------------------------------
@@ -91,6 +93,7 @@ def _build_dataset_summary(
     df: pd.DataFrame,
     target_column: str,
     task_type: Literal["classification", "regression"],
+    eda_findings: Optional[list] = None,
 ) -> dict:
     """
     Build a compact, LLM-safe summary of the dataset.
@@ -194,6 +197,14 @@ def _build_dataset_summary(
         if any(kw in col.lower() for kw in SENSITIVE_KEYWORDS)
     ]
     summary["plausible_sensitive_columns_hint"] = plausible_sensitive
+
+    # Findings from exploratory analysis. ONLY planner-routed findings are
+    # included: suspected target leakage and proxy variables are reserved for the
+    # human reviewer and must never reach the LLM, which could otherwise recommend
+    # dropping a proxy column that the Data Agent would then remove automatically.
+    planner_findings = compact_findings_for_planner(eda_findings)
+    if planner_findings:
+        summary["eda_findings"] = planner_findings
 
     return summary
 
@@ -345,6 +356,7 @@ def plan_pipeline(
     business_objective: str = "",
     human_feedback: Optional[str] = None,
     meta_out: Optional[dict] = None,
+    eda_findings: Optional[list] = None,
 ) -> dict:
     """
     Generate a validated, JSON-serialisable pipeline plan for a dataset.
@@ -364,6 +376,9 @@ def plan_pipeline(
     business_objective : str, optional
         Optional user-defined business objective or domain constraint (e.g.
         "Maximize recall on high income", "Ensure strict fairness across gender/race").
+    eda_findings : list, optional
+        Findings from eda_insights.derive_eda_findings(). Only planner-routed
+        findings are forwarded to the LLM; see _build_dataset_summary().
     meta_out : dict, optional
         If provided, populated in place with call provenance: the resolved
         model id, SHA-256 of the exact prompts sent, and token usage. Passed as an
@@ -402,8 +417,26 @@ def plan_pipeline(
     client = Groq(api_key=api_key)
 
     # --- Build compact summary (no raw data) ---
-    summary = _build_dataset_summary(df, target_column, task_type)
+    summary = _build_dataset_summary(
+        df, target_column, task_type, eda_findings=eda_findings,
+    )
     system_prompt, user_prompt = _build_prompts(summary)
+
+    # --- Require explicit handling of exploratory findings ---
+    # Added only when planner-routed findings exist, so runs without them get
+    # exactly the prompt they got before. Injected into the SYSTEM prompt as plain
+    # text, for the same json_object-mode reason documented on the retry note below.
+    if summary.get("eda_findings"):
+        system_prompt = system_prompt + (
+            "\nEDA FINDINGS: The summary includes 'eda_findings', computed "
+            "deterministically from the raw data. For EVERY entry you MUST add one "
+            "item to data_quality_concerns that names its column(s). Then decide "
+            "explicitly: either add a concrete step to recommended_preprocessing_steps "
+            "that names the column (for example 'Drop column <name> (redundant with "
+            "<other>)' or 'Winsorize <name> at the 1st and 99th percentiles'), or say "
+            "in reasoning why no action is needed. Never recommend clipping a "
+            "zero-inflated column. Output ONLY valid JSON as usual."
+        )
 
     # --- Inject optional business objective ---
     if business_objective and business_objective.strip():

@@ -27,7 +27,7 @@
 
 ```mermaid
 flowchart TD
-    START(["START: USER CSV UPLOAD + TARGET COLUMN & TASK SELECTION"]) --> EDA["[1. Data Analysis Agent]<br/>EDA profiling, IQR outliers, Pearson correlations, Chart.js"]
+    START(["START: USER CSV UPLOAD + TARGET COLUMN & TASK SELECTION"]) --> EDA["[1. Data Analysis Agent]<br/>Profiling + routed findings: identifiers, zero-inflation,<br/>redundancy, target leakage, proxy variables"]
     EDA --> PLAN["[2. Planner Agent]<br/>Groq LLM generates JSON plan & strategy"]
     PLAN --> DATA["[3. Data Agent]<br/>Imputation, frequency encoding, feature scaling"]
     DATA --> CHECK{"Quality Check Passed?"}
@@ -57,7 +57,7 @@ flowchart TD
 
 ### 6 Pipeline Agent Nodes
 
-1. **`Data Analysis Agent` (`data_analysis_agent.py`)**: Performs initial exploratory data profiling, computing missingness ratios, column summary statistics, IQR outliers, Pearson correlation matrices ($|r| \ge 0.20$), target distributions, and interactive Chart.js visualization payloads.
+1. **`Data Analysis Agent` (`data_analysis_agent.py`, `eda_insights.py`)**: The first graph node. Profiles the raw data for the dashboard, then derives structured **findings**, each routed to the stage allowed to act on it. Structural issues (identifier and constant columns) go to the Data Agent, which drops them. Judgement-light issues (zero-inflated or outlier-heavy features, redundant pairs, a skewed target) go to the Planner, which must address each by name. Suspected target leakage and **proxy variables** for protected attributes (Cramér's V / correlation ratio) are held for the human reviewer and never sent to the LLM. Every finding is shown at the gate with what each stage actually did with it.
 2. **`Planner Agent` (`planner_agent.py`)**: Uses Groq LLM (`openai/gpt-oss-20b` by default; override with the `GROQ_MODEL` env var) in JSON mode at `temperature=0.2`. Only aggregate statistics are sent — never raw rows. Column metadata is capped at 40 representative columns (target, sensitive and high-null columns prioritised) to stay inside the request size limit on wide datasets. The response is validated against 5 required keys, with one retry on parse failure.
 3. **`Data Agent` (`data_agent.py`)**: Executes deterministic data cleaning. Drops columns above 50% missing and rows with a null target, then **draws the train/test split** and fits every subsequent parameter — median/mode imputation, frequency-encoding maps, `StandardScaler` — on the train rows only, applying them to all rows. Returns `train_index` / `test_index` so the Training Agent reuses the identical split.
 4. **`Training Agent` (`training_agent.py`)**: Converts target `y` using `LabelEncoder` (0..N-1) for 100% XGBoost compatibility across binary and multi-class tasks. Fits ensemble models (`RandomForest`, `XGBoost`, `LogisticRegression`/`Ridge`), ranks leaderboards, and extracts top-5 SHAP feature importances.
@@ -228,6 +228,8 @@ Approving a model writes `artifacts/<run_id>/`:
 | `aibom.json` | AI Bill of Materials: dataset SHA-256, model SHA-256, Python and library versions, planner model id and prompt hashes, token usage, audit chain head |
 | `technical_documentation.md` | Draft documentation laid out under the nine EU AI Act Annex IV headings |
 
+The model card also lists every exploratory finding and how it was used.
+
 Every field is read from recorded pipeline state — **nothing in these documents is
 LLM-authored**, so they cannot describe a metric the run never produced. Where a
 value is absent it is marked `not recorded` rather than left plausibly blank.
@@ -253,7 +255,7 @@ they are.
 pytest
 ```
 
-The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. 59 tests covering the leakage boundary, the audit chain (including tampering and the documented truncation gap), fairness reporting honesty, compliance artifact generation and integrity verification, and an end-to-end graph run through interrupt, resume and both reroute loops.
+The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. 119 tests covering the EDA finding routes (including a captured-prompt check that proxy and leakage findings never reach the LLM), plan-step parsing against real planner phrasings, the leakage boundary, the audit chain (including tampering and the documented truncation gap), fairness reporting honesty, compliance artifact generation and integrity verification, and an end-to-end graph run through interrupt, resume and both reroute loops.
 
 The `test_*.py` scripts in the repository root are the original manual integration walkthroughs — they download the UCI Adult dataset and call the live Groq API, so they are run by hand and are excluded from `pytest` collection.
 

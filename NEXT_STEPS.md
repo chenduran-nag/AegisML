@@ -15,7 +15,7 @@ reasoning behind this ordering.
 ## Where things stand
 
 Done: every Tier 0 repair, the hash-chained audit log, compliance artifact
-generation, and an offline pytest suite (59 tests). In detail:
+generation, and an offline pytest suite (119 tests). In detail:
 
 - The train/test split is drawn before any preprocessing parameter is fitted.
 - Approved models are actually written to `saved_models/`.
@@ -32,6 +32,7 @@ Remaining, in recommended order:
 |---|---|---|
 | 0 | Live verification with a real Groq key | **DONE** — 3 bugs found and fixed |
 | 1 | Compliance artifact generation | **DONE** — `compliance_artifacts.py`, 24 new tests |
+| — | EDA-driven pipeline | **DONE** — findings routed to Data Agent / Planner / reviewer |
 | 2 | Quantitative governance evaluation | Turns the demo into a measurable result |
 | 3 | Fairness metrics + mitigation | Closes the loop the thesis promises |
 | 4 | Policy-as-code | Cheap, big framing gain |
@@ -200,6 +201,65 @@ open-source agentic-AutoML space does this, and every input already exists in
 - [ ] Editing an artifact file makes `verify_artifacts` fail.
 - [ ] The AIBOM model hash equals the SHA-256 of the saved `.joblib`.
 - [ ] Tests cover all of the above, offline.
+
+---
+
+## EDA-driven pipeline — DONE
+
+Exploratory analysis used to be a dashboard page that nothing downstream read.
+It is now `data_analysis_node`, the first node in the graph, and it produces
+structured findings (`eda_insights.py`). Each finding carries a **route** that
+decides who may act on it:
+
+| Route | Findings | Who acts |
+|---|---|---|
+| `data_agent` | per-row identifiers / free text, constant columns | Dropped deterministically before the split |
+| `planner` | zero-inflated or outlier-heavy features, redundant pairs, skewed target | Sent to the LLM, which must address each by name |
+| `reviewer` | suspected target leakage, proxy variables for protected attributes | Shown at the gate only — **never sent to the LLM** |
+
+`build_eda_linkage()` annotates every finding with what each stage actually did
+(applied / sent / mentioned / not reflected / flagged / attached). This shows on
+the EDA page, in a new **EDA Insights** tab at the gate, as proxy warnings under
+the fairness verdict (informational — the verdict is unchanged), and in the model
+card.
+
+**On UCI Adult (32,561 rows, 0.74 s):** 9 findings. `relationship` is a high-severity
+proxy for `sex` (Cramér's V 0.65); `marital-status` for `age` (0.57) and `sex`
+(0.46); `occupation` for `sex` (0.44); `capital-gain` and `capital-loss` are
+zero-inflated; `education` and `education-num` are redundant (1.0);
+`hours-per-week` is peaked. There were no identifier, constant or leakage false
+positives. Live against `openai/gpt-oss-20b`, the planner named all four
+planner-routed findings, proposed binary indicators for the zero-inflated columns,
+left `hours-per-week` alone, and did not touch any proxy column.
+
+**Found and fixed along the way.** The Data Agent's substring matcher misread two
+of those live planner steps. It dropped *both* `education` and `education-num`
+from "Drop 'education-num' and keep 'education'", and winsorized `hours-per-week`
+from "Keep 'hours-per-week' as is; consider winsorizing ... if ...". It also
+misread the example phrasing the new prompt rule itself suggests. Rewritten
+(clauses, hedges, scope terminators, longest-first names); the exact strings are
+pinned as regression tests.
+
+Re-verified live after a clean server restart: the planner again wrote
+"Drop 'education-num' (redundant with 'education')", and this time only
+`education-num` was dropped. An earlier live run had silently executed pre-fix
+code, because `uvicorn --reload` logged a reload but never replaced its worker — see
+the gotcha in `CLAUDE.md`. Passing tests did not reveal this; checking the serving
+process's start time did.
+
+**Still open:**
+
+- The planner recommends transforms the deterministic Data Agent cannot execute
+  yet — binary "is non-zero" indicators and `log1p`. These findings show as
+  *sent / mentioned* but never *applied*. Implementing a small, whitelisted set of
+  transforms (fit on train where they learn anything) is the natural extension.
+- Proxy detection keys on column **names**. A protected attribute stored under an
+  opaque name is missed, and pairs of protected attributes are not reported as
+  proxies of each other.
+- Integer identifiers are caught only when named like an id or stored as monotonic
+  row numbers.
+- The hedge rule is deliberately conservative: "Drop X if present" is treated as
+  advice and not executed.
 
 ---
 

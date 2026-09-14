@@ -107,6 +107,10 @@ class PipelineState(TypedDict, total=False):
     artifacts_manifest : Optional[dict]
         Result of compliance_artifacts.generate_artifacts(): output directory plus
         a per-file path/digest map. Set only on the approve path.
+    eda_findings : Optional[list]
+        Structured findings from eda_insights.derive_eda_findings(), each carrying a
+        `route` ("data_agent", "planner" or "reviewer") that decides which stage may
+        act on it. Set once by data_analysis_node.
     eda_report : Optional[dict]
         Exploratory profiling report from analyze_raw_dataset(), computed by the
         server at upload time. Stored in state (not a module-level cache) so it
@@ -163,6 +167,7 @@ class PipelineState(TypedDict, total=False):
     cleaned_df_bytes: Optional[bytes]
     split_index: Optional[dict]
     eda_report: Optional[dict]
+    eda_findings: Optional[list]
     dataset_sha256: Optional[str]
     planner_meta: Optional[dict]
     artifacts_manifest: Optional[dict]

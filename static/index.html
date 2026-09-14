@@ -404,6 +404,21 @@
       </div>
     </div>
 
+    <!-- EDA Findings: what the analysis found and who acts on it -->
+    <div class="glass-card" style="margin-bottom: 24px;">
+      <div class="card-title">Findings &amp; How They Are Used</div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+        Each finding is routed to the stage allowed to act on it.
+        <strong>Auto-applied by Data Agent:</strong> structural issues such as identifier or constant columns.
+        <strong>Sent to Planner:</strong> judgement-light issues the plan must address by name.
+        <strong>Held for reviewer:</strong> suspected target leakage and proxy variables, which are never sent to the LLM
+        or acted on automatically.
+      </p>
+      <div id="eda-findings-list">
+        <div style="font-size: 0.85rem; color: var(--text-muted);">Run the pipeline to derive findings.</div>
+      </div>
+    </div>
+
     <!-- Interactive Data Analysis Visualizations Grid -->
     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 24px;">
       <div class="glass-card" style="margin-bottom: 0;">
@@ -556,6 +571,7 @@
         <button class="tab-btn" onclick="switchTab(event, 'tab-data')">Data Cleaning Report</button>
         <button class="tab-btn" onclick="switchTab(event, 'tab-leaderboard')">Model Leaderboard</button>
         <button class="tab-btn" onclick="switchTab(event, 'tab-fairness')">Fairness Assessment</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-eda-insights')">EDA Insights <span id="eda-insights-count" style="color: #fbbf24;"></span></button>
       </div>
 
       <!-- Tab 1: Planner -->
@@ -637,6 +653,17 @@
           </tbody>
         </table>
         <div style="margin-top: 14px; font-size: 0.8rem; color: var(--text-muted);" id="fairness-skipped"></div>
+        <div id="fairness-proxy-warnings"></div>
+      </div>
+
+      <!-- Tab 5: EDA Insights -->
+      <div class="tab-content" id="tab-eda-insights">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+          Every finding from exploratory analysis, with what each stage actually did with it.
+          "Mentioned" is a textual check that the plan names the column; it is not proof the
+          concern was resolved.
+        </p>
+        <div id="eda-insights-list"></div>
       </div>
 
     </div>
@@ -995,6 +1022,64 @@
       });
     }
 
+    function escHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
+
+    const EDA_ROUTE_LABEL = {
+      data_agent: 'Auto-applied by Data Agent',
+      planner: 'Sent to Planner',
+      reviewer: 'Held for reviewer',
+    };
+    const EDA_SEVERITY_COLOR = { high: '#f87171', medium: '#fbbf24', info: '#93c5fd' };
+    const EDA_STATUS_STYLE = {
+      applied:       ['#34d399', 'rgba(16, 185, 129, 0.14)'],
+      mentioned:     ['#93c5fd', 'rgba(59, 130, 246, 0.14)'],
+      sent:          ['#a5b4fc', 'rgba(99, 102, 241, 0.14)'],
+      flagged:       ['#fbbf24', 'rgba(245, 158, 11, 0.14)'],
+      attached:      ['#fbbf24', 'rgba(245, 158, 11, 0.14)'],
+      not_reflected: ['#fca5a5', 'rgba(239, 68, 68, 0.12)'],
+      not_applied:   ['#9ca3af', 'rgba(107, 114, 128, 0.14)'],
+      pending:       ['#9ca3af', 'rgba(107, 114, 128, 0.14)'],
+    };
+
+    // Column names and evidence come from the uploaded CSV, so every value is
+    // escaped before it reaches innerHTML.
+    function renderEDAFindings(findings, targetId, withOutcomes) {
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      if (!findings || !findings.length) {
+        el.innerHTML = '<div style="font-size: 0.85rem; color: var(--text-muted); padding: 8px 0;">No identifier, distribution, redundancy, leakage or proxy issues were detected.</div>';
+        return;
+      }
+      el.innerHTML = findings.map(f => {
+        const sev = EDA_SEVERITY_COLOR[f.severity] || '#9ca3af';
+        const cols = (f.columns || []).map(escHtml).join(', ');
+        let outcomes = '';
+        if (withOutcomes && f.outcomes && f.outcomes.length) {
+          const chips = f.outcomes.map(o => {
+            const style = EDA_STATUS_STYLE[o.status] || EDA_STATUS_STYLE.pending;
+            return `<span style="font-size: 0.72rem; color: ${style[0]}; background: ${style[1]}; border-radius: 6px; padding: 3px 8px;">${escHtml(o.stage)}: ${escHtml(String(o.status).replace(/_/g, ' '))}</span>`;
+          }).join('');
+          const details = f.outcomes.map(o =>
+            `<div style="font-size: 0.74rem; color: var(--text-dark); margin-top: 3px;">${escHtml(o.stage)} — ${escHtml(o.detail)}</div>`
+          ).join('');
+          outcomes = `<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;">${chips}</div>${details}`;
+        }
+        return `<div style="border: 1px solid var(--card-border); border-left: 3px solid ${sev}; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; background: rgba(0, 0, 0, 0.25);">
+          <div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline;">
+            <strong style="font-size: 0.88rem;">${escHtml(String(f.type).replace(/_/g, ' '))}${cols ? ' — ' + cols : ''}</strong>
+            <span style="font-size: 0.72rem; color: ${sev}; text-transform: uppercase; white-space: nowrap;">${escHtml(f.severity)} · ${escHtml(EDA_ROUTE_LABEL[f.route] || f.route)}</span>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">${escHtml(f.evidence)}</div>
+          <div style="font-size: 0.8rem; color: var(--text-main); margin-top: 4px;">${escHtml(f.recommendation)}</div>
+          ${outcomes}
+        </div>`;
+      }).join('');
+    }
+
     function renderEDAReport(eda) {
       if (!eda || !eda.summary) return;
       const sum = eda.summary;
@@ -1002,6 +1087,8 @@
       document.getElementById('eda-total-cols').innerText = sum.total_columns || 0;
       document.getElementById('eda-missing-pct').innerText = (sum.missing_pct || 0) + '%';
       document.getElementById('eda-outliers-cnt').innerText = sum.outlier_columns_count || 0;
+
+      renderEDAFindings(eda.findings || [], 'eda-findings-list', false);
 
       // Render Visual Charts
       if (eda.charts) {
@@ -1229,6 +1316,32 @@
           <td>${f.group_details ? `Max: ${f.group_details.group_a} vs Min: ${f.group_details.group_b}` : 'N/A'}</td>
         </tr>
       `).join('') : '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No sensitive attribute violations evaluated</td></tr>';
+
+      // EDA findings, each annotated with how every stage used it
+      const insights = payload.eda_findings || [];
+      renderEDAFindings(insights, 'eda-insights-list', true);
+      const insightCount = document.getElementById('eda-insights-count');
+      if (insightCount) insightCount.innerText = insights.length ? `(${insights.length})` : '';
+
+      // Proxy warnings: informational, shown under the fairness verdict
+      const proxies = payload.proxy_warnings || [];
+      const proxyEl = document.getElementById('fairness-proxy-warnings');
+      if (proxyEl) {
+        proxyEl.innerHTML = proxies.length ? `
+          <div style="margin-top: 16px; padding: 12px 14px; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; background: rgba(245, 158, 11, 0.08);">
+            <strong style="color: #fbbf24; font-size: 0.85rem;">Proxy variables detected by exploratory analysis</strong>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin: 4px 0 8px;">
+              These columns carry information about a protected attribute, so disparities by that attribute can
+              persist through them even if the attribute itself is removed. Informational only: they do not change
+              the verdict above.
+            </div>
+            ${proxies.map(p => {
+              const m = p.metric || {};
+              const note = p.protected_attribute_audited ? '' : ' — <span style="color: #fca5a5;">this protected attribute was not in the audited set</span>';
+              return `<div style="font-size: 0.8rem; margin-top: 3px;"><code>${escHtml(p.proxy)}</code> &rarr; <code>${escHtml(p.protected_attribute)}</code> (${escHtml(m.name)} ${escHtml(m.value)}, ${escHtml(p.severity)})${note}</div>`;
+            }).join('')}
+          </div>` : '';
+      }
 
       // Fetch Audit Log
       fetchAuditTrail(currentThreadId);

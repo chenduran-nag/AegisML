@@ -345,6 +345,55 @@ def test_rejection_cap_terminates_without_approval_or_artifacts(graph, toy_df):
 
 
 # ---------------------------------------------------------------------------
+# EDA findings flow through the graph
+# ---------------------------------------------------------------------------
+
+
+def test_data_analysis_runs_first_and_is_audited(graph, toy_df):
+    from audit_log import get_audit_trail
+
+    config = _run_to_gate(graph, toy_df, "t-eda-audit")
+    trail = get_audit_trail("t-eda-audit", db_path=graph.audit_db)
+
+    assert trail[0]["event_type"] == "data_analysis_run"
+    values = graph.g.get_state(config).values
+    assert "summary" in values["eda_report"]
+    assert isinstance(values["eda_findings"], list)
+
+
+def test_structural_finding_is_dropped_and_linked_at_the_gate(graph, toy_df):
+    df = toy_df.copy()
+    df.insert(0, "record_id", [f"R{i:05d}" for i in range(len(df))])
+    config = {"configurable": {"thread_id": "t-eda-id"}}
+    graph.g.invoke(_initial_state(df), config=config)
+
+    snapshot = graph.g.get_state(config)
+    dropped = snapshot.values["data_agent_result"]["quality_report"]["columns_dropped"]
+    assert "record_id" in dropped
+
+    payload = snapshot.tasks[0].interrupts[0].value
+    finding = next(f for f in payload["eda_findings"]
+                   if f["id"] == "identifier_column:record_id")
+    assert any(o["status"] == "applied" for o in finding["outcomes"])
+    assert "proxy_warnings" in payload
+
+
+def test_eda_failure_does_not_break_the_pipeline(graph, toy_df, monkeypatch):
+    from audit_log import get_audit_trail
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("synthetic EDA failure")
+
+    monkeypatch.setattr(pipeline_graph, "derive_eda_findings", _boom)
+    config = _run_to_gate(graph, toy_df, "t-eda-fail")
+
+    assert "human_approval_node" in graph.g.get_state(config).next
+    first = get_audit_trail("t-eda-fail", db_path=graph.audit_db)[0]
+    assert first["event_type"] == "data_analysis_run"
+    assert "FAILED" in first["summary"]
+
+
+# ---------------------------------------------------------------------------
 # Audit trail of a full run
 # ---------------------------------------------------------------------------
 

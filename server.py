@@ -117,9 +117,6 @@ def _build_pipeline_response(thread_id: str) -> dict:
     }
 
 
-from data_analysis_agent import analyze_raw_dataset
-
-
 @app.post("/api/pipeline/start")
 async def start_pipeline(
     file: UploadFile = File(...),
@@ -129,8 +126,8 @@ async def start_pipeline(
 ):
     """
     Ingest uploaded CSV, construct initial state, and invoke pipeline graph
-    until paused at human_approval_node or completed.
-    Also computes exploratory data analysis via Data Analysis Agent.
+    until paused at human_approval_node or completed. Exploratory analysis runs
+    inside the graph as data_analysis_node.
     """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported")
@@ -162,20 +159,9 @@ async def start_pipeline(
     thread_id = f"run-{uuid.uuid4().hex[:8]}"
     config = {"configurable": {"thread_id": thread_id}}
 
-    # Compute EDA analysis report. It goes into the graph state rather than a
-    # module-level dict so that it survives a server restart like every other
-    # part of the run — an in-memory cache would silently lose the profiling
-    # report for any run that outlived the process.
-    try:
-        eda_report = analyze_raw_dataset(df_raw, target_column)
-    except Exception as exc:
-        print(f"[server] EDA analysis failed: {exc}")
-        eda_report = {"error": str(exc)}
-
     initial_state = {
         "df_bytes": df_to_bytes(df_raw),
         "dataset_sha256": dataset_sha256,
-        "eda_report": eda_report,
         "target_column": target_column,
         "task_type": task_type,
         "business_objective": business_objective or "",
@@ -199,7 +185,11 @@ async def start_pipeline(
         raise HTTPException(status_code=500, detail=f"Pipeline execution error: {exc}")
 
     res = _build_pipeline_response(thread_id)
-    res["eda_report"] = eda_report
+    values = graph.get_state(config).values or {}
+    res["eda_report"] = {
+        **(values.get("eda_report") or {}),
+        "findings": values.get("eda_findings") or [],
+    }
     return res
 
 
@@ -209,10 +199,11 @@ async def get_eda_report(thread_id: str):
     Get Data Analysis Agent EDA report for a given run thread_id.
     """
     snapshot = graph.get_state({"configurable": {"thread_id": thread_id}})
-    report = (snapshot.values or {}).get("eda_report")
+    values = snapshot.values or {}
+    report = values.get("eda_report")
     if not report:
         raise HTTPException(status_code=404, detail="EDA report not found for this run")
-    return report
+    return {**report, "findings": values.get("eda_findings") or []}
 
 
 @app.post("/api/pipeline/resume")

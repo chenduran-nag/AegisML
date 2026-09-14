@@ -7,6 +7,9 @@ Graph structure:
     START
       │
       ▼
+  data_analysis_node    ← profiles raw data, derives routed EDA findings
+      │
+      ▼
   planner_node          ← calls plan_pipeline() (LLM)
       │
       ▼
@@ -65,6 +68,8 @@ from training_agent import run_training_agent
 from fairness_agent import run_fairness_agent
 from audit_log import DEFAULT_AUDIT_DB, log_audit_event
 from compliance_artifacts import ARTIFACT_EVENT_TYPE, generate_artifacts
+from data_analysis_agent import analyze_raw_dataset
+from eda_insights import build_eda_linkage, derive_eda_findings, findings_for_route
 
 MAX_RETRIES = 2          # maximum planner→data_agent auto-retries
 MAX_HUMAN_REROUTES = 2   # maximum human rejection reroutes before capping
@@ -87,6 +92,76 @@ def _get_run_id(config: RunnableConfig | None) -> str:
     if config and "configurable" in config:
         return config["configurable"].get("thread_id", "unknown_run")
     return "unknown_run"
+
+
+# ---------------------------------------------------------------------------
+# Node: Data Analysis
+# ---------------------------------------------------------------------------
+
+
+def data_analysis_node(state: PipelineState, config: RunnableConfig) -> dict:
+    """
+    First node: profile the raw data and derive routed findings.
+
+    This used to run in server.py before graph.invoke(), which meant it was not
+    audited, not part of the checkpointed run, and not executed at all when the
+    pipeline was driven from a script or a test. As a node it is all three.
+
+    Runs exactly once per run — every loop re-enters at the planner or at
+    training, never here — so findings stay stable across reroutes.
+
+    A failure here must not stop the pipeline: exploratory analysis informs later
+    stages but is not required by them. A failure is recorded in the audit log
+    instead, so its absence is itself visible to a reviewer.
+    """
+    run_id = _get_run_id(config)
+    df = bytes_to_df(state["df_bytes"])
+    target_column = state["target_column"]
+    task_type = state["task_type"]
+
+    try:
+        eda_report = analyze_raw_dataset(df, target_column)
+    except Exception as exc:
+        print(f"[data_analysis_node] Profiling failed: {type(exc).__name__}: {exc}")
+        eda_report = {"error": f"{type(exc).__name__}: {exc}"}
+
+    findings_error = None
+    try:
+        findings = derive_eda_findings(df, target_column, task_type)
+    except Exception as exc:
+        findings = []
+        findings_error = f"{type(exc).__name__}: {exc}"
+        print(f"[data_analysis_node] Finding derivation failed: {findings_error}")
+
+    counts = {route: len(findings_for_route(findings, route))
+              for route in ("data_agent", "planner", "reviewer")}
+    print(
+        f"[data_analysis_node] {len(findings)} finding(s): "
+        f"data_agent={counts['data_agent']} planner={counts['planner']} "
+        f"reviewer={counts['reviewer']}"
+    )
+
+    log_audit_event(
+        run_id=run_id,
+        db_path=AUDIT_DB_PATH,
+        event_type="data_analysis_run",
+        event_source="automated",
+        summary=(
+            f"Data Analysis profiled {len(df):,} rows x {df.shape[1]} columns and "
+            f"derived {len(findings)} finding(s): {counts['data_agent']} for the "
+            f"Data Agent, {counts['planner']} for the Planner, {counts['reviewer']} "
+            f"held for the reviewer"
+            + (f" (finding derivation FAILED: {findings_error})" if findings_error else "")
+        ),
+        # Aggregate-only: the profiling summary and the findings, never per-row data.
+        details={
+            "summary": eda_report.get("summary", {}),
+            "findings": findings,
+            "error": eda_report.get("error") or findings_error,
+        },
+    )
+
+    return {"eda_report": eda_report, "eda_findings": findings}
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +199,7 @@ def planner_node(state: PipelineState, config: RunnableConfig) -> dict:
         business_objective=state.get("business_objective", "") or "",
         human_feedback=state.get("human_feedback", "") or "",
         meta_out=planner_meta,
+        eda_findings=state.get("eda_findings") or [],
     )
 
     models_str = ", ".join(plan.get("recommended_models", []))
@@ -157,6 +233,7 @@ def data_agent_node(state: PipelineState, config: RunnableConfig) -> dict:
         plan=state["plan"],
         target_column=state["target_column"],
         task_type=state["task_type"],
+        eda_findings=state.get("eda_findings") or [],
     )
 
     cleaned_df = result.pop("cleaned_df")
@@ -350,6 +427,7 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
         sensitive_attribute_candidates=sensitive_candidates,
         task_type=state["task_type"],
         eval_index=split.get("test"),
+        proxy_findings=findings_for_route(state.get("eda_findings"), "reviewer"),
     )
 
     passed = result.get("overall_fairness_passed", False)
@@ -410,6 +488,12 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
         "fairness_evaluated": fair_res.get("fairness_evaluated", False),
         "attributes_skipped": fair_res.get("attributes_skipped", []),
         "unresolved_quality_issue": state.get("unresolved_quality_issue", False),
+        # Every EDA finding annotated with what each stage did with it. A pure
+        # function of recorded state, so safe to build before interrupt().
+        "eda_findings": build_eda_linkage(
+            state.get("eda_findings") or [], plan, data_res, fair_res,
+        ),
+        "proxy_warnings": fair_res.get("proxy_warnings", []),
     }
 
     print("[human_approval_node] Interrupting execution for Human Approval...")
@@ -724,6 +808,7 @@ def build_graph(db_path: str = "pipeline_state.db"):
     builder = StateGraph(PipelineState)
 
     # Register processing nodes
+    builder.add_node("data_analysis_node", data_analysis_node)
     builder.add_node("planner_node", planner_node)
     builder.add_node("data_agent_node", data_agent_node)
     builder.add_node("training_node", training_node)
@@ -739,7 +824,8 @@ def build_graph(db_path: str = "pipeline_state.db"):
     builder.add_node("mark_human_cap_failure", _mark_human_cap_failure)
 
     # Fixed edges
-    builder.add_edge(START, "planner_node")
+    builder.add_edge(START, "data_analysis_node")
+    builder.add_edge("data_analysis_node", "planner_node")
     builder.add_edge("planner_node", "data_agent_node")
 
     # Conditional routing after data agent

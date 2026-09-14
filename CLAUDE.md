@@ -26,7 +26,7 @@ protect it.
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-pytest                      # 59 offline tests, no API key or network needed
+pytest                      # 119 offline tests, no API key or network needed
 ```
 
 Running the app needs `GROQ_API_KEY` in a `.env` file at the repo root (gitignored,
@@ -36,7 +36,9 @@ never commit it), then `python server.py` → http://localhost:8000.
 
 | File | Role |
 |---|---|
-| `pipeline_graph.py` | LangGraph `StateGraph`: nodes, 3 feedback loops, `SqliteSaver`, model serialisation in `audit_log_node` |
+| `pipeline_graph.py` | LangGraph `StateGraph`: `data_analysis_node` first, 3 feedback loops, `SqliteSaver`, model serialisation in `audit_log_node` |
+| `data_analysis_agent.py` | Raw profiling + Chart.js payloads for the EDA page |
+| `eda_insights.py` | Turns profiling into routed findings (`data_agent` / `planner` / `reviewer`) + `build_eda_linkage()`; shared column-name matching |
 | `graph_state.py` | `PipelineState` TypedDict; DataFrames stored as pickled bytes, models as joblib bytes |
 | `planner_agent.py` | The ONLY LLM call (Groq, JSON mode). Sends aggregate stats only |
 | `data_agent.py` | Deterministic cleaning. Draws the train/test split, fits everything on train |
@@ -80,6 +82,17 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
    and that no compliance certification exists. New features get the same honesty.
    The generated Annex IV pack names its own gaps (sections 8 and 9) on purpose —
    do not quietly turn those into claims.
+11. **EDA findings are routed, and reviewer findings never reach the LLM.** Suspected
+    target leakage and proxy variables (`route == "reviewer"`) are shown at the gate
+    only. If the planner saw "X is a proxy for sex" it could write "Drop column X",
+    and the Data Agent would execute it — an automated fairness decision nobody
+    approved. `compact_findings_for_planner()` enforces this; a test captures the
+    real prompt to prove it. A reviewer who wants to act uses Loop 2.
+12. **The Data Agent executes only unconditional instructions.** `_parse_plan_steps`
+    reads each `;` clause separately, ignores hedged clauses ("consider", "if ..."),
+    applies a verb only before a scope terminator ("keep", "redundant with", "("),
+    and matches column names longest-first via `columns_named_in()`. Each rule
+    fixes a misreading of a real planner step; the phrasings are pinned in tests.
 10. **Compliance artifacts are generated, never authored.** Every field in
     `compliance_artifacts.py` is read from recorded state. Never let an LLM write
     a model card, and never emit a plausible blank where a value is missing —
@@ -101,7 +114,13 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
   `build_graph(db_path=tmp)`. All are read at call time, so `monkeypatch.setattr`
   is enough; see the `graph` fixture in `tests/test_graph_end_to_end.py`.
 - A `plan_pipeline` stub should populate the `meta_out` dict it is handed, or the
-  AIBOM has no planner provenance to record.
+  AIBOM has no planner provenance to record. It also receives `eda_findings=`;
+  accept `**kwargs`.
+- EDA runs inside the graph (`data_analysis_node`), not in `server.py`. Tests that
+  build state by hand do not need to supply `eda_report`.
+- To test what the LLM is actually sent without a key, monkeypatch
+  `planner_agent._call_groq` and capture its arguments — see
+  `test_planner_prompt_carries_planner_findings_but_not_proxies`.
 - Importing `pipeline_graph` builds a module-level graph, creating `pipeline_state.db`
   in the working directory (gitignored).
 - **pandas 3** uses a `str` dtype for text columns, not `object`. Use
@@ -109,3 +128,9 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
 - **Windows + redirected output:** agent `print`s contain `→`. When stdout is piped or
   redirected on Windows it falls back to cp1252 and raises `UnicodeEncodeError`. Set
   `PYTHONIOENCODING=utf-8` when running scripts through a pipe.
+- **Windows + `uvicorn --reload` can serve stale code.** Observed here: the reloader
+  logged "Reloading...", but every server process still predated the edits, and a
+  live run reproduced a parser bug that was already fixed on disk. For any live
+  verification, stop the server, start it **without** `--reload`, and confirm the
+  process serving port 8000 started after your last edit. A passing test suite does
+  not prove the running server has the same code.

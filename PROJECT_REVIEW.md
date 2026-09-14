@@ -9,7 +9,7 @@
 > **Update — branch `fix/tier0-repairs-and-audit-chain`:** all of Tier 0, item 1.1
 > (hash-chained audit log) and item 1.2 (compliance artifact generation) are
 > implemented, plus two Medium-severity items (#5, #8) that fell out of the same
-> refactor. See [Implementation status](#implementation-status). 59 offline tests
+> refactor. See [Implementation status](#implementation-status). 119 offline tests
 > pass, and the system has now been verified end to end against the live Groq
 > planner through the real dashboard, which surfaced three further UI defects
 > (#17, #18 and a lost model name) — all fixed.
@@ -36,6 +36,8 @@
 | Step 0 live verification against real Groq + browser | **Done** — 3 UI bugs found and fixed |
 | #17 **New:** terminated runs rendered as "approved" in the dashboard | Fixed |
 | #18 **New:** temporal dead zone aborted the approved-path render | Fixed |
+| EDA-driven pipeline: routed findings, proxy + leakage detection, linkage | **Done** — see `NEXT_STEPS.md` |
+| #19 **New:** plan-step matcher dropped both columns of a redundant pair | Fixed — clause / hedge / scope rules |
 | 1.3 Policy-as-code | Not started |
 | 1.4 Reviewer identity | Not started |
 | Tier 2 / Tier 3 | Not started |
