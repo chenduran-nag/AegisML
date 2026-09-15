@@ -99,7 +99,7 @@ RUN_FIELDS = [
     "dataset", "arm", "seed", "status", "error", "gates", "final_model",
     "accuracy", "f1", "auc_roc",
     "fairness_evaluated", "overall_fairness_passed", "attributes_evaluated",
-    "n_violations", "min_disparate_impact", "max_parity_difference",
+    "n_violations", "n_advisory_violations", "min_disparate_impact", "max_parity_difference",
     "max_equal_opportunity_difference", "protected_attributes_evaluated",
     "protected_attributes_unaudited", "mitigated_attributes",
     "retries", "reroutes", "eda_findings", "columns_dropped",
@@ -401,6 +401,8 @@ def _final_metrics(values: dict, gates: int) -> dict:
     quality = (values.get("data_agent_result") or {}).get("quality_report") or {}
     metrics = training.get("selected_model_metrics") or {}
     report = fairness.get("fairness_report") or []
+    verdict_rows = [r for r in report
+                    if r.get("counts_toward_verdict", r.get("protected")) is not False]
 
     if values.get("unresolved_quality_issue"):
         status = "terminated_quality_cap"
@@ -427,16 +429,18 @@ def _final_metrics(values: dict, gates: int) -> dict:
         "fairness_evaluated": bool(fairness.get("fairness_evaluated")),
         "overall_fairness_passed": fairness.get("overall_fairness_passed"),
         "attributes_evaluated": ";".join(str(r.get("attribute")) for r in report),
-        # None, not 0, when nothing was measured (invariant 4).
-        "n_violations": (sum(1 for r in report if r.get("violation"))
-                         if report else None),
-        "min_disparate_impact": _min(r.get("disparate_impact") for r in report),
-        "max_parity_difference": (max(r["demographic_parity_difference"] for r in report
-                                      if r.get("demographic_parity_difference") is not None)
-                                  if any(r.get("demographic_parity_difference") is not None
-                                         for r in report) else None),
+        # Fairness columns follow the verdict: protected attributes only. Advisory
+        # (unprotected) violations are counted separately. None, not 0, when nothing
+        # was measured (invariant 4).
+        "n_violations": (sum(1 for r in verdict_rows if r.get("violation"))
+                         if verdict_rows else None),
+        "n_advisory_violations": (sum(1 for r in report if r.get("violation")
+                                      and r not in verdict_rows) if report else None),
+        "min_disparate_impact": _min(r.get("disparate_impact") for r in verdict_rows),
+        "max_parity_difference": _max(
+            r.get("demographic_parity_difference") for r in verdict_rows),
         "max_equal_opportunity_difference": _max(
-            r.get("equal_opportunity_difference") for r in report),
+            r.get("equal_opportunity_difference") for r in verdict_rows),
         "protected_attributes_evaluated": (sum(1 for r in report if r.get("protected"))
                                            if report else None),
         "protected_attributes_unaudited": ";".join(
@@ -562,7 +566,10 @@ def fmt_mean_std(stat, digits: int = 3) -> str:
 
 
 def _gate_stats(rows: list[dict]) -> dict:
-    evaluated = [r for r in rows if r.get("attribute") is not None]
+    # Protected attributes only, matching the verdict. A row without a protected flag
+    # (results recorded before the flag existed) counts; only an explicit False is advisory.
+    evaluated = [r for r in rows if r.get("attribute") is not None
+                 and r.get("protected") not in (False, "False")]
     return {
         "violations": (sum(1 for r in evaluated if r.get("violation"))
                        if evaluated else None),
@@ -1128,11 +1135,15 @@ def write_report(out_dir: Path, runs: list[dict], trajectory: list[dict],
   ({manifest.get('planner_cache_hits', '?')} of {manifest.get('planner_calls', '?')} planner
   calls served from `experiments/planner_cache/`).
 - **Rejection cap:** {manifest.get('max_human_reroutes', '?')} human reroutes per run.
-- **Min disparate impact** is the lowest DI across the attributes the Fairness Agent
-  audited for that run; **max parity difference** is the largest demographic parity
-  difference. An attribute is violated when DI < 0.80 **or** parity difference > 0.10,
-  so a run can clear the DI threshold and still carry violations. Runs where fairness
-  was not evaluated are excluded from every fairness column, never counted as fair.
+- **The verdict covers protected attributes only**, and so do the fairness columns:
+  **min disparate impact** is the lowest DI across the protected attributes audited for
+  that run, **max parity difference** the largest demographic parity difference, and
+  **violated attributes** the protected attributes in violation. Attributes the planner
+  proposes that are not protected (occupation, job, education) are audited but advisory;
+  they appear in `fairness_trajectory.csv` and `n_advisory_violations`. An attribute is
+  violated when DI < 0.80 **or** parity difference > 0.10, so a run can clear the DI
+  threshold and still carry violations. Runs where fairness was not evaluated are
+  excluded from every fairness column, never counted as fair.
 - **Groups** come from raw uploaded values; age is banded (<25, 25-59, 60+); groups
   with fewer than {manifest.get('min_group_size', 30)} evaluation rows are excluded from
   the comparison; protected attributes present in the data are audited even when the

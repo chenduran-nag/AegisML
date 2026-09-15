@@ -110,7 +110,9 @@ def fairness_verdict(fairness_result: dict | None) -> str:
     fr = fairness_result or {}
     passed = fr.get("overall_fairness_passed")
     if passed is None:
-        if fr.get("fairness_report") and fr.get("protected_attributes_unaudited"):
+        coverage = fr.get("fairness_coverage")
+        if coverage == "partial" or (coverage is None and fr.get("fairness_report")
+                                     and fr.get("protected_attributes_unaudited")):
             return "NOT FULLY EVALUATED"
         return "NOT EVALUATED"
     return "PASSED" if passed else "VIOLATION DETECTED"
@@ -221,10 +223,10 @@ def build_model_card(
             "for ranking features but not as user-facing effect sizes."
         )
     unaudited = [p.get("attribute") for p in fair_res.get("protected_attributes_unaudited") or []]
-    if fair_res.get("overall_fairness_passed") is None and not fair_res.get("fairness_report"):
+    if fair_res.get("overall_fairness_passed") is None and fairness_verdict(fair_res) == "NOT EVALUATED":
         limitations.append(
-            "Fairness was NOT evaluated for this run. No fairness claim of any "
-            "kind is supported by this document."
+            "Fairness was NOT evaluated for this run: no protected attribute could be "
+            "audited. No fairness claim of any kind is supported by this document."
         )
     elif unaudited:
         limitations.append(
@@ -232,6 +234,13 @@ def build_model_card(
             + ", ".join(unaudited) + ". No fairness claim about "
             + ("them" if len(unaudited) > 1 else "it")
             + " is supported, and no overall pass was recorded."
+        )
+    advisory = fair_res.get("advisory_violations") or []
+    if advisory:
+        limitations.append(
+            "The fairness verdict covers protected attributes only (detected by column "
+            "name or declared by the reviewer). Violations on other audited attributes "
+            "are advisory and did not affect it: " + ", ".join(advisory) + "."
         )
     mitigated = (state.get("mitigation") or {}).get("attributes") or []
     if mitigated:
@@ -314,6 +323,9 @@ def build_model_card(
             "report": fair_res.get("fairness_report", []),
             "attributes_skipped": fair_res.get("attributes_skipped", []),
             "coverage": fair_res.get("fairness_coverage") or NOT_RECORDED,
+            "verdict_scope": "protected attributes only",
+            "declared_protected_attributes": state.get("declared_protected_attributes") or [],
+            "advisory_violations": fair_res.get("advisory_violations", []),
             "protected_attributes_unaudited": fair_res.get("protected_attributes_unaudited", []),
             "candidates_proposed": plan.get("sensitive_attribute_candidates", []),
         },
@@ -367,10 +379,13 @@ def render_model_card_md(card: dict) -> str:
     fairness_rows = [
         [f.get("attribute"),
          {True: "yes", False: "no"}.get(f.get("protected"), NOT_RECORDED),
+         {True: "yes", False: "no (advisory)"}.get(
+             f.get("counts_toward_verdict", f.get("protected")), NOT_RECORDED),
          f.get("disparate_impact"),
          f.get("demographic_parity_difference"),
          f.get("equal_opportunity_difference"),
-         "VIOLATION" if f.get("violation") else "passed",
+         ("VIOLATION" if f.get("counts_toward_verdict", f.get("protected")) is not False
+          else "advisory violation") if f.get("violation") else "passed",
          _groups_compared(f)]
         for f in fair.get("report", [])
     ]
@@ -468,9 +483,15 @@ proxy variables to the human reviewer only.
 
 Measured on {fair['evaluated_rows']} held-out rows. Groups with fewer than {fair['thresholds'].get('min_group_size')} rows are excluded from the comparison. Equal-opportunity difference is reported but does not affect the verdict.
 
-{_md_table(["Attribute", "Protected", "Disparate impact", "Parity difference", "Equal opportunity difference", "Status", "Groups compared"], fairness_rows)}
+The verdict covers **protected attributes only** (detected by column name or declared by the reviewer); violations on other audited attributes are advisory.
+
+{_md_table(["Attribute", "Protected", "Counts toward verdict", "Disparate impact", "Parity difference", "Equal opportunity difference", "Status", "Groups compared"], fairness_rows)}
 
 **Protected attributes present but not audited:** {', '.join(p.get('attribute', '') for p in fair.get('protected_attributes_unaudited') or []) or 'none'}
+
+**Declared protected by the reviewer:** {', '.join(fair.get('declared_protected_attributes') or []) or 'none'}
+
+**Advisory violations (not protected):** {', '.join(fair.get('advisory_violations') or []) or 'none'}
 
 **Candidates proposed by the planner:** {', '.join(fair['candidates_proposed']) or 'none'}
 

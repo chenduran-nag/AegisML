@@ -291,24 +291,38 @@ def _credit_seed_19_shape():
 
 
 def test_a_pass_on_unprotected_attributes_with_age_unaudited_is_not_a_pass():
+    """German Credit seed 19: only `job` audited, and `job` is not protected."""
     cleaned, raw, preds = _credit_seed_19_shape()
     result = _audit(cleaned, raw, preds, ["job"])
 
     assert _entry(result, "job")["violation"] is False
     assert result["overall_fairness_passed"] is None
-    assert result["fairness_evaluated"] is True
-    assert result["fairness_coverage"] == "partial"
+    assert result["fairness_evaluated"] is False, "an advisory result supports no conclusion"
+    assert result["fairness_coverage"] == "none"
     (gap,) = result["protected_attributes_unaudited"]
     assert gap["attribute"] == "age" and "fewer than 2 groups" in gap["reason"]
+    assert any("NOT EVALUATED" in a for a in result["actions_taken"])
+
+
+def _age_unaudited(raw):
+    # Many distinct ages, so age is banded: "25-59" gets 190 rows, "<25" only 10.
+    raw["age"] = list(np.resize(np.arange(25, 60), 190)) + list(np.resize(np.arange(18, 25), 10))
+    return raw
+
+
+def test_a_protected_pass_with_another_protected_attribute_unaudited_is_not_fully_evaluated():
+    cleaned, raw, preds = _frames({"Male": (100, 50), "Female": (100, 48)})
+    result = _audit(cleaned, _age_unaudited(raw), preds, ["sex"])
+
+    assert result["overall_fairness_passed"] is None
+    assert result["fairness_evaluated"] is True
+    assert result["fairness_coverage"] == "partial"
     assert any("NOT FULLY EVALUATED" in a for a in result["actions_taken"])
 
 
 def test_a_measured_violation_is_still_false_when_coverage_is_partial():
-    cleaned, raw, preds = _frames({"skilled": (100, 80), "unskilled": (100, 20)},
-                                  attribute="job")
-    # Many distinct ages, so age is banded: "25-59" gets 190 rows, "<25" only 10.
-    raw["age"] = list(np.resize(np.arange(25, 60), 190)) + list(np.resize(np.arange(18, 25), 10))
-    result = _audit(cleaned, raw, preds, ["job"])
+    cleaned, raw, preds = _frames({"Male": (100, 80), "Female": (100, 20)})
+    result = _audit(cleaned, _age_unaudited(raw), preds, ["sex"])
 
     assert result["overall_fairness_passed"] is False
     assert result["fairness_coverage"] == "partial"
@@ -337,8 +351,95 @@ def test_an_unprotected_skip_does_not_block_a_pass():
 def test_model_card_verdict_names_partial_coverage():
     from compliance_artifacts import fairness_verdict
 
+    cleaned, raw, preds = _frames({"Male": (100, 50), "Female": (100, 48)})
+    assert fairness_verdict(_audit(cleaned, _age_unaudited(raw), preds, ["sex"])) == \
+        "NOT FULLY EVALUATED"
     cleaned, raw, preds = _credit_seed_19_shape()
-    assert fairness_verdict(_audit(cleaned, raw, preds, ["job"])) == "NOT FULLY EVALUATED"
+    assert fairness_verdict(_audit(cleaned, raw, preds, ["job"])) == "NOT EVALUATED"
+
+
+# ---------------------------------------------------------------------------
+# Verdict scope: protected attributes only; the rest are advisory
+# ---------------------------------------------------------------------------
+
+
+def test_an_unprotected_violation_is_advisory_and_does_not_fail_the_verdict():
+    cleaned, raw, preds = _frames({"Male": (100, 50), "Female": (100, 48)})
+    # job: skilled rows are the first 100 (mostly Male), a large rate gap.
+    raw["job"] = ["skilled"] * 100 + ["unskilled"] * 100
+    preds[:] = [1] * 60 + [0] * 40 + [1] * 38 + [0] * 62
+    raw["sex"] = ["Male", "Female"] * 100
+    result = _audit(cleaned, raw, preds, ["sex", "job"])
+
+    job = _entry(result, "job")
+    assert job["violation"] is True and job["counts_toward_verdict"] is False
+    assert _entry(result, "sex")["counts_toward_verdict"] is True
+    assert result["advisory_violations"] == ["job"]
+    assert result["overall_fairness_passed"] is True
+    assert any(a.startswith("ADVISORY") for a in result["actions_taken"])
+
+
+def test_auditing_only_unprotected_attributes_is_not_evaluated():
+    cleaned, raw, preds = _frames({"skilled": (100, 80), "unskilled": (100, 20)},
+                                  attribute="job")
+    result = _audit(cleaned, raw, preds, ["job"])
+
+    assert result["fairness_report"], "the attribute is still audited and reported"
+    assert result["overall_fairness_passed"] is None
+    assert result["fairness_evaluated"] is False
+    assert result["fairness_coverage"] == "none"
+    assert result["advisory_violations"] == ["job"]
+
+
+# ---------------------------------------------------------------------------
+# Reviewer-declared protected attributes
+# ---------------------------------------------------------------------------
+
+
+def test_a_declared_attribute_counts_toward_the_verdict():
+    """German Credit's personal_status holds sex and marital status; name matching misses it."""
+    spec = {"male single": (100, 70), "female div/dep/mar": (100, 30)}
+    cleaned, raw, preds = _frames(spec, attribute="personal_status")
+
+    undeclared = _audit(cleaned, raw, preds, [])
+    assert undeclared["fairness_report"] == []
+    assert undeclared["overall_fairness_passed"] is None
+
+    declared = _audit(cleaned, raw, preds, [], declared_protected=["personal_status"])
+    entry = _entry(declared, "personal_status")
+    assert entry["source"] == "declared" and entry["protected"] is True
+    assert declared["overall_fairness_passed"] is False
+    assert declared["declared_protected_attributes"] == ["personal_status"]
+
+
+def test_declaring_a_planner_proposed_attribute_moves_it_into_the_verdict():
+    cleaned, raw, preds = _frames({"skilled": (100, 80), "unskilled": (100, 20)},
+                                  attribute="job")
+    result = _audit(cleaned, raw, preds, ["job"], declared_protected=["job"])
+
+    assert _entry(result, "job")["source"] == "planner"
+    assert result["advisory_violations"] == []
+    assert result["overall_fairness_passed"] is False
+
+
+def test_a_declared_attribute_feeds_eda_proxy_detection():
+    from eda_insights import derive_eda_findings
+
+    rng = np.random.default_rng(3)
+    status = rng.choice(["a", "b", "c"], size=400)
+    df = pd.DataFrame({
+        "personal_status": status,
+        "housing": pd.Series(status).map({"a": "own", "b": "rent", "c": "free"}),
+        "amount": rng.normal(size=400),
+        "y": rng.choice([0, 1], size=400),
+    })
+
+    def proxies(**kwargs):
+        return [f["columns"] for f in derive_eda_findings(df, "y", "classification", **kwargs)
+                if f["type"] == "proxy_variable"]
+
+    assert proxies() == []
+    assert ["housing", "personal_status"] in proxies(declared_protected=["personal_status"])
 
 
 def test_raw_frame_must_share_the_cleaned_index():

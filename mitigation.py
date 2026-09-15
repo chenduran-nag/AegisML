@@ -16,9 +16,9 @@ DESIGN / WHY
   - Groups are formed with the Fairness Agent's own rules (raw values, age bands, a
     missing-value group), so the reweighted attribute is the audited one.
   - The attribute is chosen deterministically, not by the LLM: the protected
-    attribute with the lowest disparate impact among the violations, otherwise the
-    violated attribute with the lowest disparate impact. A later mitigation adds
-    its attribute, and weights are computed on the intersection of all of them.
+    attribute with the lowest disparate impact among the violations. Advisory
+    (unprotected) attributes are never reweighted. A later mitigation adds its
+    attribute, and weights are computed on the intersection of all of them.
   - State and the audit log hold per-cell weights, which are aggregates, never
     per-row weights (invariant 8). Row weights are rebuilt from the raw frame at
     training time from those same cells, so what is logged is what was trained on.
@@ -37,13 +37,19 @@ INTERSECTION_SEPARATOR = " x "
 
 
 def choose_attribute(fairness_result: dict | None, already_mitigated: list[str]) -> str | None:
-    """The violated attribute to mitigate next, or None if none is left."""
+    """
+    The protected attribute to mitigate next, or None if none is left.
+
+    Only attributes that count toward the verdict are candidates. Reweighing an
+    advisory attribute cannot change the verdict, and in the evaluation it did not
+    help (German Credit `job`).
+    """
     report = (fairness_result or {}).get("fairness_report") or []
-    violated = [r for r in report
-                if r.get("violation") and r.get("attribute") not in already_mitigated]
-    if not violated:
+    pool = [r for r in report
+            if r.get("violation") and r.get("counts_toward_verdict", r.get("protected"))
+            and r.get("attribute") not in already_mitigated]
+    if not pool:
         return None
-    pool = [r for r in violated if r.get("protected")] or violated
     return min(pool, key=lambda r: r["disparate_impact"])["attribute"]
 
 

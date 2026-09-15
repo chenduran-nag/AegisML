@@ -169,6 +169,10 @@ class PipelineState(TypedDict, total=False):
         {method, attributes, applications: [{attribute, status, reason, cells,
         before}]}. Cells are per-(group, label) weights, never per-row data. While
         attributes is non-empty, training_node trains with reweighing weights.
+    declared_protected_attributes : Optional[list[str]]
+        Columns the reviewer declared protected at run start. They are audited, count
+        toward the fairness verdict, and feed EDA proxy detection, in addition to the
+        columns detected by name.
     """
 
     df_bytes: bytes
@@ -200,3 +204,4 @@ class PipelineState(TypedDict, total=False):
     model_saved_path: Optional[str]
     model_save_error: Optional[str]
     mitigation: Optional[dict]
+    declared_protected_attributes: Optional[list[str]]

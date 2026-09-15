@@ -98,8 +98,8 @@ def test_the_worst_protected_violation_is_chosen_first():
     ]}
     assert choose_attribute(fairness, []) == "race"
     assert choose_attribute(fairness, ["race"]) == "sex"
-    assert choose_attribute(fairness, ["race", "sex"]) == "job"
-    assert choose_attribute(fairness, ["race", "sex", "job"]) is None
+    # `job` is advisory: reweighing it cannot change the verdict, so it is never chosen.
+    assert choose_attribute(fairness, ["race", "sex"]) is None
 
 
 # ---------------------------------------------------------------------------

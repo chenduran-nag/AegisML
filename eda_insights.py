@@ -59,7 +59,7 @@ HONEST LIMITS:
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 import numpy as np
 import pandas as pd
@@ -120,8 +120,15 @@ def _name_tokens(name: str) -> list[str]:
     return [t for t in re.split(r"[^a-z0-9]+", str(name).lower()) if t]
 
 
-def is_protected_attribute(column: str) -> bool:
-    """True if a column name looks like a protected attribute."""
+def is_protected_attribute(column: str, declared: Optional[Iterable[str]] = None) -> bool:
+    """
+    True if a column is a protected attribute: named like one, or declared as one by
+    the reviewer at run start. Name matching misses opaque or combined columns (German
+    Credit's `personal_status` holds sex and marital status), which is why a reviewer
+    can declare them.
+    """
+    if declared and str(column) in {str(d) for d in declared}:
+        return True
     for token in _name_tokens(column):
         if token in PROTECTED_EXACT_TOKENS:
             return True
@@ -264,6 +271,7 @@ def derive_eda_findings(
     df: pd.DataFrame,
     target_column: str,
     task_type: str,
+    declared_protected: Optional[Iterable[str]] = None,
 ) -> list[dict]:
     """
     Derive structured, routed findings from the raw dataset.
@@ -418,10 +426,11 @@ def derive_eda_findings(
                 ))
 
     # 4b. Proxy variables for protected attributes (route: reviewer)
-    protected = [c for c in candidates if is_protected_attribute(c)]
+    declared = list(declared_protected or [])
+    protected = [c for c in candidates if is_protected_attribute(c, declared)]
     for attribute in protected:
         for col in candidates:
-            if col == attribute or is_protected_attribute(col):
+            if col == attribute or is_protected_attribute(col, declared):
                 continue
             result = association(work[col], work[attribute])
             if not result or result[1] < PROXY_MEDIUM_THRESHOLD:
@@ -444,7 +453,7 @@ def derive_eda_findings(
             ))
 
     # 4c. Redundant feature pairs (route: planner)
-    non_protected = [c for c in candidates if not is_protected_attribute(c)]
+    non_protected = [c for c in candidates if not is_protected_attribute(c, declared)]
     if len(non_protected) <= MAX_FEATURES_FOR_PAIRWISE:
         for i, left in enumerate(non_protected):
             for right in non_protected[i + 1:]:

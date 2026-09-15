@@ -135,7 +135,10 @@ def data_analysis_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     findings_error = None
     try:
-        findings = derive_eda_findings(df, target_column, task_type)
+        findings = derive_eda_findings(
+            df, target_column, task_type,
+            declared_protected=state.get("declared_protected_attributes"),
+        )
     except Exception as exc:
         findings = []
         findings_error = f"{type(exc).__name__}: {exc}"
@@ -498,6 +501,7 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
         # Group membership is read from the raw upload: scaling and encoding in the
         # cleaned frame destroy it (a 0/1 sex column becomes a float).
         raw_frame=bytes_to_df(state["df_bytes"]),
+        declared_protected=state.get("declared_protected_attributes"),
     )
 
     passed = result.get("overall_fairness_passed", False)
@@ -561,6 +565,8 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
         "fairness_evaluated": fair_res.get("fairness_evaluated", False),
         "fairness_coverage": fair_res.get("fairness_coverage"),
         "protected_attributes_unaudited": fair_res.get("protected_attributes_unaudited", []),
+        "advisory_violations": fair_res.get("advisory_violations", []),
+        "declared_protected_attributes": state.get("declared_protected_attributes") or [],
         "attributes_skipped": fair_res.get("attributes_skipped", []),
         "unresolved_quality_issue": state.get("unresolved_quality_issue", False),
         # Every EDA finding annotated with what each stage did with it. A pure
@@ -667,6 +673,8 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
             "overall_fairness_passed": fairness_passed,
             "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
             "fairness_coverage": fairness_result.get("fairness_coverage"),
+            "advisory_violations": fairness_result.get("advisory_violations", []),
+            "declared_protected_attributes": state.get("declared_protected_attributes") or [],
             "protected_attributes_unaudited": [
                 p.get("attribute") for p in fairness_result.get("protected_attributes_unaudited", [])
             ],

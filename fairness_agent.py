@@ -51,6 +51,15 @@ evaluation (experiments/run_governance_eval.py) exposed:
     depend on an LLM remembering to mention it. Each report entry records whether
     it came from the planner or was added automatically.
 
+  The verdict covers protected attributes only.
+    Protected means named like one (eda_insights.is_protected_attribute) or declared by
+    the reviewer at run start (declared_protected). Other attributes the planner
+    proposes, such as occupation or job, are still audited and reported, but their
+    violations are ADVISORY (counts_toward_verdict False, listed in advisory_violations):
+    anti-discrimination rules such as the four-fifths rule are defined over protected
+    characteristics. With no protected attribute evaluated, the verdict is None and
+    fairness_evaluated is False.
+
   An unaudited protected attribute blocks a pass.
     If a protected attribute present in the data is skipped (for example, its age
     bands are all under MIN_GROUP_SIZE) and no audited attribute is violated, the
@@ -258,6 +267,7 @@ def run_fairness_agent(
     proxy_findings: list | None = None,
     raw_frame: pd.DataFrame | None = None,
     min_group_size: int = MIN_GROUP_SIZE,
+    declared_protected: list | None = None,
 ) -> dict:
     """
     Evaluate algorithmic fairness across sensitive attributes.
@@ -305,6 +315,8 @@ def run_fairness_agent(
             "fairness_evaluated": False,
             "fairness_coverage": "none",
             "protected_attributes_unaudited": [],
+            "advisory_violations": [],
+            "declared_protected_attributes": list(declared_protected or []),
             "proxy_warnings": _proxy_warnings(
                 proxy_findings, sensitive_attribute_candidates, []),
             "fairness_report": [],
@@ -382,7 +394,13 @@ def run_fairness_agent(
     observed_classes = set(pd.unique(y_true.dropna()))
     binary_target = len(observed_classes) == 2 and observed_classes <= {0, 1}
 
-    # Planner candidates first, then protected attributes the planner did not name.
+    declared = [str(c).strip() for c in (declared_protected or []) if str(c).strip()]
+
+    def _protected(name: str) -> bool:
+        return is_protected_attribute(name, declared)
+
+    # Planner candidates first, then reviewer-declared attributes, then protected
+    # attributes detected by name that neither named.
     candidates: list[tuple[str, str]] = []
     seen: set[str] = set()
     for candidate in sensitive_attribute_candidates or []:
@@ -390,9 +408,14 @@ def run_fairness_agent(
         if name and name not in seen:
             candidates.append((name, "planner"))
             seen.add(name)
+    for name in declared:
+        if name != target_column and name not in seen:
+            candidates.append((name, "declared"))
+            seen.add(name)
+            actions.append(f"Added '{name}' to the audit: declared protected by the reviewer")
     if raw_eval is not None:
         for column in raw_eval.columns:
-            if column != target_column and column not in seen and is_protected_attribute(column):
+            if column != target_column and column not in seen and _protected(column):
                 candidates.append((column, "auto"))
                 seen.add(column)
                 actions.append(
@@ -409,7 +432,7 @@ def run_fairness_agent(
         actions.append(f"Skipped '{attribute}': {reason}")
         # A planner-named column that does not exist is not a coverage gap: there is
         # no group in the data to be unfair to.
-        if is_protected_attribute(attribute) and _attribute_present(
+        if _protected(attribute) and _attribute_present(
                 attribute, raw_eval, eval_df, target_column):
             protected_unaudited.append({"attribute": attribute, "reason": reason})
 
@@ -475,13 +498,17 @@ def run_fairness_agent(
         violation = (disparate_impact < DISPARATE_IMPACT_THRESHOLD
                      or parity_difference > DEMOGRAPHIC_PARITY_DIFF_THRESHOLD)
 
+        protected = _protected(attribute)
+        status = ("VIOLATION" if violation else "passed") if protected else (
+            "advisory violation, not a protected attribute" if violation else
+            "passed, advisory")
         excluded_note = (f"; excluded groups under {min_group_size} rows: "
                          + ", ".join(f"{k} ({v})" for k, v in excluded.items())
                          if excluded else "")
         eo_note = (f", equal-opportunity difference {equal_opportunity:.4f}"
                    if equal_opportunity is not None else "")
         actions.append(
-            f"Evaluated '{attribute}' [{'VIOLATION' if violation else 'passed'}] "
+            f"Evaluated '{attribute}' [{status}] "
             f"({grouping}; {source}): disparate impact {disparate_impact:.4f}, "
             f"parity difference {parity_difference:.4f}{eo_note} - highest "
             f"'{max_name}' {max_rate:.4f} (n={max_detail['n']}), lowest '{min_name}' "
@@ -490,7 +517,9 @@ def run_fairness_agent(
 
         fairness_report.append({
             "attribute": attribute,
-            "protected": is_protected_attribute(attribute),
+            "protected": protected,
+            # The verdict covers protected attributes only; the rest are advisory.
+            "counts_toward_verdict": protected,
             "source": source,
             "grouping": grouping,
             "disparate_impact": disparate_impact,
@@ -510,29 +539,40 @@ def run_fairness_agent(
             },
         })
 
-    if not fairness_report:
+    verdict_entries = [r for r in fairness_report if r["counts_toward_verdict"]]
+    advisory_violations = [r["attribute"] for r in fairness_report
+                           if r["violation"] and not r["counts_toward_verdict"]]
+    if not verdict_entries:
         overall_passed, coverage = None, "none"
         actions.append(
-            "NOT EVALUATED: no attribute could be resolved into at least two comparable "
-            "groups. No fairness conclusion can be drawn."
+            "NOT EVALUATED: no protected attribute could be resolved into at least two "
+            "comparable groups. No fairness conclusion can be drawn"
+            + (f"; audited attributes that are not protected are advisory only "
+               f"({', '.join(r['attribute'] for r in fairness_report)})."
+               if fairness_report else ".")
         )
     else:
         coverage = "partial" if protected_unaudited else "complete"
-        if any(r["violation"] for r in fairness_report):
+        if any(r["violation"] for r in verdict_entries):
             # A measured violation is a finding whatever else went unmeasured.
             overall_passed = False
         elif protected_unaudited:
-            # Not a pass: the attributes that were audited cleared, but a protected
-            # attribute present in the data was not measured at all.
+            # Not a pass: the protected attributes that were audited cleared, but another
+            # protected attribute present in the data was not measured at all.
             overall_passed = None
             actions.append(
-                "NOT FULLY EVALUATED: no violation among the audited attributes, but "
-                "protected attribute(s) present in the data could not be audited: "
+                "NOT FULLY EVALUATED: no violation among the audited protected attributes, "
+                "but protected attribute(s) present in the data could not be audited: "
                 + "; ".join(f"'{p['attribute']}' ({p['reason']})" for p in protected_unaudited)
                 + ". No overall pass can be recorded."
             )
         else:
             overall_passed = True
+    if advisory_violations:
+        actions.append(
+            "ADVISORY: violations on attributes that are not protected do not affect the "
+            "verdict: " + ", ".join(advisory_violations)
+        )
 
     proxy_warnings = _proxy_warnings(
         proxy_findings,
@@ -554,9 +594,13 @@ def run_fairness_agent(
         "proxy_warnings": proxy_warnings,
         "fairness_report": fairness_report,
         "overall_fairness_passed": overall_passed,
-        "fairness_evaluated": bool(fairness_report),
+        # True only when a protected attribute was measured: advisory results alone
+        # support no fairness conclusion.
+        "fairness_evaluated": bool(verdict_entries),
         "fairness_coverage": coverage,
         "protected_attributes_unaudited": protected_unaudited,
+        "advisory_violations": advisory_violations,
+        "declared_protected_attributes": declared,
         "evaluated_rows": int(len(eval_df)),
         "min_group_size": min_group_size,
         "attributes_skipped": attributes_skipped,

@@ -116,6 +116,8 @@ def _build_pipeline_response(thread_id: str) -> dict:
             "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
             "fairness_coverage": fairness_result.get("fairness_coverage"),
             "protected_attributes_unaudited": fairness_result.get("protected_attributes_unaudited", []),
+            "advisory_violations": fairness_result.get("advisory_violations", []),
+            "declared_protected_attributes": values.get("declared_protected_attributes") or [],
         },
     }
 
@@ -126,6 +128,7 @@ async def start_pipeline(
     target_column: str = Form(...),
     task_type: str = Form(...),
     business_objective: Optional[str] = Form(None),
+    protected_attributes: Optional[str] = Form(None),
 ):
     """
     Ingest uploaded CSV, construct initial state, and invoke pipeline graph
@@ -153,6 +156,23 @@ async def start_pipeline(
             detail=f"Target column '{target_column}' not found in CSV headers: {list(df_raw.columns)}"
         )
 
+    # Reviewer-declared protected attributes. A typo must fail loudly: silently
+    # ignoring an unknown column would let a verdict skip the attribute it was meant
+    # to cover.
+    declared_protected = list(dict.fromkeys(
+        c.strip() for c in (protected_attributes or "").split(",") if c.strip()))
+    unknown = [c for c in declared_protected if c not in df_raw.columns]
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Protected attribute column(s) not found in CSV headers: {unknown}",
+        )
+    if target_column in declared_protected:
+        raise HTTPException(
+            status_code=400,
+            detail="The target column cannot also be declared a protected attribute.",
+        )
+
     if not os.environ.get("GROQ_API_KEY"):
         raise HTTPException(
             status_code=500,
@@ -168,6 +188,7 @@ async def start_pipeline(
         "target_column": target_column,
         "task_type": task_type,
         "business_objective": business_objective or "",
+        "declared_protected_attributes": declared_protected,
         "retry_count": 0,
         "unresolved_quality_issue": False,
         "last_failure_reason": None,
