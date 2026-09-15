@@ -72,7 +72,10 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
    split travels through state as index labels (`PipelineState["split_index"]`).
 4. **Unmeasured is not passed.** `overall_fairness_passed` is `True`, `False`, or
    `None` (not evaluated). `None` must never render as a pass. The UI has three
-   states for this; keep it that way for any new metric.
+   states for this; keep it that way for any new metric. `None` also covers partial
+   coverage: no violation, but a protected attribute present in the data could not be
+   audited (`fairness_coverage == "partial"`, named in `protected_attributes_unaudited`,
+   shown as NOT FULLY EVALUATED).
 5. **The audit log is append-only.** Write only through `log_audit_event()`. Never
    `UPDATE`/`DELETE`. Changing `_canonical_content()` breaks verification of every
    existing entry — if it must change, version it.

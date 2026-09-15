@@ -273,6 +273,74 @@ def test_error_rate_metrics_are_none_for_a_non_binary_target():
     assert entry["equalized_odds_difference"] is None
 
 
+# ---------------------------------------------------------------------------
+# Coverage: an unaudited protected attribute blocks a pass (#26)
+# ---------------------------------------------------------------------------
+
+
+def _credit_seed_19_shape():
+    """
+    The German Credit seed-19 case: `job` clears, and `age` is present but only one
+    band reaches the minimum group size, so it cannot be compared.
+    """
+    cleaned, raw, preds = _frames({"skilled": (100, 50), "unskilled": (100, 48)},
+                                  attribute="job")
+    # Many distinct ages, so age is banded: "25-59" gets 190 rows, "<25" only 10.
+    raw["age"] = list(np.resize(np.arange(25, 60), 190)) + list(np.resize(np.arange(18, 25), 10))          # "25-59": 190 rows, "<25": 10 rows
+    return cleaned, raw, preds
+
+
+def test_a_pass_on_unprotected_attributes_with_age_unaudited_is_not_a_pass():
+    cleaned, raw, preds = _credit_seed_19_shape()
+    result = _audit(cleaned, raw, preds, ["job"])
+
+    assert _entry(result, "job")["violation"] is False
+    assert result["overall_fairness_passed"] is None
+    assert result["fairness_evaluated"] is True
+    assert result["fairness_coverage"] == "partial"
+    (gap,) = result["protected_attributes_unaudited"]
+    assert gap["attribute"] == "age" and "fewer than 2 groups" in gap["reason"]
+    assert any("NOT FULLY EVALUATED" in a for a in result["actions_taken"])
+
+
+def test_a_measured_violation_is_still_false_when_coverage_is_partial():
+    cleaned, raw, preds = _frames({"skilled": (100, 80), "unskilled": (100, 20)},
+                                  attribute="job")
+    # Many distinct ages, so age is banded: "25-59" gets 190 rows, "<25" only 10.
+    raw["age"] = list(np.resize(np.arange(25, 60), 190)) + list(np.resize(np.arange(18, 25), 10))
+    result = _audit(cleaned, raw, preds, ["job"])
+
+    assert result["overall_fairness_passed"] is False
+    assert result["fairness_coverage"] == "partial"
+
+
+def test_a_protected_name_missing_from_the_data_is_not_a_coverage_gap():
+    """The planner naming a column that does not exist leaves nobody unmeasured."""
+    cleaned, raw, preds = _frames({"Male": (100, 50), "Female": (100, 48)})
+    result = _audit(cleaned, raw, preds, ["sex", "gender"])
+
+    assert any(s.startswith("gender") for s in result["attributes_skipped"])
+    assert result["protected_attributes_unaudited"] == []
+    assert result["overall_fairness_passed"] is True
+    assert result["fairness_coverage"] == "complete"
+
+
+def test_an_unprotected_skip_does_not_block_a_pass():
+    cleaned, raw, preds = _frames({"Male": (100, 50), "Female": (100, 48)})
+    raw["hours_per_week"] = np.linspace(1, 99, len(raw))
+    result = _audit(cleaned, raw, preds, ["sex", "hours_per_week"])
+
+    assert result["overall_fairness_passed"] is True
+    assert result["protected_attributes_unaudited"] == []
+
+
+def test_model_card_verdict_names_partial_coverage():
+    from compliance_artifacts import fairness_verdict
+
+    cleaned, raw, preds = _credit_seed_19_shape()
+    assert fairness_verdict(_audit(cleaned, raw, preds, ["job"])) == "NOT FULLY EVALUATED"
+
+
 def test_raw_frame_must_share_the_cleaned_index():
     cleaned, raw, preds = _frames({"Male": (100, 60), "Female": (100, 30)})
     with pytest.raises(ValueError, match="share index labels"):

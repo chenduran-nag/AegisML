@@ -103,12 +103,15 @@ def fairness_verdict(fairness_result: dict | None) -> str:
     """
     Render the fairness outcome as one of three words.
 
-    Mirrors invariant 4: `overall_fairness_passed is None` means nothing was
-    measured, and must never be presented as a pass.
+    Mirrors invariant 4: `overall_fairness_passed is None` means no pass could be
+    recorded, and must never be presented as one. It is NOT FULLY EVALUATED when
+    some attributes were audited but a protected attribute in the data was not.
     """
     fr = fairness_result or {}
     passed = fr.get("overall_fairness_passed")
     if passed is None:
+        if fr.get("fairness_report") and fr.get("protected_attributes_unaudited"):
+            return "NOT FULLY EVALUATED"
         return "NOT EVALUATED"
     return "PASSED" if passed else "VIOLATION DETECTED"
 
@@ -204,10 +207,18 @@ def build_model_card(
             "SHAP values for this linear model are in log-odds space, suitable "
             "for ranking features but not as user-facing effect sizes."
         )
-    if fair_res.get("overall_fairness_passed") is None:
+    unaudited = [p.get("attribute") for p in fair_res.get("protected_attributes_unaudited") or []]
+    if fair_res.get("overall_fairness_passed") is None and not fair_res.get("fairness_report"):
         limitations.append(
             "Fairness was NOT evaluated for this run. No fairness claim of any "
             "kind is supported by this document."
+        )
+    elif unaudited:
+        limitations.append(
+            "Protected attribute(s) present in the data could not be audited: "
+            + ", ".join(unaudited) + ". No fairness claim about "
+            + ("them" if len(unaudited) > 1 else "it")
+            + " is supported, and no overall pass was recorded."
         )
     if state.get("unresolved_quality_issue"):
         limitations.append(
@@ -271,6 +282,8 @@ def build_model_card(
             },
             "report": fair_res.get("fairness_report", []),
             "attributes_skipped": fair_res.get("attributes_skipped", []),
+            "coverage": fair_res.get("fairness_coverage") or NOT_RECORDED,
+            "protected_attributes_unaudited": fair_res.get("protected_attributes_unaudited", []),
             "candidates_proposed": plan.get("sensitive_attribute_candidates", []),
         },
 
@@ -424,6 +437,8 @@ proxy variables to the human reviewer only.
 Measured on {fair['evaluated_rows']} held-out rows. Groups with fewer than {fair['thresholds'].get('min_group_size')} rows are excluded from the comparison. Equal-opportunity difference is reported but does not affect the verdict.
 
 {_md_table(["Attribute", "Protected", "Disparate impact", "Parity difference", "Equal opportunity difference", "Status", "Groups compared"], fairness_rows)}
+
+**Protected attributes present but not audited:** {', '.join(p.get('attribute', '') for p in fair.get('protected_attributes_unaudited') or []) or 'none'}
 
 **Candidates proposed by the planner:** {', '.join(fair['candidates_proposed']) or 'none'}
 

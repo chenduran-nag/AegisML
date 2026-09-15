@@ -1300,15 +1300,24 @@
       const fairness = payload.fairness_report || [];
       const overallPassed = payload.overall_fairness_passed;
       const badgeEl = document.getElementById('fairness-status-badge');
-      if (overallPassed === null || overallPassed === undefined || fairness.length === 0) {
+      // A null verdict with audited attributes means a protected attribute in the data
+      // could not be audited: amber, and never a pass (invariant 4).
+      const unauditedProtected = (payload.protected_attributes_unaudited || []).map(p => p.attribute);
+      const unauditedNames = unauditedProtected.map(escHtml).join(', ');
+      const amberStyle = 'background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); padding: 6px 12px; font-size: 0.85rem;';
+      if (fairness.length === 0) {
         badgeEl.innerHTML =
-          '<span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: NOT EVALUATED — no conclusion can be drawn</span>';
+          `<span class="badge" style="${amberStyle}">OVERALL FAIRNESS: NOT EVALUATED — no conclusion can be drawn</span>`;
+      } else if (overallPassed === null || overallPassed === undefined) {
+        badgeEl.innerHTML =
+          `<span class="badge" style="${amberStyle}">OVERALL FAIRNESS: NOT FULLY EVALUATED — no violation among audited attributes, but protected attribute(s) not audited: ${unauditedNames || 'unknown'}</span>`;
       } else if (overallPassed) {
         badgeEl.innerHTML =
           '<span class="badge badge-pass" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: PASSED (ALL ATTRIBUTES CLEARED)</span>';
       } else {
         badgeEl.innerHTML =
-          '<span class="badge badge-fail" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: VIOLATION DETECTED</span>';
+          '<span class="badge badge-fail" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: VIOLATION DETECTED</span>'
+          + (unauditedNames ? `<div style="font-size: 0.78rem; color: #fbbf24; margin-top: 6px;">Also not audited (protected): ${unauditedNames}</div>` : '');
       }
 
       const minGroupSize = payload.fairness_min_group_size ?? 30;
@@ -1341,7 +1350,8 @@
       const skippedEl = document.getElementById('fairness-skipped');
       if (skippedEl) {
         skippedEl.innerHTML = skipped.length
-          ? `<strong>Not audited:</strong><ul style="margin: 6px 0 0 18px;">${skipped.map(s => `<li>${escHtml(s)}</li>`).join('')}</ul>`
+          ? (unauditedNames ? `<div style="color: #fbbf24; margin-bottom: 6px;"><strong>Protected attributes not audited:</strong> ${unauditedNames} — no overall pass can be recorded while these are unmeasured.</div>` : '')
+            + `<strong>Not audited:</strong><ul style="margin: 6px 0 0 18px;">${skipped.map(s => `<li>${escHtml(s)}</li>`).join('')}</ul>`
           : '';
       }
 

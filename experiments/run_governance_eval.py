@@ -99,6 +99,7 @@ RUN_FIELDS = [
     "fairness_evaluated", "overall_fairness_passed", "attributes_evaluated",
     "n_violations", "min_disparate_impact", "max_parity_difference",
     "max_equal_opportunity_difference", "protected_attributes_evaluated",
+    "protected_attributes_unaudited",
     "retries", "reroutes", "eda_findings", "columns_dropped",
     "train_rows", "test_rows", "split_seed_recorded",
     "planner_calls", "planner_cache_hits", "planner_tokens_recorded", "planner_model",
@@ -287,6 +288,8 @@ def scripted_decision(arm: Arm, payload: dict, reroutes_used: int,
 
     passed = payload.get("overall_fairness_passed")
     if passed is None:
+        if payload.get("fairness_report"):
+            return approve("no violation, but a protected attribute was not audited")
         return approve("fairness not evaluated: no evidence to reject on")
     if passed:
         return approve("no fairness violation")
@@ -419,6 +422,8 @@ def _final_metrics(values: dict, gates: int) -> dict:
             r.get("equal_opportunity_difference") for r in report),
         "protected_attributes_evaluated": (sum(1 for r in report if r.get("protected"))
                                            if report else None),
+        "protected_attributes_unaudited": ";".join(
+            str(p.get("attribute")) for p in fairness.get("protected_attributes_unaudited") or []),
         "retries": values.get("retry_count", 0),
         "reroutes": values.get("rejection_reroute_count", 0),
         "eda_findings": len(values.get("eda_findings") or []),
@@ -605,6 +610,8 @@ def summarise(runs: list[dict], trajectory: list[dict],
             evaluated = [r for r in approved if r.get("fairness_evaluated") in (True, "True")]
             violating = [r for r in evaluated
                          if r.get("overall_fairness_passed") in (False, "False")]
+            # Audited, no violation, but a protected attribute went unmeasured: no pass.
+            partial = [r for r in evaluated if r.get("overall_fairness_passed") in (None, "")]
             errors = sum(1 for r in ar if r.get("status") == "error")
             stats = {
                 "auc": mean_std(r.get("auc_roc") for r in approved),
@@ -621,6 +628,7 @@ def summarise(runs: list[dict], trajectory: list[dict],
             summary_rows.append({
                 "dataset": ds, "arm": arm_key, "runs": len(ar), "errors": errors,
                 "approved": len(approved), "fairness_evaluated": len(evaluated),
+                "fairness_partial": len(partial),
                 "approved_with_violation": len(violating),
                 **{f"{k}_mean": (v[0] if v else None) for k, v in stats.items()},
                 **{f"{k}_std": (v[1] if v else None) for k, v in stats.items()},
@@ -629,7 +637,8 @@ def summarise(runs: list[dict], trajectory: list[dict],
             md.append(
                 f"| **{arm_key}** {arms[arm_key].label} | {approved_cell} | "
                 f"{fmt_mean_std(stats['auc'])} | {fmt_mean_std(stats['accuracy'])} | "
-                f"{len(evaluated)}/{len(approved)} | "
+                f"{len(evaluated)}/{len(approved)}"
+                f"{f' ({len(partial)} partial)' if partial else ''} | "
                 f"{len(violating)}/{len(evaluated) if evaluated else 0} | "
                 f"{fmt_mean_std(stats['min_di'])} | {fmt_mean_std(stats['max_dpd'])} | "
                 f"{fmt_mean_std(stats['max_eod'])} | {fmt_mean_std(stats['protected'], 1)} | "

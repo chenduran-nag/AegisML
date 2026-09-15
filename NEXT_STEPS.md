@@ -426,10 +426,15 @@ protected attribute does not stop a pass.
 
 Do these in this order:
 
-1. **Verdict coverage (#26).** If a protected attribute present in the data could not be
-   audited, the verdict must not read "passed". Either `None` (not fully evaluated) or a
-   distinct "passed on partial coverage" state, rendered amber like NOT EVALUATED
-   (invariant 4). Decide which, and pin German Credit seed 19's shape in a test.
+1. **Verdict coverage (#26) — DONE.** No violation plus an unaudited protected attribute
+   now gives `None`, shown amber as NOT FULLY EVALUATED with the attribute and reason
+   named. `None` rather than a fourth state keeps invariant 4's three states; the new
+   `fairness_coverage` ("complete" / "partial" / "none") and
+   `protected_attributes_unaudited` fields distinguish it from nothing evaluated. A
+   measured violation is still `False`. A protected name the planner invents, absent from
+   the data, is not a gap. German Credit seed 19's shape is pinned in
+   `tests/test_fairness_groups.py`. The committed evaluation results predate this rule; they
+   are re-run together with arm D.
 2. **Separate protected from unprotected violations in the verdict.** Today a violation on
    `occupation` or `job` counts exactly like one on `sex`. Keep auditing planner-proposed
    attributes, but consider basing the pass/fail on protected attributes only, and report

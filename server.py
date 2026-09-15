@@ -114,6 +114,8 @@ def _build_pipeline_response(thread_id: str) -> dict:
             "selected_model_name": (values.get("training_result") or {}).get("selected_model_name"),
             "overall_fairness_passed": fairness_result.get("overall_fairness_passed"),
             "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
+            "fairness_coverage": fairness_result.get("fairness_coverage"),
+            "protected_attributes_unaudited": fairness_result.get("protected_attributes_unaudited", []),
         },
     }
 

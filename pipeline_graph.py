@@ -536,6 +536,8 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
         "fairness_report": fair_res.get("fairness_report", []),
         "overall_fairness_passed": fair_res.get("overall_fairness_passed"),
         "fairness_evaluated": fair_res.get("fairness_evaluated", False),
+        "fairness_coverage": fair_res.get("fairness_coverage"),
+        "protected_attributes_unaudited": fair_res.get("protected_attributes_unaudited", []),
         "attributes_skipped": fair_res.get("attributes_skipped", []),
         "unresolved_quality_issue": state.get("unresolved_quality_issue", False),
         # Every EDA finding annotated with what each stage did with it. A pure
@@ -641,6 +643,10 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
             "selected_model": selected_name,
             "overall_fairness_passed": fairness_passed,
             "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
+            "fairness_coverage": fairness_result.get("fairness_coverage"),
+            "protected_attributes_unaudited": [
+                p.get("attribute") for p in fairness_result.get("protected_attributes_unaudited", [])
+            ],
             "model_saved_path": saved_path,
             "model_save_error": save_error,
             "total_retries_used": state.get("retry_count", 0),

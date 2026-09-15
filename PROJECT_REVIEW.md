@@ -45,7 +45,7 @@
 | #24 **New:** `age` was proposed by the planner on every benchmark and never audited | Fixed — banded <25 / 25-59 / 60+ |
 | #25 **New:** skipped attributes were computed but never shown on the dashboard | Fixed — "Not audited" list with reasons |
 | 3.1 Quantitative governance evaluation: 4 datasets × 3 arms × 5 seeds, replay-verified exact | **Done**, re-run after #22–#25 — 57/60 approved models violate; the 3 passes never audited a protected attribute; see `experiments/results/summary.md` |
-| #26 **New:** a verdict reads "passed" when a protected attribute present in the data could not be audited (German Credit seed 19 passed on `job` alone; age bands too small) | Open — Step 3b |
+| #26 **New:** a verdict reads "passed" when a protected attribute present in the data could not be audited (German Credit seed 19 passed on `job` alone; age bands too small) | Fixed — verdict is `None` (NOT FULLY EVALUATED) with the gap named; committed results predate the fix |
 | 1.3 Policy-as-code | Not started |
 | 1.4 Reviewer identity | Not started |
 | Tier 2 / Tier 3 | Not started |

@@ -231,7 +231,7 @@ Means over 5 seeds. Arms A and B were identical on every run, so they share a co
    thresholds. The 3 that passed are a single German Credit split (seed 19) under all three
    arms, and that audit covered only `job`: the split's age bands were too small to compare,
    so the dataset's main protected attribute went unaudited while the verdict read "passed".
-   That is an open defect, not a compliant model (see the caveats).
+   That was a defect, not a compliant model; it is now fixed (see the caveats).
 2. **Rejecting a model and taking the next best is not a fairness intervention.** Arm C
    rerouted 19 of 20 runs; the approved model had fewer violated attributes in 2, the same in
    14, and more in 3. It cost AUC on every dataset (−0.018 to −0.051). COMPAS magnitudes
@@ -272,8 +272,10 @@ slightly (0.771 → 0.798) once a 5-row `job` group was excluded.
   fifth, `age` under 25 (about 1,700 rows, a positive rate under 1% against about 25% for
   ages 25–59). `occupation` is not a protected attribute. Among protected attributes, Adult's
   lowest DI is `age` (0.02), then `race` (0.28) and `sex` (0.31).
-- **A protected attribute that cannot be audited does not stop a "passed" verdict.** German
-  Credit could compare age bands on only 3 of 5 splits; seed 19 passed on `job` alone.
+- **A protected attribute that could not be audited did not stop a "passed" verdict** in
+  these results. German Credit could compare age bands on only 3 of 5 splits; seed 19
+  passed on `job` alone. This is now fixed in code (the verdict reads NOT FULLY EVALUATED
+  and names the attribute), but the results above predate the fix and have not been re-run.
 - **The verdict mixes protected and unprotected attributes.** The planner still proposes
   `occupation`, `job`, `education` and `marital`, and their violations count toward the
   verdict exactly as `sex` or `age` do. Each attribute is labelled protected or not in the
