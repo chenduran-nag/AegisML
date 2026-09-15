@@ -663,6 +663,7 @@
           </tbody>
         </table>
         <div style="margin-top: 14px; font-size: 0.8rem; color: var(--text-muted);" id="fairness-skipped"></div>
+        <div id="fairness-intersectional"></div>
         <div id="fairness-mitigation"></div>
         <div id="fairness-proxy-warnings"></div>
       </div>
@@ -1179,7 +1180,9 @@
       // function hits the temporal dead zone and throws a ReferenceError, which
       // aborted the whole render on the approved path (banner shown, artifact path
       // and artifacts panel silently never populated).
-      const payload = data.review_payload || {};
+      // A finished run has no live gate payload; show the one the reviewer decided on,
+      // so its evaluation tabs are not empty.
+      const payload = data.review_payload || data.last_review_payload || {};
 
       if (data.status === 'paused') {
         document.getElementById('decision-card').style.display = 'block';
@@ -1278,12 +1281,18 @@
       document.getElementById('data-missing').innerText = (quality.missing_pct_after_cleaning || 0) + '%';
       document.getElementById('data-rows-dropped').innerText = quality.rows_dropped || 0;
       document.getElementById('data-cols-dropped').innerText = (quality.columns_dropped || []).length;
-      document.getElementById('data-actions').innerHTML = (payload.data_agent_actions || []).map(a => `<li>${a}</li>`).join('');
+      // Actions quote uploaded column names and planner text: escape before rendering.
+      document.getElementById('data-actions').innerHTML = (payload.data_agent_actions || []).map(a => `<li>${escHtml(a)}</li>`).join('');
 
       // Render Leaderboard & KPI Block
       const selectedModel = payload.selected_model_name;
       const leaderboard = payload.leaderboard || [];
-      const isReg = selectedTaskType === 'regression';
+      // Decide from the run's own metrics, not the upload form's toggle: after a reload
+      // the toggle is back at its default, and a regression run showed "ACCURACY N/A".
+      const metricsOf = leaderboard.filter(m => m.metrics && Object.keys(m.metrics).length);
+      const isReg = metricsOf.length
+        ? metricsOf.some(m => m.metrics.rmse !== undefined && m.metrics.rmse !== null)
+        : selectedTaskType === 'regression';
 
       if (selectedModel) {
         document.getElementById('kpi-block').style.display = 'flex';
@@ -1315,7 +1324,7 @@
         document.getElementById('leaderboard-tbody').innerHTML = `
           <tr>
             <td colspan="7" style="text-align: center; color: var(--accent-red); font-weight: 600; padding: 20px;">
-              ⚠️ ${errMsg}<br>
+              ⚠️ ${escHtml(errMsg)}<br>
               <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">
                 Hint: If your target column contains continuous decimal numbers (like Unemployment), please select <strong>Regression</strong> task type in Step 1.
               </span>
@@ -1412,6 +1421,38 @@
           ? (unauditedNames ? `<div style="color: #fbbf24; margin-bottom: 6px;"><strong>Protected attributes not audited:</strong> ${unauditedNames} — no overall pass can be recorded while these are unmeasured.</div>` : '')
             + `<strong>Not audited:</strong><ul style="margin: 6px 0 0 18px;">${skipped.map(s => `<li>${escHtml(s)}</li>`).join('')}</ul>`
           : '';
+      }
+
+      // Intersectional subgroups: pairs of protected attributes audited together.
+      // Reported only — they never change the verdict above.
+      const intersections = payload.intersectional_report || [];
+      const intersectionSkips = payload.intersections_skipped || [];
+      const interEl = document.getElementById('fairness-intersectional');
+      if (interEl) {
+        interEl.innerHTML = (intersections.length || intersectionSkips.length) ? `
+          <div style="margin-top: 16px; padding: 12px 14px; border: 1px solid var(--card-border); border-radius: 8px;">
+            <strong style="font-size: 0.85rem;">Intersectional subgroups (reported only, not in the verdict)</strong>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 8px;">
+              Pairs of protected attributes audited together. A model can treat every group of each attribute alike and still treat some combinations very differently.
+            </div>
+            ${intersections.length ? `<div style="overflow-x: auto;"><table style="font-size: 0.8rem;">
+              <thead><tr><th>Combination</th><th>Status</th><th>Disparate impact</th><th>Parity difference</th><th>Groups compared</th></tr></thead>
+              <tbody>${intersections.map(e => {
+                const gd = e.group_details || {};
+                const excl = Object.entries(e.excluded_groups || {});
+                return `<tr>
+                  <td><strong>${escHtml(e.attribute)}</strong></td>
+                  <td>${e.violation
+                    ? '<span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);">GAP (REPORTED)</span>'
+                    : '<span class="badge badge-pass">WITHIN THRESHOLDS</span>'}</td>
+                  <td>${escHtml(e.disparate_impact)}</td>
+                  <td>${escHtml(e.demographic_parity_difference)}</td>
+                  <td>Max: ${escHtml(gd.group_a)} (n=${escHtml(gd.group_a_n)}) vs Min: ${escHtml(gd.group_b)} (n=${escHtml(gd.group_b_n)})${excl.length
+                    ? `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">Excluded (small): ${excl.map(([g, n]) => `${escHtml(g)} (${escHtml(n)})`).join(', ')}</div>` : ''}</td>
+                </tr>`;
+              }).join('')}</tbody></table></div>` : ''}
+            ${intersectionSkips.length ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Not compared: ${intersectionSkips.map(escHtml).join('; ')}</div>` : ''}
+          </div>` : '';
       }
 
       // Mitigation: what was reweighted, and the latest before against now, so the

@@ -91,11 +91,11 @@ PRIMARY_METRIC_REGRESSION = "rmse"          # lower is better  -> sort ascending
 
 _REGISTRY: dict[str, tuple[Any, Any]] = {
     "logisticregression": (
-        LogisticRegression(max_iter=1000, random_state=RANDOM_STATE, n_jobs=-1),
+        LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),  # n_jobs has no effect here; sklearn 1.8+ warns
         None,
     ),
     "logistic": (
-        LogisticRegression(max_iter=1000, random_state=RANDOM_STATE, n_jobs=-1),
+        LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),  # n_jobs has no effect here; sklearn 1.8+ warns
         None,
     ),
     "randomforest": (

@@ -26,6 +26,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+import sys
+
+# Agent log lines contain non-ASCII characters (→). With stdout redirected to a file on
+# Windows, Python falls back to a legacy code page and print() raises
+# UnicodeEncodeError mid-run. Replace unencodable characters instead of crashing.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 
 # Auto-load .env if GROQ_API_KEY is not already in environment
 if "GROQ_API_KEY" not in os.environ:
@@ -98,6 +108,8 @@ def _build_pipeline_response(thread_id: str) -> dict:
         "status": "paused" if is_paused else ("completed" if not next_nodes else "running"),
         "next_nodes": next_nodes,
         "review_payload": payload,
+        # The last payload a reviewer decided on, so a finished run's tabs are not empty.
+        "last_review_payload": None if is_paused else values.get("last_review_payload"),
         "model_saved_path": saved_path,
         "artifacts": sorted((manifest.get("files") or {}).keys()),
         "values": {

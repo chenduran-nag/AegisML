@@ -26,7 +26,7 @@ protect it.
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-pytest                      # 205 offline tests, no API key or network needed
+pytest                      # 226 offline tests, no API key or network needed
 python experiments/run_governance_eval.py                  # reproduce the evaluation from the committed cache, no Groq key
 python experiments/run_governance_eval.py --summarise-only # rebuild its tables + figure from the saved CSVs
 ```
@@ -118,12 +118,25 @@ Loops 2–4 share one rejection cap (`MAX_HUMAN_REROUTES`).
     and protected attributes present in the data are audited even if the planner omits
     them. Equal-opportunity and equalized-odds gaps are reported but never change the
     verdict: that rule is a policy decision (Step 4).
+    **The verdict covers protected attributes only** (named like one, or declared by the
+    reviewer at run start via `declared_protected_attributes`). Other audited attributes
+    are advisory (`counts_toward_verdict: False`, `advisory_violations`). With no
+    protected attribute evaluated, the verdict is `None` and `fairness_evaluated` is
+    False. **Intersectional pairs** of protected attributes go to `intersectional_report`
+    and are reported only, never part of the verdict.
 15. **Mitigation is reviewer-triggered, deterministic and train-only.** It runs only on a
     human `reject_and_mitigate` decision; the attribute is chosen by `choose_attribute()`,
     never by the LLM. Weights are fitted on train rows with the Fairness Agent's grouping
     (`resolve_groups_from_raw`). State and the audit log hold per-(group, label) cells,
     never per-row weights; `training_node` rebuilds row weights from the raw frame. Once
-    applied it stays on for the rest of the run, and the model card must say so.
+    applied it stays on for the rest of the run, and the model card must say so. Only
+    protected violations are mitigated.
+16. **Gate decisions use validation rows; test rows are scored once, after approval.**
+    The Data Agent splits train / validation / test (64 / 16 / 20). The leaderboard,
+    the fairness audit and every reviewer decision use `_gate_index(split)` (validation).
+    Nothing may read the test rows before `audit_log_node`, which scores the approved
+    model on them (`_final_test_evaluation`) and logs `final_test_evaluation`. Report
+    those numbers; the gate numbers were used to choose.
 
 ## Conventions
 
@@ -174,8 +187,8 @@ Loops 2–4 share one rejection cap (`MAX_HUMAN_REROUTES`).
 - **One-hot column names are sanitised for XGBoost** (`[`, `]`, `<` → `(`, `)`, `lt`/`le`).
   Only the generated dummy columns are renamed, so the Fairness Agent's one-hot
   fallback still finds an attribute by its prefix (with a raw frame it reads raw values).
-- **`toy_df` is 1,000 rows on purpose.** A 200-row test split is the smallest in which the
-  main groups clear `MIN_GROUP_SIZE`. A test that calls `run_fairness_agent` on a smaller
+- **`toy_df` is 1,000 rows on purpose.** The gate audits a 160-row validation split
+  (200 test rows), about the smallest in which the main groups clear `MIN_GROUP_SIZE`. A test that calls `run_fairness_agent` on a smaller
   frame must pass `min_group_size=` explicitly, or its attributes are skipped. And since
   protected columns are audited automatically, a test that needs "nothing auditable"
   must drop `sex`, `race` and `age` from the frame, not just leave them out of the plan.

@@ -374,6 +374,8 @@ def build_model_card(
             "verdict_scope": "protected attributes only",
             "declared_protected_attributes": state.get("declared_protected_attributes") or [],
             "advisory_violations": fair_res.get("advisory_violations", []),
+            "intersectional_report": fair_res.get("intersectional_report", []),
+            "intersections_skipped": fair_res.get("intersections_skipped", []),
             "protected_attributes_unaudited": fair_res.get("protected_attributes_unaudited", []),
             "candidates_proposed": plan.get("sensitive_attribute_candidates", []),
         },
@@ -542,6 +544,12 @@ The verdict covers **protected attributes only** (detected by column name or dec
 **Declared protected by the reviewer:** {', '.join(fair.get('declared_protected_attributes') or []) or 'none'}
 
 **Advisory violations (not protected):** {', '.join(fair.get('advisory_violations') or []) or 'none'}
+
+**Intersectional subgroups** (pairs of protected attributes; reported only, not part of the verdict):
+
+{_md_table(["Combination", "Disparate impact", "Parity difference", "Status", "Groups compared"], [[e.get("attribute"), e.get("disparate_impact"), e.get("demographic_parity_difference"), "gap (reported)" if e.get("violation") else "within thresholds", _groups_compared(e)] for e in fair.get("intersectional_report") or []])}
+
+{("Not compared: " + "; ".join(_md_cell(s) for s in fair.get("intersections_skipped"))) if fair.get("intersections_skipped") else ""}
 
 **Candidates proposed by the planner:** {', '.join(fair['candidates_proposed']) or 'none'}
 

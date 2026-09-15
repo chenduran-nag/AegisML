@@ -60,6 +60,13 @@ evaluation (experiments/run_governance_eval.py) exposed:
     characteristics. With no protected attribute evaluated, the verdict is None and
     fairness_evaluated is False.
 
+  Intersectional subgroups are reported, not judged.
+    Pairs of evaluated protected attributes (sex × race) are audited together with
+    the same group rules, because a model can treat every group of each attribute
+    alike and still treat some combinations very differently. Results go to
+    intersectional_report and never change the verdict — the same rule as the
+    error-rate gaps. Whether they should count is a policy decision (Step 4).
+
   An unaudited protected attribute blocks a pass.
     If a protected attribute present in the data is skipped (for example, its age
     bands are all under MIN_GROUP_SIZE) and no audited attribute is violated, the
@@ -92,6 +99,8 @@ DEMOGRAPHIC_PARITY_DIFF_THRESHOLD = 0.10   # max 10-point rate gap
 MIN_GROUP_SIZE = 30                        # evaluation rows a group needs to be compared
 MIN_CLASS_ROWS_FOR_ERROR_RATES = 10        # true positives / negatives needed for TPR / FPR
 MAX_GROUPS = 20                            # more categories than this are not compared
+MAX_INTERSECTIONS = 10                     # pairs of protected attributes audited together
+INTERSECTION_SEPARATOR = " × "
 MISSING_GROUP = "(missing)"
 
 # [lower, upper) bounds and the label a reviewer reads.
@@ -317,6 +326,8 @@ def run_fairness_agent(
             "protected_attributes_unaudited": [],
             "advisory_violations": [],
             "declared_protected_attributes": list(declared_protected or []),
+            "intersectional_report": [],
+            "intersections_skipped": [],
             "proxy_warnings": _proxy_warnings(
                 proxy_findings, sensitive_attribute_candidates, []),
             "fairness_report": [],
@@ -426,6 +437,9 @@ def run_fairness_agent(
     fairness_report: list[dict] = []
     attributes_skipped: list[str] = []
     protected_unaudited: list[dict] = []
+    # Group label per evaluation row for each evaluated protected attribute, kept for
+    # the intersectional comparison.
+    resolved_groups: dict[str, pd.Series] = {}
 
     def _skip(attribute: str, reason: str) -> None:
         attributes_skipped.append(f"{attribute} ({reason})")
@@ -515,6 +529,8 @@ def run_fairness_agent(
             f"{min_rate:.4f} (n={min_detail['n']}){excluded_note}"
         )
 
+        if protected:
+            resolved_groups[attribute] = frame["group"].astype(str)
         fairness_report.append({
             "attribute": attribute,
             "protected": protected,
@@ -574,6 +590,61 @@ def run_fairness_agent(
             "verdict: " + ", ".join(advisory_violations)
         )
 
+    # Intersectional subgroups: reported only, never part of the verdict.
+    intersectional_report: list[dict] = []
+    intersections_skipped: list[str] = []
+    names = [r["attribute"] for r in verdict_entries]
+    pairs = [(a, b) for i, a in enumerate(names) for b in names[i + 1:]][:MAX_INTERSECTIONS]
+    for first, second in pairs:
+        name = f"{first}{INTERSECTION_SEPARATOR}{second}"
+        cross = pd.DataFrame({
+            "group": (resolved_groups[first] + INTERSECTION_SEPARATOR
+                      + resolved_groups[second]).to_numpy(),
+            "pred": predictions,
+        })
+        sizes = cross.groupby("group").size().sort_values(ascending=False)
+        eligible = sizes[sizes >= min_group_size]
+        excluded = {str(k): int(v) for k, v in sizes[sizes < min_group_size].items()}
+        if len(eligible) < 2:
+            listed = ", ".join(f"{k}={int(v)}" for k, v in sizes.items())
+            intersections_skipped.append(
+                f"{name} (fewer than 2 combinations with at least {min_group_size} "
+                f"evaluation rows: {listed})")
+            continue
+        rates = {
+            str(g): {"n": int(sizes[g]),
+                     "positive_rate": round(float(cross.loc[cross["group"] == g, "pred"].mean()), 4)}
+            for g in eligible.index
+        }
+        ranked = sorted(rates.items(), key=lambda kv: kv[1]["positive_rate"], reverse=True)
+        (high, high_d), (low, low_d) = ranked[0], ranked[-1]
+        di = (round(low_d["positive_rate"] / high_d["positive_rate"], 4)
+              if high_d["positive_rate"] > 0 else 1.0)
+        dpd = round(high_d["positive_rate"] - low_d["positive_rate"], 4)
+        gap = di < DISPARATE_IMPACT_THRESHOLD or dpd > DEMOGRAPHIC_PARITY_DIFF_THRESHOLD
+        intersectional_report.append({
+            "attribute": name,
+            "attributes": [first, second],
+            "disparate_impact": di,
+            "demographic_parity_difference": dpd,
+            "violation": gap,
+            "counts_toward_verdict": False,
+            "groups": rates,
+            "excluded_groups": excluded,
+            "group_details": {
+                "group_a": high, "group_a_positive_rate": high_d["positive_rate"],
+                "group_a_n": high_d["n"],
+                "group_b": low, "group_b_positive_rate": low_d["positive_rate"],
+                "group_b_n": low_d["n"],
+            },
+        })
+        actions.append(
+            f"Intersectional '{name}' (reported only, not in the verdict): disparate impact "
+            f"{di:.4f}, parity difference {dpd:.4f} - highest '{high}' "
+            f"{high_d['positive_rate']:.4f} (n={high_d['n']}), lowest '{low}' "
+            f"{low_d['positive_rate']:.4f} (n={low_d['n']})"
+        )
+
     proxy_warnings = _proxy_warnings(
         proxy_findings,
         [name for name, _ in candidates],
@@ -601,6 +672,8 @@ def run_fairness_agent(
         "protected_attributes_unaudited": protected_unaudited,
         "advisory_violations": advisory_violations,
         "declared_protected_attributes": declared,
+        "intersectional_report": intersectional_report,
+        "intersections_skipped": intersections_skipped,
         "evaluated_rows": int(len(eval_df)),
         "min_group_size": min_group_size,
         "attributes_skipped": attributes_skipped,

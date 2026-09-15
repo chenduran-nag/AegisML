@@ -211,3 +211,4 @@ class PipelineState(TypedDict, total=False):
     mitigation: Optional[dict]
     declared_protected_attributes: Optional[list[str]]
     final_evaluation: Optional[dict]
+    last_review_payload: Optional[dict]

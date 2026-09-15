@@ -584,6 +584,8 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
         "fairness_coverage": fair_res.get("fairness_coverage"),
         "protected_attributes_unaudited": fair_res.get("protected_attributes_unaudited", []),
         "advisory_violations": fair_res.get("advisory_violations", []),
+        "intersectional_report": fair_res.get("intersectional_report", []),
+        "intersections_skipped": fair_res.get("intersections_skipped", []),
         "declared_protected_attributes": state.get("declared_protected_attributes") or [],
         "attributes_skipped": fair_res.get("attributes_skipped", []),
         "unresolved_quality_issue": state.get("unresolved_quality_issue", False),
@@ -621,7 +623,10 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
         },
     )
 
-    return {"human_decision": decision, "human_feedback": human_feedback}
+    # The payload the reviewer decided on, kept so a completed run can still show its
+    # evaluation tabs. Written after interrupt() returns, so re-execution is harmless.
+    return {"human_decision": decision, "human_feedback": human_feedback,
+            "last_review_payload": payload}
 
 
 # ---------------------------------------------------------------------------
@@ -663,7 +668,8 @@ def _final_test_evaluation(state: PipelineState, run_id: str) -> dict | None:
             "fairness": {k: fairness.get(k) for k in (
                 "overall_fairness_passed", "fairness_evaluated", "fairness_coverage",
                 "fairness_report", "advisory_violations", "protected_attributes_unaudited",
-                "attributes_skipped", "evaluated_rows", "min_group_size")},
+                "attributes_skipped", "evaluated_rows", "min_group_size",
+                "intersectional_report", "intersections_skipped")},
         }
         summary = (f"Final evaluation of the approved model on {result['rows']:,} untouched "
                    f"test rows: {metrics}; fairness overall_passed="

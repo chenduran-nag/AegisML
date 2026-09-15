@@ -895,13 +895,19 @@ def render_charts(runs: list[dict], out_dir: Path, arms: dict[str, Arm] = ARMS,
                 plotted[ds] = len(usable)
                 labels[ds] = []
                 label_positions[ds] = []
-                missing = []
+                # Every excluded run is accounted for, including an arm that is only
+                # partly plotted. Arms with the same exclusions share one note.
+                by_text: dict[str, list[str]] = {}
                 for arm_key in arm_keys:
-                    if any(r["arm"] == arm_key for r in usable):
-                        continue
                     arm_runs = [r for r in ds_runs if r["arm"] == arm_key]
-                    if arm_runs:
-                        missing.append(f"{arm_key}: {_exclusion_summary(arm_runs)}")
+                    excluded = [r for r in arm_runs if r not in usable]
+                    if not excluded:
+                        continue
+                    text = _exclusion_summary(excluded)
+                    if len(excluded) < len(arm_runs):
+                        text += f" (of {len(arm_runs)})"
+                    by_text.setdefault(text, []).append(arm_key)
+                missing = [f"{', '.join(keys)}: {text}" for text, keys in by_text.items()]
                 notes[ds] = missing
 
                 if not usable:
