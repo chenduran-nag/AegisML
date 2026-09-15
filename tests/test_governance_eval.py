@@ -282,7 +282,9 @@ def test_unevaluated_fairness_is_never_recorded_as_zero(toy_df, monkeypatch, fak
         ev.prepare_frame(TOY_SPEC, toy_df.drop(columns=["sex", "race", "age"])),
         ev.ARMS["C"], seed=42)
 
-    assert row["status"] == "approved"
+    # The scripted reviewer tries to approve; the default policy refuses to approve a
+    # model whose fairness was not measured, so the run ends unapproved.
+    assert row["status"] == "terminated_approval_blocked"
     assert row["fairness_evaluated"] is False
     assert row["overall_fairness_passed"] is None
     assert row["min_disparate_impact"] is None

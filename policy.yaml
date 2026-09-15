@@ -1,0 +1,33 @@
+# AegisML governance policy.
+#
+# Every run records this policy's version and SHA-256 (audit log, AIBOM, model card).
+# The hash covers the values, not comments or formatting. Unknown keys, wrong types
+# and out-of-range values fail loudly at startup. Change `version` when you change a
+# value, so results can say which policy produced them.
+
+version: "1.0.0"
+
+data:
+  column_drop_null_threshold: 0.50          # drop a feature column above this share missing
+  column_high_null_warning_threshold: 0.35  # quality fails if a column this empty is kept
+  row_drop_ratio_limit: 0.30                # quality fails if more rows than this are dropped
+  ohe_cardinality_limit: 10                 # one-hot below this many categories, else frequency
+  null_pct_quality_limit: 5.0               # quality fails at or above this % missing cells
+  test_size: 0.20                           # untouched test rows, scored once after approval
+  validation_size: 0.20                     # share of the remaining rows used at the gate
+
+fairness:
+  disparate_impact_threshold: 0.80          # four-fifths rule
+  demographic_parity_difference_threshold: 0.10
+  min_group_size: 30                        # evaluation rows a group needs to be compared
+
+governance:
+  max_retries: 2                            # automatic data-quality retries
+  max_human_reroutes: 2                     # reviewer rejections before the run ends
+  # Refuse to approve a classification model whose fairness verdict is NOT EVALUATED
+  # or NOT FULLY EVALUATED. Regression has no fairness definition and is exempt.
+  block_approval_when_fairness_not_evaluated: true
+
+training:
+  allowed_models: null                      # null = every registry model, or a list such as
+                                            # [LogisticRegression, XGBoost]

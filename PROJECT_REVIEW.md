@@ -54,8 +54,8 @@
 | #27 **New:** planner lists, Data Agent actions and the leaderboard error were inserted into the dashboard unescaped (LLM output and uploaded column names) | Fixed — escaped |
 | #28 **New:** the regression KPI read the upload form's task toggle rather than the run's metrics ("ACCURACY N/A") | Fixed |
 | #29 **New:** a completed run's evaluation tabs were empty (no live gate payload) | Fixed — `last_review_payload` |
-| #30 **New:** on small datasets the 160-row validation split cannot audit any protected attribute, so the gate verdict is NOT EVALUATED and reviewers approve blind (German Credit, all seeds) | Open — Step 4 policy flag / validation sizing |
-| 1.3 Policy-as-code | Not started |
+| #30 **New:** on small datasets the 160-row validation split cannot audit any protected attribute, so the gate verdict is NOT EVALUATED and reviewers approve blind (German Credit, all seeds) | Addressed by policy — approving an unevaluated classification model is blocked by default; validation sizing for small datasets still open |
+| 1.3 Policy-as-code | **Done** — `policy.yaml`, strict validation, version + SHA-256 in state, audit log, AIBOM and model card |
 | 1.4 Reviewer identity | Not started |
 | Tier 2 / Tier 3 | Not started |
 

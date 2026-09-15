@@ -66,6 +66,7 @@ from planner_agent import plan_pipeline
 from data_agent import run_data_agent
 from training_agent import evaluate_model, run_training_agent
 from fairness_agent import run_fairness_agent
+from policy import default_policy, policy_value
 from mitigation import (
     INTERSECTION_SEPARATOR,
     METHOD as MITIGATION_METHOD,
@@ -81,6 +82,57 @@ from eda_insights import build_eda_linkage, derive_eda_findings, findings_for_ro
 
 MAX_RETRIES = 2          # maximum planner→data_agent auto-retries
 MAX_HUMAN_REROUTES = 2   # maximum human rejection reroutes before capping
+
+# The policy the code enforces when a run carries none in state (tests, direct calls).
+# A run started by the server or the evaluation carries its own validated policy.
+DEFAULT_POLICY = default_policy()
+
+
+def _policy_value(state: PipelineState, section: str, key: str, fallback):
+    """A limit from the run's policy, or `fallback` (read at call time) without one."""
+    return policy_value(state.get("policy"), section, key, fallback)
+
+
+def _policy_section(state: PipelineState, section: str) -> dict:
+    return dict((state.get("policy") or {}).get(section) or {})
+
+
+def _fairness_limits(state: PipelineState) -> dict:
+    """Keyword arguments for run_fairness_agent from the run's policy (none without one)."""
+    fairness = _policy_section(state, "fairness")
+    mapping = {"min_group_size": "min_group_size",
+               "disparate_impact_threshold": "disparate_impact_threshold",
+               "demographic_parity_difference_threshold": "parity_difference_threshold"}
+    return {arg: fairness[key] for key, arg in mapping.items() if key in fairness}
+
+
+def _approval_block_reason(state: PipelineState) -> str | None:
+    """
+    Why approving this model is refused by policy, or None if it is allowed.
+
+    A classification model whose fairness verdict is None — NOT EVALUATED, or NOT
+    FULLY EVALUATED — cannot be approved while block_approval_when_fairness_not_evaluated
+    is set (the default). The evaluation showed why: on German Credit no protected
+    attribute could be audited at the gate, and reviewers approved blind. Regression
+    has no fairness definition and is exempt.
+    """
+    block = _policy_value(state, "governance", "block_approval_when_fairness_not_evaluated",
+                          DEFAULT_POLICY["governance"]["block_approval_when_fairness_not_evaluated"])
+    if not block or state.get("task_type") != "classification":
+        return None
+    fairness = state.get("fairness_result") or {}
+    if fairness.get("overall_fairness_passed") is not None:
+        return None
+    partial = fairness.get("fairness_coverage") == "partial"
+    unaudited = [p.get("attribute") for p in fairness.get("protected_attributes_unaudited") or []]
+    return (
+        f"fairness is {'NOT FULLY EVALUATED' if partial else 'NOT EVALUATED'}"
+        + (f" (protected attribute(s) not audited: {', '.join(unaudited)})" if unaudited else
+           " (no protected attribute could be audited)")
+        + ". The governance policy blocks approving a model whose fairness was not measured. "
+          "Reject to try another model or to fix the data, or start a new run that "
+          "declares the protected attributes."
+    )
 
 # Directory approved models are serialised into by audit_log_node.
 SAVED_MODELS_DIR = "saved_models"
@@ -126,6 +178,20 @@ def data_analysis_node(state: PipelineState, config: RunnableConfig) -> dict:
     df = bytes_to_df(state["df_bytes"])
     target_column = state["target_column"]
     task_type = state["task_type"]
+
+    # Record the policy governing this run before anything acts on it.
+    if state.get("policy"):
+        log_audit_event(
+            run_id=run_id,
+            db_path=AUDIT_DB_PATH,
+            event_type="policy_applied",
+            event_source="automated",
+            summary=(f"Governance policy {state.get('policy_version')} applied "
+                     f"(SHA-256 {str(state.get('policy_sha256'))[:12]}…)"),
+            details={"policy_version": state.get("policy_version"),
+                     "policy_sha256": state.get("policy_sha256"),
+                     "policy": state.get("policy")},
+        )
 
     try:
         eda_report = analyze_raw_dataset(df, target_column)
@@ -246,6 +312,7 @@ def data_agent_node(state: PipelineState, config: RunnableConfig) -> dict:
         task_type=state["task_type"],
         eda_findings=state.get("eda_findings") or [],
         split_seed=state.get("split_seed"),
+        thresholds=_policy_section(state, "data"),
     )
 
     cleaned_df = result.pop("cleaned_df")
@@ -299,9 +366,10 @@ def route_after_data_agent(state: PipelineState) -> str:
         print(f"[router] Quality PASSED → training_node (retries used: {retry_count})")
         return "training_node"
 
-    if retry_count < MAX_RETRIES:
+    max_retries = _policy_value(state, "governance", "max_retries", MAX_RETRIES)
+    if retry_count < max_retries:
         print(
-            f"[router] Quality FAILED → retry {retry_count + 1}/{MAX_RETRIES} "
+            f"[router] Quality FAILED → retry {retry_count + 1}/{max_retries} "
             "— routing to planner"
         )
         return "planner_node"
@@ -352,6 +420,20 @@ def training_node(state: PipelineState, config: RunnableConfig) -> dict:
             print(f"[training_node] All recommended models {recommended_models} were rejected! Fallback to unrejected models...")
             all_known = ["LogisticRegression", "RandomForest", "XGBoost", "GradientBoosting", "Ridge", "Lasso"]
             recommended_models = [m for m in all_known if m.lower() not in rejected]
+
+    # Policy: only allowed models may be trained, whatever the planner recommends.
+    allowed = _policy_value(state, "training", "allowed_models", None)
+    if allowed:
+        def _norm(name):
+            return str(name).lower().replace("-", "").replace("_", "").replace(" ", "")
+        allowed_keys = {_norm(a) for a in allowed}
+        kept = [m for m in recommended_models if _norm(m) in allowed_keys]
+        if not kept:
+            kept = [a for a in allowed if a.lower() not in rejected]
+        if kept != recommended_models:
+            print(f"[training_node] Policy allowed_models {allowed}: training {kept} "
+                  f"instead of {recommended_models}")
+        recommended_models = kept
 
     print(f"[training_node] Training models: {recommended_models}")
 
@@ -520,6 +602,7 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
         # cleaned frame destroy it (a 0/1 sex column becomes a float).
         raw_frame=bytes_to_df(state["df_bytes"]),
         declared_protected=state.get("declared_protected_attributes"),
+        **_fairness_limits(state),
     )
 
     passed = result.get("overall_fairness_passed", False)
@@ -562,8 +645,15 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     payload = {
         "question": "Governance Review: Please evaluate pipeline outputs and select a decision.",
-        "allowed_decisions": ["approve", "reject_data_quality", "reject_model_or_fairness",
-                              "reject_and_mitigate"],
+        # Approve is withheld when policy blocks it; the reason is shown to the reviewer.
+        "allowed_decisions": [
+            d for d in ("approve", "reject_data_quality", "reject_model_or_fairness",
+                        "reject_and_mitigate")
+            if not (d == "approve" and _approval_block_reason(state))
+        ],
+        "approval_blocked_reason": _approval_block_reason(state),
+        "policy_version": state.get("policy_version"),
+        "policy_sha256": state.get("policy_sha256"),
         # Pure function of recorded state, so safe before interrupt() (invariant 6).
         "mitigation": mitigation_summary(state.get("mitigation"), train_res, fair_res),
         "plan_summary": {
@@ -660,6 +750,7 @@ def _final_test_evaluation(state: PipelineState, run_id: str) -> dict | None:
             eval_index=split["test"],
             raw_frame=bytes_to_df(state["df_bytes"]),
             declared_protected=state.get("declared_protected_attributes"),
+            **_fairness_limits(state),
         )
         result = {
             "split": "test",
@@ -755,6 +846,8 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
             "fairness_coverage": fairness_result.get("fairness_coverage"),
             "advisory_violations": fairness_result.get("advisory_violations", []),
             "declared_protected_attributes": state.get("declared_protected_attributes") or [],
+            "policy_version": state.get("policy_version"),
+            "policy_sha256": state.get("policy_sha256"),
             "protected_attributes_unaudited": [
                 p.get("attribute") for p in fairness_result.get("protected_attributes_unaudited", [])
             ],
@@ -845,33 +938,38 @@ def route_after_human_approval(state: PipelineState) -> str:
     reroute_count = state.get("rejection_reroute_count", 0)
 
     if decision == "approve":
+        if _approval_block_reason(state):
+            print("[router] Human decision: APPROVE refused by governance policy → "
+                  "END with unresolved_approval_blocked=True")
+            return "approval_blocked"
         print(f"[router] Human decision: APPROVED → audit_log_node (human reroutes used: {reroute_count})")
         return "audit_log_node"
 
-    if reroute_count >= MAX_HUMAN_REROUTES:
+    max_reroutes = _policy_value(state, "governance", "max_human_reroutes", MAX_HUMAN_REROUTES)
+    if reroute_count >= max_reroutes:
         print(
-            f"[router] Human decision: '{decision}', but rejection cap ({MAX_HUMAN_REROUTES}) "
+            f"[router] Human decision: '{decision}', but rejection cap ({max_reroutes}) "
             "reached → routing to END with unresolved_human_rejection=True"
         )
         return "human_cap_failure"
 
     if decision == "reject_data_quality":
         print(
-            f"[router] Human decision: REJECT_DATA_QUALITY → reroute {reroute_count + 1}/{MAX_HUMAN_REROUTES} "
+            f"[router] Human decision: REJECT_DATA_QUALITY → reroute {reroute_count + 1}/{max_reroutes} "
             "to planner_node"
         )
         return "reroute_planner"
 
     if decision == "reject_model_or_fairness":
         print(
-            f"[router] Human decision: REJECT_MODEL_OR_FAIRNESS → reroute {reroute_count + 1}/{MAX_HUMAN_REROUTES} "
+            f"[router] Human decision: REJECT_MODEL_OR_FAIRNESS → reroute {reroute_count + 1}/{max_reroutes} "
             "directly to training_node (skipping planner and data agent)"
         )
         return "reroute_training"
 
     if decision == "reject_and_mitigate":
         print(
-            f"[router] Human decision: REJECT_AND_MITIGATE → reroute {reroute_count + 1}/{MAX_HUMAN_REROUTES} "
+            f"[router] Human decision: REJECT_AND_MITIGATE → reroute {reroute_count + 1}/{max_reroutes} "
             "to mitigation_node, then retraining with reweighing"
         )
         return "reroute_mitigation"
@@ -1009,6 +1107,36 @@ def mitigation_node(state: PipelineState, config: RunnableConfig) -> dict:
                            "applications": applications}}
 
 
+def _mark_approval_blocked(state: PipelineState, config: RunnableConfig) -> dict:
+    """
+    An approve decision refused by policy ends the run without an approved model.
+
+    The dashboard and API refuse it before it reaches the graph; this is the last line
+    of enforcement for any other caller. Nothing is saved and no artifacts are written.
+    """
+    run_id = _get_run_id(config)
+    fairness = state.get("fairness_result") or {}
+    reason = _approval_block_reason(state) or "approval blocked by governance policy"
+    print(f"[mark_approval_blocked] {reason}")
+    log_audit_event(
+        run_id=run_id,
+        db_path=AUDIT_DB_PATH,
+        event_type="final_outcome",
+        event_source="automated",
+        summary=f"Approval refused by governance policy: {reason}",
+        details={
+            "status": "APPROVAL_BLOCKED_BY_POLICY",
+            "reason": reason,
+            "selected_model": (state.get("training_result") or {}).get("selected_model_name"),
+            "overall_fairness_passed": fairness.get("overall_fairness_passed"),
+            "fairness_coverage": fairness.get("fairness_coverage"),
+            "policy_version": state.get("policy_version"),
+            "policy_sha256": state.get("policy_sha256"),
+        },
+    )
+    return {"unresolved_approval_blocked": True}
+
+
 def _mark_human_cap_failure(state: PipelineState, config: RunnableConfig) -> dict:
     """Called when human rejection cap is reached."""
     run_id = _get_run_id(config)
@@ -1066,6 +1194,7 @@ def build_graph(db_path: str = "pipeline_state.db"):
     builder.add_node("increment_human_reroute_training", _increment_human_reroute_training)
     builder.add_node("increment_human_reroute_mitigation", _increment_human_reroute_mitigation)
     builder.add_node("mitigation_node", mitigation_node)
+    builder.add_node("mark_approval_blocked", _mark_approval_blocked)
     builder.add_node("mark_human_cap_failure", _mark_human_cap_failure)
     builder.add_node("mark_training_failure", _mark_training_failure)
 
@@ -1107,8 +1236,10 @@ def build_graph(db_path: str = "pipeline_state.db"):
             "reroute_training": "increment_human_reroute_training",
             "reroute_mitigation": "increment_human_reroute_mitigation",
             "human_cap_failure": "mark_human_cap_failure",
+            "approval_blocked": "mark_approval_blocked",
         },
     )
+    builder.add_edge("mark_approval_blocked", END)
     builder.add_edge("increment_human_reroute_mitigation", "mitigation_node")
     builder.add_edge("mitigation_node", "training_node")
 

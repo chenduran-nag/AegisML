@@ -26,7 +26,7 @@ protect it.
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-pytest                      # 226 offline tests, no API key or network needed
+pytest                      # 251 offline tests, no API key or network needed
 python experiments/run_governance_eval.py                  # reproduce the evaluation from the committed cache, no Groq key
 python experiments/run_governance_eval.py --summarise-only # rebuild its tables + figure from the saved CSVs
 ```
@@ -47,6 +47,7 @@ never commit it), then `python server.py` → http://localhost:8000.
 | `training_agent.py` | Model registry, leaderboard, SHAP. Reuses the Data Agent's split |
 | `fairness_agent.py` | DI + parity difference (the verdict) and TPR/FPR gaps (reported only) on held-out rows. Groups from raw values; age banded; groups under 30 rows excluded |
 | `mitigation.py` | Reweighing mitigation for the `reject_and_mitigate` decision: attribute choice, train-only cell weights, before/after summary |
+| `policy.py`, `policy.yaml` | Policy-as-code: validated thresholds and governance rules, version + SHA-256 recorded per run |
 | `audit_log.py` | Append-only, SHA-256 hash-chained audit log + `verify_audit_chain()` |
 | `compliance_artifacts.py` | Model card, AIBOM and Annex IV draft; digests chained into the audit log + `verify_artifacts()` |
 | `server.py` | FastAPI: `/api/pipeline/{start,resume,status,audit,eda,artifacts}` |
@@ -137,6 +138,16 @@ Loops 2–4 share one rejection cap (`MAX_HUMAN_REROUTES`).
     Nothing may read the test rows before `audit_log_node`, which scores the approved
     model on them (`_final_test_evaluation`) and logs `final_test_evaluation`. Report
     those numbers; the gate numbers were used to choose.
+17. **The run's policy governs it, and is recorded.** The server loads `policy.yaml` once
+    (an invalid file stops startup) and puts the validated policy, its version and its
+    SHA-256 in state. Nodes read limits through `_policy_value` / `_policy_section` /
+    `_fairness_limits`, falling back to module constants only when a run carries no
+    policy. Never read a threshold constant directly in a node. A `policy_applied` audit
+    event is the first entry of every run that carries a policy. **Approving a
+    classification model whose fairness verdict is `None` is refused by default**
+    (`block_approval_when_fairness_not_evaluated`): the payload withholds `approve`, the
+    API returns 409, and the graph routes a stray approve to `mark_approval_blocked`.
+    Regression is exempt.
 
 ## Conventions
 

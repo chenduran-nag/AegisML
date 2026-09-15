@@ -18,6 +18,9 @@ langgraph-checkpoint-sqlite>=2.0.0
 langchain-core>=0.3.0
 typing-extensions>=4.8.0
 
+# --- Policy-as-code (policy.yaml) ---
+pyyaml>=6.0
+
 # --- Web backend (server.py) ---
 fastapi>=0.100.0
 uvicorn>=0.23.0

@@ -212,3 +212,9 @@ class PipelineState(TypedDict, total=False):
     declared_protected_attributes: Optional[list[str]]
     final_evaluation: Optional[dict]
     last_review_payload: Optional[dict]
+    # Governance policy (policy.py): the validated policy, its version and SHA-256.
+    policy: Optional[dict]
+    policy_version: Optional[str]
+    policy_sha256: Optional[str]
+    # True when an approve decision was refused by policy and the run ended.
+    unresolved_approval_blocked: bool

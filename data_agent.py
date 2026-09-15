@@ -79,6 +79,25 @@ SPLIT_RANDOM_STATE = 42
 WINSOR_LOWER_QUANTILE = 0.01
 WINSOR_UPPER_QUANTILE = 0.99
 
+
+def _resolve_thresholds(thresholds: dict | None) -> dict:
+    """
+    The limits this run uses: the module constants, overridden by the run's policy
+    (policy.yaml `data` section, passed in by pipeline_graph). Unknown keys are ignored
+    here because policy.validate_policy has already rejected them.
+    """
+    limits = {
+        "column_drop_null_threshold": COLUMN_DROP_NULL_THRESHOLD,
+        "column_high_null_warning_threshold": COLUMN_HIGH_NULL_WARNING_THRESHOLD,
+        "row_drop_ratio_limit": ROW_DROP_RATIO_LIMIT,
+        "ohe_cardinality_limit": OHE_CARDINALITY_LIMIT,
+        "null_pct_quality_limit": NULL_PCT_QUALITY_LIMIT,
+        "test_size": TEST_SIZE,
+        "validation_size": VALIDATION_SIZE,
+    }
+    limits.update({k: v for k, v in (thresholds or {}).items() if k in limits})
+    return limits
+
 # Verbs that mark a plan step as a clipping instruction. Bare "cap" is excluded
 # because it matches inside "capital-gain".
 CLIP_KEYWORDS = ("winsor", "clip", "capping", "cap outlier", "cap extreme")
@@ -201,6 +220,8 @@ def _split_indices(
     task_type: str,
     actions: list[str],
     random_state: int = SPLIT_RANDOM_STATE,
+    test_size: float = TEST_SIZE,
+    validation_size: float = VALIDATION_SIZE,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Compute train/validation/test row indices BEFORE any statistic is fitted.
@@ -242,7 +263,7 @@ def _split_indices(
 
     rest_idx, test_idx = train_test_split(
         df.index.to_numpy(),
-        test_size=TEST_SIZE,
+        test_size=test_size,
         random_state=random_state,
         stratify=stratify,
     )
@@ -254,7 +275,7 @@ def _split_indices(
             rest_stratify = y.loc[rest_idx]
     train_idx, validation_idx = train_test_split(
         rest_idx,
-        test_size=VALIDATION_SIZE,
+        test_size=validation_size,
         random_state=random_state,
         stratify=rest_stratify,
     )
@@ -352,6 +373,7 @@ def _drop_high_null_columns(
     target_column: str,
     explicit_drop_columns: list[str],
     actions: list[str],
+    drop_threshold: float = COLUMN_DROP_NULL_THRESHOLD,
 ) -> tuple[pd.DataFrame, list[str]]:
     """
     Drop feature columns where null_pct > COLUMN_DROP_NULL_THRESHOLD, or columns
@@ -362,11 +384,11 @@ def _drop_high_null_columns(
         if col == target_column:
             continue
         null_pct = df[col].isnull().sum() / len(df)
-        if null_pct > COLUMN_DROP_NULL_THRESHOLD or col in explicit_drop_columns:
+        if null_pct > drop_threshold or col in explicit_drop_columns:
             reason = (
                 f"plan instruction ('drop {col}')"
                 if col in explicit_drop_columns
-                else f"{null_pct * 100:.1f}% missing > {COLUMN_DROP_NULL_THRESHOLD * 100:.0f}% threshold"
+                else f"{null_pct * 100:.1f}% missing > {drop_threshold * 100:.0f}% threshold"
             )
             actions.append(f"Dropped column '{col}' ({reason})")
             dropped.append(col)
@@ -528,6 +550,7 @@ def _encode_categoricals(
     target_column: str,
     actions: list[str],
     fit_index: np.ndarray,
+    ohe_limit: int = OHE_CARDINALITY_LIMIT,
 ) -> pd.DataFrame:
     """
     Encode all object-dtype feature columns:
@@ -547,8 +570,8 @@ def _encode_categoricals(
         if col != target_column and _is_encodable_categorical(df[col])
     ]
 
-    ohe_cols = [c for c in object_cols if df[c].nunique() < OHE_CARDINALITY_LIMIT]
-    freq_cols = [c for c in object_cols if df[c].nunique() >= OHE_CARDINALITY_LIMIT]
+    ohe_cols = [c for c in object_cols if df[c].nunique() < ohe_limit]
+    freq_cols = [c for c in object_cols if df[c].nunique() >= ohe_limit]
 
     # Capture nunique BEFORE get_dummies reshapes the df
     ohe_nunique = {col: df[col].nunique() for col in ohe_cols}
@@ -625,6 +648,9 @@ def _compute_quality_report(
     task_type: str,
     rows_dropped: int,
     columns_dropped: list[str],
+    null_pct_limit: float = NULL_PCT_QUALITY_LIMIT,
+    row_drop_ratio_limit: float = ROW_DROP_RATIO_LIMIT,
+    high_null_warning_threshold: float = COLUMN_HIGH_NULL_WARNING_THRESHOLD,
 ) -> tuple[dict, bool]:
     """
     Compute quality_report and quality_check_passed.
@@ -653,7 +679,7 @@ def _compute_quality_report(
         if col == target_column or col in columns_dropped:
             continue
         col_null_pct = original_df[col].isnull().sum() / len(original_df)
-        if col_null_pct >= COLUMN_HIGH_NULL_WARNING_THRESHOLD:
+        if col_null_pct >= high_null_warning_threshold:
             unhandled_high_null.append(f"{col} ({col_null_pct * 100:.1f}% missing)")
 
     # Class balance ratio on the cleaned target (classification only)
@@ -678,9 +704,9 @@ def _compute_quality_report(
     }
 
     quality_check_passed = (
-        missing_pct < NULL_PCT_QUALITY_LIMIT           # spec condition 1
+        missing_pct < null_pct_limit                    # spec condition 1
         and len(unresolved_null_cols) == 0              # spec condition 2
-        and rows_dropped_pct < ROW_DROP_RATIO_LIMIT * 100  # condition 3
+        and rows_dropped_pct < row_drop_ratio_limit * 100  # condition 3
         and len(unhandled_high_null) == 0               # condition 4
     )
 
@@ -699,6 +725,7 @@ def run_data_agent(
     task_type: str,
     eda_findings: list[dict] | None = None,
     split_seed: int | None = None,
+    thresholds: dict | None = None,
 ) -> dict:
     """
     Deterministic data cleaning pipeline. Zero LLM calls.
@@ -736,12 +763,16 @@ def run_data_agent(
     )
     columns_dropped_total.extend(eda_dropped)
 
-    # Step 1 — Drop columns > 50% missing or explicitly dropped by plan
+    # Limits from the run's governance policy, defaulting to the module constants.
+    limits = _resolve_thresholds(thresholds)
+
+    # Step 1 — Drop columns above the missing-value threshold or explicitly dropped by plan
     df, dropped = _drop_high_null_columns(
         df,
         target_column,
         hints["explicit_drop_columns"],
         actions,
+        drop_threshold=limits["column_drop_null_threshold"],
     )
     columns_dropped_total.extend(dropped)
 
@@ -756,6 +787,7 @@ def run_data_agent(
     split_seed = SPLIT_RANDOM_STATE if split_seed is None else int(split_seed)
     train_idx, validation_idx, test_idx = _split_indices(
         df, target_column, task_type, actions, random_state=split_seed,
+        test_size=limits["test_size"], validation_size=limits["validation_size"],
     )
 
     # Step 4 — Impute remaining nulls (fill values from the train split)
@@ -773,7 +805,8 @@ def run_data_agent(
         df = _label_encode_target(df, target_column, actions)
 
     # Step 6 — Encode categoricals (frequency maps from the train split)
-    df = _encode_categoricals(df, target_column, actions, fit_index=train_idx)
+    df = _encode_categoricals(df, target_column, actions, fit_index=train_idx,
+                              ohe_limit=limits["ohe_cardinality_limit"])
 
     # Step 7 — Scale numeric features (scaler fitted on the train split)
     df = _scale_numeric_features(df, target_column, actions, fit_index=train_idx)
@@ -798,6 +831,9 @@ def run_data_agent(
         task_type=task_type,
         rows_dropped=rows_dropped,
         columns_dropped=columns_dropped_total,
+        null_pct_limit=limits["null_pct_quality_limit"],
+        row_drop_ratio_limit=limits["row_drop_ratio_limit"],
+        high_null_warning_threshold=limits["column_high_null_warning_threshold"],
     )
     quality_report["train_rows"] = int(len(train_idx))
     quality_report["validation_rows"] = int(len(validation_idx))

@@ -399,6 +399,8 @@ def build_model_card(
             "human_reroutes": state.get("rejection_reroute_count", 0),
             "unresolved_quality_issue": state.get("unresolved_quality_issue", False),
             "unresolved_human_rejection": state.get("unresolved_human_rejection", False),
+            "policy_version": state.get("policy_version") or NOT_RECORDED,
+            "policy_sha256": state.get("policy_sha256") or NOT_RECORDED,
         },
 
         "limitations": limitations,
@@ -576,6 +578,7 @@ Method: {expl['method']}
 | Human reroutes | {gov['human_reroutes']} |
 | Unresolved quality issue | {gov['unresolved_quality_issue']} |
 | Unresolved human rejection | {gov['unresolved_human_rejection']} |
+| Governance policy | {gov.get('policy_version', NOT_RECORDED)} (SHA-256 `{gov.get('policy_sha256', NOT_RECORDED)}`) |
 
 ### Decision history
 
@@ -648,7 +651,8 @@ def build_aibom(state: dict, run_id: str, chain: Optional[dict] = None) -> dict:
         "governance": {
             "approver": state.get("reviewer_id", NOT_RECORDED),
             "final_decision": state.get("human_decision", NOT_RECORDED),
-            "policy_version": state.get("policy_version", NOT_RECORDED),
+            "policy_version": state.get("policy_version") or NOT_RECORDED,
+            "policy_sha256": state.get("policy_sha256") or NOT_RECORDED,
             "audit_chain_head": (chain or {}).get("head_hash"),
             "audit_chain_verified": (chain or {}).get("verified"),
         },

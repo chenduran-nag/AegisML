@@ -78,6 +78,7 @@ from langgraph.types import Command  # noqa: E402
 import fairness_agent  # noqa: E402
 import pipeline_graph  # noqa: E402
 import planner_agent  # noqa: E402
+from policy import load_policy, policy_sha256, with_overrides  # noqa: E402
 from graph_state import df_to_bytes  # noqa: E402
 
 EXPERIMENTS_DIR = REPO_ROOT / "experiments"
@@ -324,6 +325,14 @@ def scripted_decision(arm: Arm, payload: dict, reroutes_used: int,
 # ---------------------------------------------------------------------------
 
 
+def _arm_policy_state(arm: Arm) -> dict:
+    """State keys for the committed policy.yaml with the arm's retry cap applied."""
+    policy = with_overrides(load_policy()["policy"],
+                            {"governance": {"max_retries": arm.max_retries}})
+    return {"policy": policy, "policy_version": policy["version"],
+            "policy_sha256": policy_sha256(policy)}
+
+
 @contextlib.contextmanager
 def _isolated_graph(workdir: Path, max_retries: int, planner_calls: list):
     """
@@ -413,6 +422,8 @@ def _final_metrics(values: dict, gates: int) -> dict:
         status = "terminated_quality_cap"
     elif values.get("unresolved_training_failure"):
         status = "terminated_training_failure"
+    elif values.get("unresolved_approval_blocked"):
+        status = "terminated_approval_blocked"
     elif values.get("unresolved_human_rejection"):
         status = "terminated_rejection_cap"
     elif values.get("human_decision") == "approve" and not training.get("selected_model_name"):
@@ -500,6 +511,9 @@ def run_single(dataset: LoadedDataset, arm: Arm, seed: int,
                     "rejection_reroute_count": 0,
                     "unresolved_human_rejection": False,
                     "rejected_models": [],
+                    # The committed policy, with this arm's retry cap: every run records
+                    # the exact policy it ran under.
+                    **_arm_policy_state(arm),
                 }, config=config)
 
                 gates = 0
@@ -1300,6 +1314,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                      "max_retries": ARMS[k].max_retries} for k in arm_keys},
         "max_human_reroutes": pipeline_graph.MAX_HUMAN_REROUTES,
         "min_group_size": fairness_agent.MIN_GROUP_SIZE,
+        # Each arm runs under policy.yaml with its own max_retries; this is the base file.
+        "policy": {k: load_policy()[k] for k in ("version", "sha256", "source")},
         "datasets": dataset_meta,
         "planner_models": planner_models,
         "planner_calls": sum(r.get("planner_calls") or 0 for r in runs),

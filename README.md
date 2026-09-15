@@ -409,6 +409,29 @@ they are.
 
 ---
 
+## ⚖️ Governance Policy
+
+Every threshold and governance rule a reviewer might ask about lives in
+[`policy.yaml`](policy.yaml): the Data Agent's missing-value and quality limits, the
+train/validation/test sizes, the fairness thresholds and minimum group size, the retry and
+rejection caps, an allowed-models list, and whether a model whose fairness was not measured
+may be approved.
+
+- **Fails loudly.** An unknown key, a wrong type, an out-of-range value or an unknown model
+  name stops the server at startup rather than silently falling back to a default.
+- **Recorded per run.** Each run carries the validated policy, its `version` and a SHA-256
+  of its values. The first audit entry (`policy_applied`) holds the full policy; the final
+  outcome, the AIBOM and the model card name its version and hash.
+- **Approving an unevaluated model is blocked by default.** If a classification model's
+  fairness verdict is NOT EVALUATED or NOT FULLY EVALUATED, Approve is disabled with the
+  reason, the API refuses it (HTTP 409), and the pipeline itself refuses it. The
+  evaluation showed why: on German Credit the gate could not audit any protected attribute,
+  and reviewers approved models whose fairness had never been measured. Set
+  `block_approval_when_fairness_not_evaluated: false` to allow it. Regression has no
+  fairness definition and is exempt.
+
+---
+
 ## 🧪 Tests
 
 ```bash

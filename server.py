@@ -56,6 +56,11 @@ from graph_state import df_to_bytes
 from pipeline_graph import graph
 from audit_log import get_audit_trail, verify_audit_chain
 from compliance_artifacts import verify_artifacts
+from policy import load_policy
+
+# Loaded once, at startup. An invalid policy raises PolicyError here and the server does
+# not start: running under a silently defaulted policy would be worse than not running.
+POLICY = load_policy()
 
 app = FastAPI(
     title="AI Multi-Agent Governance API",
@@ -116,6 +121,9 @@ def _build_pipeline_response(thread_id: str) -> dict:
             "unresolved_human_rejection": values.get("unresolved_human_rejection", False),
             "unresolved_quality_issue": values.get("unresolved_quality_issue", False),
             "unresolved_training_failure": values.get("unresolved_training_failure", False),
+            "unresolved_approval_blocked": values.get("unresolved_approval_blocked", False),
+            "policy_version": values.get("policy_version"),
+            "policy_sha256": values.get("policy_sha256"),
             "human_decision": values.get("human_decision"),
             "human_feedback": values.get("human_feedback"),
             "retry_count": values.get("retry_count", 0),
@@ -202,6 +210,9 @@ async def start_pipeline(
         "task_type": task_type,
         "business_objective": business_objective or "",
         "declared_protected_attributes": declared_protected,
+        "policy": POLICY["policy"],
+        "policy_version": POLICY["version"],
+        "policy_sha256": POLICY["sha256"],
         "retry_count": 0,
         "unresolved_quality_issue": False,
         "last_failure_reason": None,
@@ -253,6 +264,16 @@ async def resume_pipeline(req: ResumeRequest):
         raise HTTPException(status_code=400, detail=f"Decision must be one of {allowed}")
 
     config = {"configurable": {"thread_id": req.thread_id}}
+
+    # Refuse a policy-blocked approval here, so the run stays paused and the reviewer can
+    # choose another action. The graph also enforces it, for any other caller.
+    if req.decision == "approve":
+        snapshot = graph.get_state(config)
+        if snapshot.tasks and snapshot.tasks[0].interrupts:
+            reason = (snapshot.tasks[0].interrupts[0].value or {}).get("approval_blocked_reason")
+            if reason:
+                raise HTTPException(status_code=409, detail=f"Approval blocked by policy: {reason}")
+
     resume_payload = {
         "decision": req.decision,
         "human_feedback": req.human_feedback or "",

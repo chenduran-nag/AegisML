@@ -837,7 +837,10 @@
       document.getElementById('task-reg').classList.toggle('selected', type === 'regression');
     }
 
+    let approvalBlockedReason = null;
+
     function setDecision(dec) {
+      if (dec === 'approve' && approvalBlockedReason) return;
       selectedDecision = dec;
       document.getElementById('opt-approve').classList.toggle('selected', dec === 'approve');
       document.getElementById('opt-reject-data').classList.toggle('selected', dec === 'reject_data_quality');
@@ -892,6 +895,7 @@
 
     async function submitDecision() {
       if (!currentThreadId) return;
+      if (!selectedDecision) { alert('Select a governance decision first.'); return; }
       document.getElementById('loading-overlay').style.display = 'flex';
 
       const fbInput = document.getElementById('human-feedback');
@@ -1186,6 +1190,27 @@
 
       if (data.status === 'paused') {
         document.getElementById('decision-card').style.display = 'block';
+        // Policy may refuse approval (fairness not measured): disable the option and say why.
+        approvalBlockedReason = payload.approval_blocked_reason || null;
+        const approveOpt = document.getElementById('opt-approve');
+        let blockNote = document.getElementById('approval-blocked-note');
+        if (!blockNote) {
+          blockNote = document.createElement('div');
+          blockNote.id = 'approval-blocked-note';
+          blockNote.style.cssText = 'font-size: 0.78rem; color: #fbbf24; padding: 8px 12px; border-left: 2px solid var(--accent-amber); margin-top: 6px;';
+          approveOpt.insertAdjacentElement('afterend', blockNote);
+        }
+        if (approvalBlockedReason) {
+          approveOpt.style.opacity = '0.45';
+          approveOpt.style.cursor = 'not-allowed';
+          blockNote.innerText = 'Approval blocked by policy: ' + approvalBlockedReason;
+          blockNote.style.display = 'block';
+          if (selectedDecision === 'approve') { selectedDecision = null; approveOpt.classList.remove('selected'); }
+        } else {
+          approveOpt.style.opacity = '';
+          approveOpt.style.cursor = '';
+          blockNote.style.display = 'none';
+        }
         document.getElementById('approved-banner').style.display = 'none';
         document.getElementById('terminated-banner').style.display = 'none';
         document.getElementById('artifacts-card').style.display = 'none';
@@ -1199,14 +1224,16 @@
         // rendered "Model Formally Approved & Saved to Disk" — presenting a run
         // that was rejected and terminated as a successful deployment.
         const terminated = vals.unresolved_human_rejection || vals.unresolved_quality_issue
-          || vals.unresolved_training_failure;
+          || vals.unresolved_training_failure || vals.unresolved_approval_blocked;
         const approved = vals.human_decision === 'approve' && !terminated;
 
         document.getElementById('terminated-banner').style.display = terminated ? 'block' : 'none';
         if (terminated) {
           document.getElementById('approved-banner').style.display = 'none';
           document.getElementById('artifacts-card').style.display = 'none';
-          document.getElementById('terminated-reason').innerText = vals.unresolved_quality_issue
+          document.getElementById('terminated-reason').innerText = vals.unresolved_approval_blocked
+            ? 'Approval was refused by the governance policy: the model\'s fairness was not measured (NOT EVALUATED or NOT FULLY EVALUATED), and the policy blocks approving such a model.'
+            : vals.unresolved_quality_issue
             ? 'The Data Agent quality gate never passed and the automatic retry cap was reached. Training data the pipeline itself flagged as deficient was never approved for deployment.'
             : vals.unresolved_training_failure
               ? 'No model could be trained: every remaining candidate failed to fit, so there was nothing to present for approval.'

@@ -277,6 +277,8 @@ def run_fairness_agent(
     raw_frame: pd.DataFrame | None = None,
     min_group_size: int = MIN_GROUP_SIZE,
     declared_protected: list | None = None,
+    disparate_impact_threshold: float = DISPARATE_IMPACT_THRESHOLD,
+    parity_difference_threshold: float = DEMOGRAPHIC_PARITY_DIFF_THRESHOLD,
 ) -> dict:
     """
     Evaluate algorithmic fairness across sensitive attributes.
@@ -509,8 +511,8 @@ def run_fairness_agent(
         equalized_odds = (round(max(equal_opportunity, fpr_gap), 4)
                           if equal_opportunity is not None and fpr_gap is not None else None)
 
-        violation = (disparate_impact < DISPARATE_IMPACT_THRESHOLD
-                     or parity_difference > DEMOGRAPHIC_PARITY_DIFF_THRESHOLD)
+        violation = (disparate_impact < disparate_impact_threshold
+                     or parity_difference > parity_difference_threshold)
 
         protected = _protected(attribute)
         status = ("VIOLATION" if violation else "passed") if protected else (
@@ -621,7 +623,7 @@ def run_fairness_agent(
         di = (round(low_d["positive_rate"] / high_d["positive_rate"], 4)
               if high_d["positive_rate"] > 0 else 1.0)
         dpd = round(high_d["positive_rate"] - low_d["positive_rate"], 4)
-        gap = di < DISPARATE_IMPACT_THRESHOLD or dpd > DEMOGRAPHIC_PARITY_DIFF_THRESHOLD
+        gap = di < disparate_impact_threshold or dpd > parity_difference_threshold
         intersectional_report.append({
             "attribute": name,
             "attributes": [first, second],
@@ -674,6 +676,11 @@ def run_fairness_agent(
         "declared_protected_attributes": declared,
         "intersectional_report": intersectional_report,
         "intersections_skipped": intersections_skipped,
+        "thresholds": {
+            "disparate_impact_min": disparate_impact_threshold,
+            "demographic_parity_difference_max": parity_difference_threshold,
+            "min_group_size": min_group_size,
+        },
         "evaluated_rows": int(len(eval_df)),
         "min_group_size": min_group_size,
         "attributes_skipped": attributes_skipped,

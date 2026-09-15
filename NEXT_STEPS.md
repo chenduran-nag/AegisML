@@ -37,7 +37,7 @@ Remaining, in recommended order:
 | 2 | Quantitative governance evaluation | **DONE** — no arm approved a compliant model; replay-verified |
 | 3a | Trustworthy fairness metrics | **DONE** — re-run showed the first run *understated* disparity |
 | 3b | Verdict coverage, mitigation, protected-only verdict, validation gate, intersectional | **DONE** — re-run: no approval passes; reweighing beats model switching; small datasets leave the gate blind |
-| 4 | Policy-as-code | Cheap, big framing gain |
+| 4 | Policy-as-code | **DONE** — `policy.yaml`; approving an unevaluated model blocked by default |
 | 5 | Reviewer identity + dual sign-off | An approval with no approver identity is not an audit trail |
 | 6 | Small cleanups | Anytime |
 
@@ -543,7 +543,37 @@ properly.
 
 ---
 
-## Step 4 — Policy-as-code
+## Step 4 — Policy-as-code — DONE
+
+`policy.yaml` + `policy.py`. What landed:
+
+- **Validated, versioned, hashed.** Unknown keys, wrong types, out-of-range values,
+  unknown model names and a warning threshold above the drop threshold all raise
+  `PolicyError`; the server refuses to start on an invalid file. The SHA-256 covers the
+  validated values as canonical JSON, so comments and formatting do not change it.
+- **What it controls:** Data Agent null/quality limits, one-hot limit, test and
+  validation sizes; fairness DI and parity thresholds and minimum group size; retry and
+  rejection caps; an allowed-models list; and
+  `block_approval_when_fairness_not_evaluated`.
+- **Recorded per run:** the policy is in state; a `policy_applied` audit event (the full
+  policy) opens the trail; `final_outcome`, the AIBOM (`policy_version`,
+  `policy_sha256` — no longer `not recorded`) and the model card name it.
+- **Approval block (user decision: on by default).** A classification model whose
+  fairness verdict is NOT EVALUATED or NOT FULLY EVALUATED cannot be approved: the gate
+  payload withholds `approve` and gives the reason, the dashboard disables it, the API
+  returns 409, and the graph ends a stray approve at `mark_approval_blocked`
+  (`APPROVAL_BLOCKED_BY_POLICY`). Regression is exempt. This closes #30 as a policy:
+  German Credit's blind gate can no longer end in an approval.
+- **Evaluation:** every run carries the committed policy with its arm's retry cap; the
+  manifest records the base policy's version and hash; blocked runs get the status
+  `terminated_approval_blocked`.
+
+**Still open:** selecting a policy per run (e.g. `strict` / `default`) from the
+dashboard; whether error-rate gaps and intersectional gaps should count toward the verdict
+(both are still hard-coded as reported-only, deliberately, until someone decides);
+a policy key for the verdict scope.
+
+The original specification follows.
 
 **Goal.** Turn "a pipeline with thresholds in it" into "a configurable governance
 engine", and record which policy governed each run.
