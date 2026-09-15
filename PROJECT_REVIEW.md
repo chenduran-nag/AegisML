@@ -44,8 +44,9 @@
 | #23 **New:** max-vs-min disparate impact had no minimum group size — a 4-person Adult group set DI to 0.0 | Fixed — groups under 30 rows excluded and listed |
 | #24 **New:** `age` was proposed by the planner on every benchmark and never audited | Fixed — banded <25 / 25-59 / 60+ |
 | #25 **New:** skipped attributes were computed but never shown on the dashboard | Fixed — "Not audited" list with reasons |
-| 3.1 Quantitative governance evaluation: 4 datasets × 3 arms × 5 seeds, replay-verified exact | **Done**, re-run after #22–#25 — 57/60 approved models violate; the 3 passes never audited a protected attribute; see `experiments/results/summary.md` |
-| #26 **New:** a verdict reads "passed" when a protected attribute present in the data could not be audited (German Credit seed 19 passed on `job` alone; age bands too small) | Fixed — verdict is `None` (NOT FULLY EVALUATED) with the gap named; committed results predate the fix |
+| 3.1 Quantitative governance evaluation: 4 datasets × 4 arms × 5 seeds, replay-verified | **Done**, re-run with arm D and the #26 rule — 74/80 approved models violate, 4 not fully evaluated, 2 pass; see `experiments/results/summary.md` |
+| #26 **New:** a verdict reads "passed" when a protected attribute present in the data could not be audited (German Credit seed 19 passed on `job` alone; age bands too small) | Fixed — verdict is `None` (NOT FULLY EVALUATED) with the gap named; seed 19 now reads that under every arm |
+| 3.2 Reviewer-triggered bias mitigation (reweighing), evaluated as arm D | **Done** — fewer violated attributes in 6/19 rerouted runs (model switching: 2/19) at a far smaller AUC cost; still not compliant on Adult, Bank Marketing or COMPAS |
 | 1.3 Policy-as-code | Not started |
 | 1.4 Reviewer identity | Not started |
 | Tier 2 / Tier 3 | Not started |

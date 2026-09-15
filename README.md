@@ -207,40 +207,47 @@ http://localhost:8000
 ## 📊 Evaluation: Do the Governance Loops Change Outcomes?
 
 `experiments/run_governance_eval.py` drives the real pipeline end to end with a scripted
-reviewer: **4 datasets × 3 arms × 5 train/test split seeds = 60 runs**.
+reviewer: **4 datasets × 4 arms × 5 train/test split seeds = 80 runs**.
 
 | Arm | Reviewer |
 |---|---|
 | **A** governance off | No automatic data-quality retry; approve at the first gate |
 | **B** auto-retry | Automatic retry enabled; approve at the first gate |
-| **C** fairness reviewer | Reject the model while a fairness violation remains (up to 2 reroutes), otherwise approve |
+| **C** fairness reviewer | Reject the model while a fairness violation remains (up to 2 reroutes) and take the next-best model, otherwise approve |
+| **D** mitigation reviewer | As C, but each rejection is *reject and mitigate*: the same candidates are retrained with reweighing on the worst-violating protected attribute |
 
-Means over 5 seeds. Arms A and B were identical on every run, so they share a column.
+Means over 5 seeds, shown as **A/B · C · D**. Arms A and B were identical on every run, so
+they share a value.
 
-| Dataset | AUC A/B → C | Violated attributes A/B → C | Min disparate impact A/B → C | Max parity difference A/B → C |
+| Dataset | AUC | Violated attributes | Min disparate impact | Max parity difference |
 |---|---|---|---|---|
-| UCI Adult (48,842) | 0.927 → 0.878 | 5.0 → 5.0 | 0.004 → 0.011 † | 0.493 → 0.419 |
-| German Credit (1,000) | 0.781 → 0.763 | 1.0 → 1.0 | 0.798 → 0.801 | 0.166 → 0.162 |
-| Bank Marketing (45,211) | 0.753 → 0.721 | 2.6 → 3.0 | 0.128 → 0.153 | 0.203 → 0.206 |
-| COMPAS (5,278) | 0.724 → 0.673 | 4.0 → 3.8 | 0.179 → 0.328 | 0.647 → 0.397 |
+| UCI Adult (48,842) | 0.927 · 0.878 · 0.923 | 5.0 · 5.0 · 5.0 | 0.004 · 0.011 · 0.005 † | 0.493 · 0.419 · 0.441 |
+| German Credit (1,000) | 0.781 · 0.763 · 0.784 | 1.0 · 1.0 · 0.4 | 0.798 · 0.801 · 0.848 | 0.166 · 0.162 · 0.131 |
+| Bank Marketing (45,211) | 0.753 · 0.721 · 0.733 | 2.6 · 3.0 · 3.0 | 0.128 · 0.153 · 0.287 | 0.203 · 0.206 · 0.070 |
+| COMPAS (5,278) | 0.724 · 0.673 · 0.711 | 4.0 · 3.8 · 3.2 | 0.179 · 0.328 · 0.461 | 0.647 · 0.397 · 0.216 |
 
 **Findings.**
 
-1. **No approved model passed an audit that covered the protected attributes in its data.**
-   57 of 60 approved models carried at least one violation by the Fairness Agent's own
-   thresholds. The 3 that passed are a single German Credit split (seed 19) under all three
-   arms, and that audit covered only `job`: the split's age bands were too small to compare,
-   so the dataset's main protected attribute went unaudited while the verdict read "passed".
-   That was a defect, not a compliant model; it is now fixed (see the caveats).
+1. **Almost no approved model passed.** Of 80 approved models, 74 carried at least one
+   violation by the Fairness Agent's own thresholds, and 4 were NOT FULLY EVALUATED (German
+   Credit seed 19 under every arm: its age bands were too small to compare, so no pass could be
+   recorded). The only 2 passes are German Credit under arm D (seeds 7 and 128), where `age`
+   was audited, reweighed and cleared.
 2. **Rejecting a model and taking the next best is not a fairness intervention.** Arm C
    rerouted 19 of 20 runs; the approved model had fewer violated attributes in 2, the same in
-   14, and more in 3. It cost AUC on every dataset (−0.018 to −0.051). COMPAS magnitudes
-   improved (min DI 0.18 → 0.33, max parity difference 0.65 → 0.40) but every run still
-   violated.
-3. **The automatic data-quality retry never engaged.** Benchmark data passes the quality
+   14, and more in 3. It cost AUC on every dataset (−0.018 to −0.051).
+3. **Reweighing did more, for much less, but did not make models compliant.** Arm D also
+   rerouted 19 of 20 runs; the approved model had fewer violated attributes in **6**, the same
+   in 11, and more in 2. Its AUC cost was far smaller than arm C's: −0.004 on Adult, −0.013 on
+   COMPAS, −0.020 on Bank Marketing, and none on German Credit. The attributes it reweighed
+   moved a lot: COMPAS `sex` DI went from 0.25–0.38 to 0.68–0.99 across splits, and Bank
+   Marketing's maximum parity difference fell from 0.20 to 0.07. But every COMPAS, Adult and
+   Bank Marketing run still violated on some attribute, because two reweighings with a cap of
+   two reroutes cannot cover four or five violated attributes.
+4. **The automatic data-quality retry never engaged.** Benchmark data passes the quality
    gate first time, so arms A and B coincide. That loop is exercised only by the synthetic
    tests.
-4. **The evaluation found pipeline defects**, all fixed before these results: XGBoost
+5. **The evaluation found pipeline defects**, all fixed before these results: XGBoost
    silently failed wherever category values contain `[`, `]` or `<` (German Credit); a run
    with no trained model could reach the gate, be approved, and receive a model card; and the
    Fairness Agent itself was not fit to report (next section).
@@ -272,10 +279,23 @@ slightly (0.771 → 0.798) once a 5-row `job` group was excluded.
   fifth, `age` under 25 (about 1,700 rows, a positive rate under 1% against about 25% for
   ages 25–59). `occupation` is not a protected attribute. Among protected attributes, Adult's
   lowest DI is `age` (0.02), then `race` (0.28) and `sex` (0.31).
-- **A protected attribute that could not be audited did not stop a "passed" verdict** in
-  these results. German Credit could compare age bands on only 3 of 5 splits; seed 19
-  passed on `job` alone. This is now fixed in code (the verdict reads NOT FULLY EVALUATED
-  and names the attribute), but the results above predate the fix and have not been re-run.
+- **Adult's minimum DI did not move under arm D, by design of the choice rule.** Mitigation
+  targets protected attributes first, so both of Adult's reweighings went to `age` and then
+  `race` or `sex`. Those improved (for example `race` DI 0.24–0.32 → 0.39–0.54), but
+  `age` stayed far below the threshold (0.02 → 0.06–0.10), and the unprotected `occupation`
+  group that sets the minimum was never targeted.
+- **Reweighing one attribute can push disparity onto another.** On Bank Marketing, 2 of 5
+  arm-D runs ended with one more violated attribute than they started with, while `age`
+  improved on all five.
+- **German Credit's two passes rest on 200-row test splits**, where a few predictions swing
+  disparate impact. On seed 42 no protected attribute could be compared, so the unprotected
+  `job` was reweighed instead, and got slightly worse (DI 0.751 → 0.731).
+- **Gate decisions are made on the held-out rows.** Arms C and D reject or approve by looking
+  at the test-split fairness numbers, so the approved model's metrics are not an untouched
+  estimate. The same holds for any human reviewer using the dashboard.
+- **German Credit could compare age bands on only 3 of 5 splits.** Where it could not (seeds
+  19 and 42), the verdict is NOT FULLY EVALUATED or rests on `job` alone. Before the #26 fix,
+  seed 19 was recorded as "passed" on `job` alone.
 - **The verdict mixes protected and unprotected attributes.** The planner still proposes
   `occupation`, `job`, `education` and `marital`, and their violations count toward the
   verdict exactly as `sex` or `age` do. Each attribute is labelled protected or not in the
@@ -299,25 +319,28 @@ Full tables with standard deviations, the per-gate trajectory and the run manife
 [`experiments/results/summary.md`](experiments/results/summary.md).
 
 **Reproduce it — no Groq key needed.** The planner's responses are recorded in
-`experiments/planner_cache/`. This command re-runs all 60 pipelines against them (about
-20 minutes; datasets are fetched from OpenML on first use):
+`experiments/planner_cache/`. This command re-runs all 80 pipelines against them (about
+27 minutes; datasets are fetched from OpenML on first use):
 
 ```bash
 python experiments/run_governance_eval.py
 ```
 
-This was verified: a full replay with a deliberately invalid `GROQ_API_KEY` served all 60
-planner calls from cache and reproduced `runs.csv` and `fairness_trajectory.csv`
-**exactly**, on every deterministic column. To rebuild only the tables and figure from the
+This was verified on the first, 60-run evaluation: a full replay with a deliberately
+invalid `GROQ_API_KEY` served all 60 planner calls from cache and reproduced `runs.csv` and
+`fairness_trajectory.csv` **exactly**, on every deterministic column. The current 80-run
+replay served 80 of 80 planner calls from cache, and arms A–C selected the same model with
+the same AUC as the previous run on all 60 of their runs. To rebuild only the tables and figure from the
 saved CSVs, in seconds:
 
 ```bash
 python experiments/run_governance_eval.py --summarise-only
 ```
 
-These results were re-run on top of commit `363ce53` with the corrected Fairness Agent not
-yet committed (`git_dirty: true` in the manifest); that code is committed alongside them. The
-first run's results remain in git history at `363ce53`.
+These results were produced from commit `14e2fe0`. The manifest records `git_dirty: true`
+only because `CLAUDE.md` was being edited while the run was in progress; no code changed.
+Earlier results remain in git history: the first run at `363ce53`, the corrected-metrics
+run at `ab2d12f`.
 
 ---
 

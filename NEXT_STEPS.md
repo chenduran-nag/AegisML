@@ -15,8 +15,8 @@ reasoning behind this ordering.
 ## Where things stand
 
 Done: every Tier 0 repair, the hash-chained audit log, compliance artifact
-generation, trustworthy fairness metrics, and an offline pytest suite (183 tests). In
-detail:
+generation, trustworthy fairness metrics, reviewer-triggered mitigation, and an offline
+pytest suite (205 tests). In detail:
 
 - The train/test split is drawn before any preprocessing parameter is fitted.
 - Approved models are actually written to `saved_models/`.
@@ -36,7 +36,7 @@ Remaining, in recommended order:
 | — | EDA-driven pipeline | **DONE** — findings routed to Data Agent / Planner / reviewer |
 | 2 | Quantitative governance evaluation | **DONE** — no arm approved a compliant model; replay-verified |
 | 3a | Trustworthy fairness metrics | **DONE** — re-run showed the first run *understated* disparity |
-| 3b | Verdict coverage + real mitigation (arm D) | Closes the loop the thesis promises |
+| 3b | Verdict coverage + real mitigation (arm D) | **Items 1 and 3 DONE** — reweighing beat model switching; 2 of 80 approvals genuinely pass |
 | 4 | Policy-as-code | Cheap, big framing gain |
 | 5 | Reviewer identity + dual sign-off | An approval with no approver identity is not an audit trail |
 | 6 | Small cleanups | Anytime |
@@ -433,20 +433,43 @@ Do these in this order:
    `protected_attributes_unaudited` fields distinguish it from nothing evaluated. A
    measured violation is still `False`. A protected name the planner invents, absent from
    the data, is not a gap. German Credit seed 19's shape is pinned in
-   `tests/test_fairness_groups.py`. The committed evaluation results predate this rule; they
-   are re-run together with arm D.
+   `tests/test_fairness_groups.py`. In the arm-D re-run, seed 19 is NOT FULLY EVALUATED
+   under all four arms; nothing else changed for arms A–C.
 2. **Separate protected from unprotected violations in the verdict.** Today a violation on
    `occupation` or `job` counts exactly like one on `sex`. Keep auditing planner-proposed
    attributes, but consider basing the pass/fail on protected attributes only, and report
    the rest.
-3. **Real mitigation (arm D).** Step 2 and the 3a re-run both showed that switching to the
-   next-best model does not reduce violations.
+3. **Real mitigation (arm D) — DONE.** New gate decision `reject_and_mitigate` →
+   `mitigation_node` → retraining with **reweighing** (`mitigation.py`), chosen over Fairlearn
+   by the user: no new dependency, and the approved model stays an ordinary estimator, so
+   SHAP, the joblib artifact and the model card are unchanged and no protected attribute is
+   needed at prediction time. Weights are fitted on train rows with the audit's grouping; the
+   attribute is the worst-DI protected violation (else worst-DI violation); a second
+   mitigation reweights the intersection; it shares the rejection cap. The gate shows before
+   against now, and the model card records it.
+
+   **Evaluated as arm D** (80 runs, 0 errors, 80/80 from cache; arms A–C unchanged):
+   - Fewer violated attributes in 6 of 19 rerouted runs (arm C: 2), more in 2 (arm C: 3).
+   - AUC cost −0.004 Adult, −0.013 COMPAS, −0.020 Bank Marketing, none on German Credit
+     (arm C: −0.018 to −0.051).
+   - Reweighed attributes moved a lot (COMPAS `sex` DI 0.25–0.38 → 0.68–0.99; Bank Marketing
+     max parity difference 0.20 → 0.07), but every Adult, Bank Marketing and COMPAS run still
+     violated. Two reweighings cannot cover four or five violated attributes.
+   - The only 2 genuine passes in all 80 approvals: German Credit arm D, seeds 7 and 128.
+   - Adult's minimum DI did not move: both reweighings went to protected attributes (`age`,
+     then `race`/`sex`), never to the unprotected `occupation` group that sets the minimum.
+   - Reweighing one attribute can push disparity onto another (Bank Marketing, 2 of 5 runs).
+
+   **Open from this item:** gate decisions use the held-out rows, so approved-model metrics
+   are not an untouched estimate (true of any reviewer); a validation split for gate
+   decisions would fix it. Mitigating an unprotected attribute (German Credit seed 42, `job`)
+   is allowed and did not help.
 4. Protected-attribute detection is by column name only (misses German Credit's
    `personal_status`). Consider a reviewer-declared list at run start.
 5. Intersectional subgroups (`sex × race`) with the same minimum group size.
 
-The original plan follows. Its metric items are done in 3a; the mitigation design still
-applies.
+The original plan follows. Its metric items are done in 3a. Its mitigation was implemented
+with reweighing rather than Fairlearn (item 3 above).
 
 **Goal.** Move from *detecting* bias to being able to *act* on it, and measure it
 properly.

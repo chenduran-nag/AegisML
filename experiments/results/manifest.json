@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-14T17:53:38.786197+00:00",
+  "generated_at": "2026-09-15T12:20:07.234294+00:00",
   "mode": "replay",
   "quick": false,
-  "git_commit": "363ce536f828997ebc08446eb804d6da769b8bc8",
+  "git_commit": "14e2fe0b5461fabb6e1a7dadb3a159f9d67991a1",
   "git_dirty": true,
   "python": "3.13.9",
   "platform": "Windows-10-10.0.19045-SP0",
@@ -29,6 +29,11 @@
       "label": "fairness reviewer",
       "description": "Automatic retry; reject the model while a fairness violation remains and reroutes remain, otherwise approve.",
       "max_retries": 2
+    },
+    "D": {
+      "label": "mitigation reviewer",
+      "description": "Automatic retry; while a fairness violation remains and reroutes remain, reject and mitigate (reweighing), otherwise approve.",
+      "max_retries": 2
     }
   },
   "max_human_reroutes": 2,
@@ -48,7 +53,7 @@
       "target": "class",
       "rows": 1000,
       "csv_sha256": "9888fb06e7bf42963f4db2c8fd57666d5426c0a3692d10b51571de49518a105a",
-      "note": "1,000 rows. Positive class 'good' is the favourable outcome. The main protected attribute in this dataset, age, is continuous and is not audited by the Fairness Agent, so fairness may be reported as not evaluated."
+      "note": "1,000 rows. Positive class 'good' is the favourable outcome. Age is audited in bands, but a 200-row test split often leaves fewer than two bands with 30 rows, so age goes unaudited on some seeds. `personal_status` combines sex and marital status and is not recognised as protected, because protected attributes are detected by column name."
     },
     "bank_marketing": {
       "label": "Bank Marketing",
@@ -70,9 +75,9 @@
   "planner_models": [
     "openai/gpt-oss-20b"
   ],
-  "planner_calls": 60,
-  "planner_cache_hits": 60,
-  "runs": 60,
+  "planner_calls": 80,
+  "planner_cache_hits": 80,
+  "runs": 80,
   "errors": 0,
-  "wall_clock_s": 1099.5
+  "wall_clock_s": 1599.0
 }

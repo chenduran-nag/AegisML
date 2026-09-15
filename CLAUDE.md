@@ -26,7 +26,7 @@ protect it.
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-pytest                      # 183 offline tests, no API key or network needed
+pytest                      # 205 offline tests, no API key or network needed
 python experiments/run_governance_eval.py                  # reproduce the evaluation from the committed cache, no Groq key
 python experiments/run_governance_eval.py --summarise-only # rebuild its tables + figure from the saved CSVs
 ```
@@ -46,6 +46,7 @@ never commit it), then `python server.py` → http://localhost:8000.
 | `data_agent.py` | Deterministic cleaning. Draws the train/test split, fits everything on train |
 | `training_agent.py` | Model registry, leaderboard, SHAP. Reuses the Data Agent's split |
 | `fairness_agent.py` | DI + parity difference (the verdict) and TPR/FPR gaps (reported only) on held-out rows. Groups from raw values; age banded; groups under 30 rows excluded |
+| `mitigation.py` | Reweighing mitigation for the `reject_and_mitigate` decision: attribute choice, train-only cell weights, before/after summary |
 | `audit_log.py` | Append-only, SHA-256 hash-chained audit log + `verify_audit_chain()` |
 | `compliance_artifacts.py` | Model card, AIBOM and Annex IV draft; digests chained into the audit log + `verify_artifacts()` |
 | `server.py` | FastAPI: `/api/pipeline/{start,resume,status,audit,eda,artifacts}` |
@@ -53,12 +54,14 @@ never commit it), then `python server.py` → http://localhost:8000.
 | `app.py` | Superseded Streamlit UI — do not extend |
 | `test_*.py` (repo root) | Legacy manual scripts; need live Groq + network. Not collected by pytest |
 | `tests/` | The real, offline pytest suite |
-| `experiments/run_governance_eval.py` | Governance evaluation: the real graph with a scripted reviewer, arms A/B/C × datasets × split seeds |
+| `experiments/run_governance_eval.py` | Governance evaluation: the real graph with a scripted reviewer, arms A–D (D = mitigation) × datasets × split seeds |
 | `experiments/planner_cache/`, `experiments/results/` | **Committed.** Recorded planner responses, and the results they reproduce |
 
 Loops: **1** data-quality auto-retry → planner (max 2). **2** human "reject data
 quality" → planner with feedback injected into the prompt (max 2). **3** human
-"reject model/fairness" → straight to training with the model excluded.
+"reject model/fairness" → straight to training with the model excluded. **4** human
+"reject and mitigate" → `mitigation_node` → training with reweighing, same candidates.
+Loops 2–4 share one rejection cap (`MAX_HUMAN_REROUTES`).
 
 ## Invariants — do not break these
 
@@ -115,6 +118,12 @@ quality" → planner with feedback injected into the prompt (max 2). **3** human
     and protected attributes present in the data are audited even if the planner omits
     them. Equal-opportunity and equalized-odds gaps are reported but never change the
     verdict: that rule is a policy decision (Step 4).
+15. **Mitigation is reviewer-triggered, deterministic and train-only.** It runs only on a
+    human `reject_and_mitigate` decision; the attribute is chosen by `choose_attribute()`,
+    never by the LLM. Weights are fitted on train rows with the Fairness Agent's grouping
+    (`resolve_groups_from_raw`). State and the audit log hold per-(group, label) cells,
+    never per-row weights; `training_node` rebuilds row weights from the raw frame. Once
+    applied it stays on for the rest of the run, and the model card must say so.
 
 ## Conventions
 
