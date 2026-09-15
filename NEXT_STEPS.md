@@ -36,7 +36,7 @@ Remaining, in recommended order:
 | — | EDA-driven pipeline | **DONE** — findings routed to Data Agent / Planner / reviewer |
 | 2 | Quantitative governance evaluation | **DONE** — no arm approved a compliant model; replay-verified |
 | 3a | Trustworthy fairness metrics | **DONE** — re-run showed the first run *understated* disparity |
-| 3b | Verdict coverage + real mitigation (arm D) | **Items 1 and 3 DONE** — reweighing beat model switching; 2 of 80 approvals genuinely pass |
+| 3b | Verdict coverage, mitigation, protected-only verdict, validation gate, intersectional | **DONE** — re-run: no approval passes; reweighing beats model switching; small datasets leave the gate blind |
 | 4 | Policy-as-code | Cheap, big framing gain |
 | 5 | Reviewer identity + dual sign-off | An approval with no approver identity is not an audit trail |
 | 6 | Small cleanups | Anytime |
@@ -435,10 +435,15 @@ Do these in this order:
    the data, is not a gap. German Credit seed 19's shape is pinned in
    `tests/test_fairness_groups.py`. In the arm-D re-run, seed 19 is NOT FULLY EVALUATED
    under all four arms; nothing else changed for arms A–C.
-2. **Separate protected from unprotected violations in the verdict.** Today a violation on
-   `occupation` or `job` counts exactly like one on `sex`. Keep auditing planner-proposed
-   attributes, but consider basing the pass/fail on protected attributes only, and report
-   the rest.
+2. **Protected-only verdict — DONE** (user decision). The verdict covers protected
+   attributes only; planner-proposed attributes that are not protected are audited and
+   shown as ADVISORY, and never mitigated. With no protected attribute evaluated the
+   verdict is NOT EVALUATED.
+2b. **Validation split for gate decisions — DONE** (user decision). Train / validation /
+   test = 64 / 16 / 20. The leaderboard, fairness audit and every reviewer decision use the
+   validation rows; the approved model is scored once on the untouched test rows
+   (`final_test_evaluation` audit event, model card section 4, dashboard banner), and the
+   evaluation reports those numbers.
 3. **Real mitigation (arm D) — DONE.** New gate decision `reject_and_mitigate` →
    `mitigation_node` → retraining with **reweighing** (`mitigation.py`), chosen over Fairlearn
    by the user: no new dependency, and the approved model stays an ordinary estimator, so
@@ -464,9 +469,33 @@ Do these in this order:
    are not an untouched estimate (true of any reviewer); a validation split for gate
    decisions would fix it. Mitigating an unprotected attribute (German Credit seed 42, `job`)
    is allowed and did not help.
-4. Protected-attribute detection is by column name only (misses German Credit's
-   `personal_status`). Consider a reviewer-declared list at run start.
-5. Intersectional subgroups (`sex × race`) with the same minimum group size.
+4. **Reviewer-declared protected attributes — DONE.** A dashboard field
+   (`protected_attributes`, validated against the CSV headers) adds columns that count
+   toward the verdict and feed EDA proxy detection.
+5. **Intersectional subgroups — DONE, reported only.** Pairs of evaluated protected
+   attributes (`sex × race`) with the same group rules, in `intersectional_report`, a
+   dashboard table and the model card. They never change the verdict; whether they should
+   is a Step 4 policy question.
+
+**Re-run after items 2, 2b and 4 (validation gate, test reporting, protected-only verdict).**
+80 runs, 0 errors, 80/80 from cache, every approved run reported on its test rows.
+
+- No approved model passed: 72 violated, 8 not evaluated (German Credit seeds 19 and 42).
+- Arm C: 15 rerouted, same violated protected attributes in all 15; test AUC −0.022 to −0.058.
+- Arm D: 15 rerouted, fewer in 4 (COMPAS), none worse; test AUC −0.003 to −0.015. COMPAS min
+  DI 0.18 → 0.42, max parity difference 0.62 → 0.23.
+- **German Credit's gate was blind**: no protected attribute auditable on 160 validation rows
+  on any seed, so C and D approved without rejecting; the test rows then showed age
+  violations on 3 of 5 seeds.
+- Gate AUC overstates test AUC (German Credit 0.805 vs 0.780); for arms A and B, ranking on
+  validation rows changed the selected model in 16 of 40 runs.
+
+**Open from this re-run:**
+
+- **Approving a NOT EVALUATED model** should be a policy decision, not a default: a Step 4 flag
+  (`allow_approval_when_not_evaluated`) and/or the Step 5 second-approver rule.
+- **Small datasets and the validation split.** Consider a policy-set validation size, or
+  cross-validated fairness on train rows at the gate, so small groups can be audited.
 
 The original plan follows. Its metric items are done in 3a. Its mitigation was implemented
 with reweighing rather than Fairlearn (item 3 above).
@@ -565,7 +594,7 @@ Both identities appear in the audit trail and the model card.
 
 ## Step 6 — Small cleanups (anytime)
 
-- [ ] `training_agent.py`: remove `n_jobs=-1` from `LogisticRegression`. scikit-learn
+- [x] `training_agent.py`: remove `n_jobs=-1` from `LogisticRegression`. scikit-learn
       1.8+ warns that it has no effect.
 - [ ] `training_agent.py`: `"svm"` maps to `(None, None)`, so the planner can
       recommend a model that is always skipped. Remove SVM from the planner prompt
@@ -575,19 +604,23 @@ Both identities appear in the audit trail and the model card.
 - [x] Fairness Agent: distinguish "frequency-encoded categorical" from "continuous
       numeric" when skipping an attribute. Done in Step 3a — groups now come from raw
       values, so such columns are audited rather than skipped.
-- [ ] UI: a completed run's evaluation tabs are empty (`review_payload` is `null`
-      after the graph ends). Either persist the last payload in state or rebuild the
-      tabs from `values`.
-- [ ] UI: the KPI header shows "ACCURACY N/A" on regression runs; show RMSE instead.
-- [ ] `server.py`: call `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`
-      at startup so `→` in log prints can't crash the server when stdout is
-      redirected to a file on Windows.
+- [x] UI: a completed run's evaluation tabs are empty. The gate node now keeps
+      `last_review_payload`, returned by the status API once a run completes.
+- [x] UI: the KPI header showed "ACCURACY N/A" on regression runs. Cause: it read the
+      upload form's task toggle, not the run's metrics. Fixed.
+- [x] `server.py`: stdout/stderr reconfigured to UTF-8 with `errors="replace"`.
+- [x] Add a GitHub Actions workflow that runs `pytest` on push
+      (`.github/workflows/tests.yml`, Python 3.13, no secrets).
+- [x] Found along the way: planner lists, Data Agent actions and the leaderboard error
+      were inserted into the dashboard unescaped. Escaped.
 - [ ] Retire `app.py` (the Streamlit UI) — delete it or move it to `legacy/` — and
-      drop `streamlit` from requirements.
+      drop `streamlit` from requirements. **Deferred: the partner's code; agree first.**
 - [ ] Move the legacy root `test_*.py` scripts into `scripts/manual/` and update the
-      README.
-- [ ] Add a GitHub Actions workflow that runs `pytest` on push. The suite is fully
-      offline, so it needs no secrets.
+      README. **Deferred:** they import root modules and open `.env` by relative path,
+      so moving them means editing all eight of the partner's scripts; agree first.
+- [ ] SVM: the planner can still recommend it, and it is skipped with a reason. Removing
+      it from the planner prompt would change every prompt hash and invalidate the
+      committed planner cache, so it waits for the next cache re-record.
 - [ ] Longer term: audit-chain anchoring. Periodically publish the head hash
       outside the database (a signed log, another host, a timestamping service).
       This closes the truncation gap documented in the README.

@@ -44,9 +44,17 @@
 | #23 **New:** max-vs-min disparate impact had no minimum group size — a 4-person Adult group set DI to 0.0 | Fixed — groups under 30 rows excluded and listed |
 | #24 **New:** `age` was proposed by the planner on every benchmark and never audited | Fixed — banded <25 / 25-59 / 60+ |
 | #25 **New:** skipped attributes were computed but never shown on the dashboard | Fixed — "Not audited" list with reasons |
-| 3.1 Quantitative governance evaluation: 4 datasets × 4 arms × 5 seeds, replay-verified | **Done**, re-run with arm D and the #26 rule — 74/80 approved models violate, 4 not fully evaluated, 2 pass; see `experiments/results/summary.md` |
+| 3.1 Quantitative governance evaluation: 4 datasets × 4 arms × 5 seeds, replay-verified | **Done**, re-run with the validation gate and protected-only verdict — on test rows 72/80 approved models violate, 8 not evaluated, 0 pass; see `experiments/results/summary.md` |
 | #26 **New:** a verdict reads "passed" when a protected attribute present in the data could not be audited (German Credit seed 19 passed on `job` alone; age bands too small) | Fixed — verdict is `None` (NOT FULLY EVALUATED) with the gap named; seed 19 now reads that under every arm |
 | 3.2 Reviewer-triggered bias mitigation (reweighing), evaluated as arm D | **Done** — fewer violated attributes in 6/19 rerouted runs (model switching: 2/19) at a far smaller AUC cost; still not compliant on Adult, Bank Marketing or COMPAS |
+| Protected-only fairness verdict; unprotected attributes advisory (user decision) | **Done** |
+| Reviewer-declared protected attributes at run start (also feed EDA proxy detection) | **Done** |
+| Validation split: gate decisions on validation rows, approved model scored once on test rows (user decision) | **Done** |
+| Intersectional subgroups (pairs of protected attributes), reported only | **Done** |
+| #27 **New:** planner lists, Data Agent actions and the leaderboard error were inserted into the dashboard unescaped (LLM output and uploaded column names) | Fixed — escaped |
+| #28 **New:** the regression KPI read the upload form's task toggle rather than the run's metrics ("ACCURACY N/A") | Fixed |
+| #29 **New:** a completed run's evaluation tabs were empty (no live gate payload) | Fixed — `last_review_payload` |
+| #30 **New:** on small datasets the 160-row validation split cannot audit any protected attribute, so the gate verdict is NOT EVALUATED and reviewers approve blind (German Credit, all seeds) | Open — Step 4 policy flag / validation sizing |
 | 1.3 Policy-as-code | Not started |
 | 1.4 Reviewer identity | Not started |
 | Tier 2 / Tier 3 | Not started |

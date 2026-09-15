@@ -1,537 +1,501 @@
 dataset,arm,seed,gate_index,model,auc_roc,accuracy,overall_fairness_passed,attribute,disparate_impact,demographic_parity_difference,equal_opportunity_difference,protected,excluded_groups,violation,decision,decision_reason
-adult,A,42,0,XGBoost,0.9273,0.8734,False,age,0.0192,0.2449,0.1983,True,,True,approve,arm approves at the first gate
-adult,A,42,0,XGBoost,0.9273,0.8734,False,sex,0.3306,0.1739,0.0628,True,,True,approve,arm approves at the first gate
-adult,A,42,0,XGBoost,0.9273,0.8734,False,race,0.3193,0.1554,0.2385,True,,True,approve,arm approves at the first gate
-adult,A,42,0,XGBoost,0.9273,0.8734,False,marital-status,0.0435,0.3761,0.4447,False,Married-AF-spouse=7,True,approve,arm approves at the first gate
-adult,A,42,0,XGBoost,0.9273,0.8734,False,occupation,0.0,0.4987,0.6081,False,Armed-Forces=2,True,approve,arm approves at the first gate
-adult,A,7,0,XGBoost,0.9284,0.8733,False,age,0.0189,0.2442,0.3162,True,,True,approve,arm approves at the first gate
-adult,A,7,0,XGBoost,0.9284,0.8733,False,sex,0.3209,0.1752,0.0823,True,,True,approve,arm approves at the first gate
-adult,A,7,0,XGBoost,0.9284,0.8733,False,race,0.2352,0.1785,0.3637,True,,True,approve,arm approves at the first gate
-adult,A,7,0,XGBoost,0.9284,0.8733,False,marital-status,0.0608,0.3709,0.2633,False,Married-AF-spouse=6,True,approve,arm approves at the first gate
-adult,A,7,0,XGBoost,0.9284,0.8733,False,occupation,0.0,0.5067,0.6108,False,Armed-Forces=5,True,approve,arm approves at the first gate
-adult,A,19,0,XGBoost,0.9243,0.8724,False,age,0.0188,0.2454,0.3046,True,,True,approve,arm approves at the first gate
-adult,A,19,0,XGBoost,0.9243,0.8724,False,sex,0.3055,0.1816,0.09,True,,True,approve,arm approves at the first gate
-adult,A,19,0,XGBoost,0.9243,0.8724,False,race,0.212,0.1907,0.2146,True,,True,approve,arm approves at the first gate
-adult,A,19,0,XGBoost,0.9243,0.8724,False,marital-status,0.0553,0.3778,0.3456,False,Married-AF-spouse=4,True,approve,arm approves at the first gate
-adult,A,19,0,XGBoost,0.9243,0.8724,False,occupation,0.0,0.4722,0.5952,False,Armed-Forces=5,True,approve,arm approves at the first gate
-adult,A,73,0,XGBoost,0.9242,0.8699,False,age,0.019,0.2479,0.2517,True,,True,approve,arm approves at the first gate
-adult,A,73,0,XGBoost,0.9242,0.8699,False,sex,0.2911,0.1887,0.1227,True,,True,approve,arm approves at the first gate
-adult,A,73,0,XGBoost,0.9242,0.8699,False,race,0.2927,0.18,0.2974,True,,True,approve,arm approves at the first gate
-adult,A,73,0,XGBoost,0.9242,0.8699,False,marital-status,0.0604,0.3812,0.3367,False,Married-AF-spouse=5,True,approve,arm approves at the first gate
-adult,A,73,0,XGBoost,0.9242,0.8699,False,occupation,0.0,0.5065,0.6392,False,Armed-Forces=2,True,approve,arm approves at the first gate
-adult,A,128,0,XGBoost,0.9295,0.8775,False,age,0.0192,0.2457,0.2568,True,,True,approve,arm approves at the first gate
-adult,A,128,0,XGBoost,0.9295,0.8775,False,sex,0.309,0.184,0.1228,True,,True,approve,arm approves at the first gate
-adult,A,128,0,XGBoost,0.9295,0.8775,False,race,0.3179,0.1498,0.3873,True,,True,approve,arm approves at the first gate
-adult,A,128,0,XGBoost,0.9295,0.8775,False,marital-status,0.0486,0.3918,0.3228,False,Married-AF-spouse=8,True,approve,arm approves at the first gate
-adult,A,128,0,XGBoost,0.9295,0.8775,False,occupation,0.0203,0.4815,0.6058,False,Armed-Forces=3,True,approve,arm approves at the first gate
-adult,B,42,0,XGBoost,0.9273,0.8734,False,age,0.0192,0.2449,0.1983,True,,True,approve,arm approves at the first gate
-adult,B,42,0,XGBoost,0.9273,0.8734,False,sex,0.3306,0.1739,0.0628,True,,True,approve,arm approves at the first gate
-adult,B,42,0,XGBoost,0.9273,0.8734,False,race,0.3193,0.1554,0.2385,True,,True,approve,arm approves at the first gate
-adult,B,42,0,XGBoost,0.9273,0.8734,False,marital-status,0.0435,0.3761,0.4447,False,Married-AF-spouse=7,True,approve,arm approves at the first gate
-adult,B,42,0,XGBoost,0.9273,0.8734,False,occupation,0.0,0.4987,0.6081,False,Armed-Forces=2,True,approve,arm approves at the first gate
-adult,B,7,0,XGBoost,0.9284,0.8733,False,age,0.0189,0.2442,0.3162,True,,True,approve,arm approves at the first gate
-adult,B,7,0,XGBoost,0.9284,0.8733,False,sex,0.3209,0.1752,0.0823,True,,True,approve,arm approves at the first gate
-adult,B,7,0,XGBoost,0.9284,0.8733,False,race,0.2352,0.1785,0.3637,True,,True,approve,arm approves at the first gate
-adult,B,7,0,XGBoost,0.9284,0.8733,False,marital-status,0.0608,0.3709,0.2633,False,Married-AF-spouse=6,True,approve,arm approves at the first gate
-adult,B,7,0,XGBoost,0.9284,0.8733,False,occupation,0.0,0.5067,0.6108,False,Armed-Forces=5,True,approve,arm approves at the first gate
-adult,B,19,0,XGBoost,0.9243,0.8724,False,age,0.0188,0.2454,0.3046,True,,True,approve,arm approves at the first gate
-adult,B,19,0,XGBoost,0.9243,0.8724,False,sex,0.3055,0.1816,0.09,True,,True,approve,arm approves at the first gate
-adult,B,19,0,XGBoost,0.9243,0.8724,False,race,0.212,0.1907,0.2146,True,,True,approve,arm approves at the first gate
-adult,B,19,0,XGBoost,0.9243,0.8724,False,marital-status,0.0553,0.3778,0.3456,False,Married-AF-spouse=4,True,approve,arm approves at the first gate
-adult,B,19,0,XGBoost,0.9243,0.8724,False,occupation,0.0,0.4722,0.5952,False,Armed-Forces=5,True,approve,arm approves at the first gate
-adult,B,73,0,XGBoost,0.9242,0.8699,False,age,0.019,0.2479,0.2517,True,,True,approve,arm approves at the first gate
-adult,B,73,0,XGBoost,0.9242,0.8699,False,sex,0.2911,0.1887,0.1227,True,,True,approve,arm approves at the first gate
-adult,B,73,0,XGBoost,0.9242,0.8699,False,race,0.2927,0.18,0.2974,True,,True,approve,arm approves at the first gate
-adult,B,73,0,XGBoost,0.9242,0.8699,False,marital-status,0.0604,0.3812,0.3367,False,Married-AF-spouse=5,True,approve,arm approves at the first gate
-adult,B,73,0,XGBoost,0.9242,0.8699,False,occupation,0.0,0.5065,0.6392,False,Armed-Forces=2,True,approve,arm approves at the first gate
-adult,B,128,0,XGBoost,0.9295,0.8775,False,age,0.0192,0.2457,0.2568,True,,True,approve,arm approves at the first gate
-adult,B,128,0,XGBoost,0.9295,0.8775,False,sex,0.309,0.184,0.1228,True,,True,approve,arm approves at the first gate
-adult,B,128,0,XGBoost,0.9295,0.8775,False,race,0.3179,0.1498,0.3873,True,,True,approve,arm approves at the first gate
-adult,B,128,0,XGBoost,0.9295,0.8775,False,marital-status,0.0486,0.3918,0.3228,False,Married-AF-spouse=8,True,approve,arm approves at the first gate
-adult,B,128,0,XGBoost,0.9295,0.8775,False,occupation,0.0203,0.4815,0.6058,False,Armed-Forces=3,True,approve,arm approves at the first gate
-adult,C,42,0,XGBoost,0.9273,0.8734,False,age,0.0192,0.2449,0.1983,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,0,XGBoost,0.9273,0.8734,False,sex,0.3306,0.1739,0.0628,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,0,XGBoost,0.9273,0.8734,False,race,0.3193,0.1554,0.2385,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,0,XGBoost,0.9273,0.8734,False,marital-status,0.0435,0.3761,0.4447,False,Married-AF-spouse=7,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,0,XGBoost,0.9273,0.8734,False,occupation,0.0,0.4987,0.6081,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,1,RandomForest,0.9066,0.8577,False,age,0.022,0.2404,0.0905,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,1,RandomForest,0.9066,0.8577,False,sex,0.3224,0.174,0.079,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,1,RandomForest,0.9066,0.8577,False,race,0.2284,0.1649,0.2269,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,1,RandomForest,0.9066,0.8577,False,marital-status,0.0431,0.3792,0.4517,False,Married-AF-spouse=7,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,1,RandomForest,0.9066,0.8577,False,occupation,0.0252,0.4371,0.5668,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,42,2,LogisticRegression,0.8772,0.8258,False,age,0.0387,0.2385,0.2129,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,42,2,LogisticRegression,0.8772,0.8258,False,sex,0.3241,0.1408,0.0418,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,42,2,LogisticRegression,0.8772,0.8258,False,race,0.2447,0.1506,0.3,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,42,2,LogisticRegression,0.8772,0.8258,False,marital-status,0.0316,0.3155,0.3699,False,Married-AF-spouse=7,True,approve,violation remains but reroutes are exhausted
-adult,C,42,2,LogisticRegression,0.8772,0.8258,False,occupation,0.0,0.4181,0.5476,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
-adult,C,7,0,XGBoost,0.9284,0.8733,False,age,0.0189,0.2442,0.3162,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,0,XGBoost,0.9284,0.8733,False,sex,0.3209,0.1752,0.0823,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,0,XGBoost,0.9284,0.8733,False,race,0.2352,0.1785,0.3637,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,0,XGBoost,0.9284,0.8733,False,marital-status,0.0608,0.3709,0.2633,False,Married-AF-spouse=6,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,0,XGBoost,0.9284,0.8733,False,occupation,0.0,0.5067,0.6108,False,Armed-Forces=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,1,RandomForest,0.904,0.8568,False,age,0.0145,0.2444,0.4111,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,1,RandomForest,0.904,0.8568,False,sex,0.2884,0.1841,0.1104,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,1,RandomForest,0.904,0.8568,False,race,0.2041,0.1716,0.3252,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,1,RandomForest,0.904,0.8568,False,marital-status,0.053,0.3738,0.3192,False,Married-AF-spouse=6,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,1,RandomForest,0.904,0.8568,False,occupation,0.0,0.4749,0.5457,False,Armed-Forces=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,7,2,LogisticRegression,0.8796,0.8311,False,age,0.0344,0.2499,0.3305,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,7,2,LogisticRegression,0.8796,0.8311,False,sex,0.2991,0.1556,0.114,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,7,2,LogisticRegression,0.8796,0.8311,False,race,0.2021,0.1737,0.3802,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,7,2,LogisticRegression,0.8796,0.8311,False,marital-status,0.0397,0.3318,0.298,False,Married-AF-spouse=6,True,approve,violation remains but reroutes are exhausted
-adult,C,7,2,LogisticRegression,0.8796,0.8311,False,occupation,0.0,0.4589,0.5953,False,Armed-Forces=5,True,approve,violation remains but reroutes are exhausted
-adult,C,19,0,XGBoost,0.9243,0.8724,False,age,0.0188,0.2454,0.3046,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,0,XGBoost,0.9243,0.8724,False,sex,0.3055,0.1816,0.09,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,0,XGBoost,0.9243,0.8724,False,race,0.212,0.1907,0.2146,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,0,XGBoost,0.9243,0.8724,False,marital-status,0.0553,0.3778,0.3456,False,Married-AF-spouse=4,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,0,XGBoost,0.9243,0.8724,False,occupation,0.0,0.4722,0.5952,False,Armed-Forces=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,1,RandomForest,0.9032,0.8562,False,age,0.0147,0.2416,0.4468,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,1,RandomForest,0.9032,0.8562,False,sex,0.2997,0.1804,0.1233,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,1,RandomForest,0.9032,0.8562,False,race,0.3041,0.1467,0.1363,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,1,RandomForest,0.9032,0.8562,False,marital-status,0.0432,0.3787,0.4377,False,Married-AF-spouse=4,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,1,RandomForest,0.9032,0.8562,False,occupation,0.0,0.4598,0.5098,False,Armed-Forces=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,19,2,LogisticRegression,0.8783,0.8286,False,age,0.0433,0.2366,0.2654,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,19,2,LogisticRegression,0.8783,0.8286,False,sex,0.2931,0.1529,0.0842,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,19,2,LogisticRegression,0.8783,0.8286,False,race,0.2218,0.18,0.2645,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,19,2,LogisticRegression,0.8783,0.8286,False,marital-status,0.0457,0.3198,0.3508,False,Married-AF-spouse=4,True,approve,violation remains but reroutes are exhausted
-adult,C,19,2,LogisticRegression,0.8783,0.8286,False,occupation,0.0,0.4255,0.6069,False,Armed-Forces=5,True,approve,violation remains but reroutes are exhausted
-adult,C,73,0,XGBoost,0.9242,0.8699,False,age,0.019,0.2479,0.2517,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,0,XGBoost,0.9242,0.8699,False,sex,0.2911,0.1887,0.1227,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,0,XGBoost,0.9242,0.8699,False,race,0.2927,0.18,0.2974,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,0,XGBoost,0.9242,0.8699,False,marital-status,0.0604,0.3812,0.3367,False,Married-AF-spouse=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,0,XGBoost,0.9242,0.8699,False,occupation,0.0,0.5065,0.6392,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,1,RandomForest,0.9013,0.8558,False,age,0.0143,0.2482,0.2812,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,1,RandomForest,0.9013,0.8558,False,sex,0.2922,0.1868,0.111,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,1,RandomForest,0.9013,0.8558,False,race,0.414,0.1428,0.178,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,1,RandomForest,0.9013,0.8558,False,marital-status,0.0445,0.391,0.3998,False,Married-AF-spouse=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,1,RandomForest,0.9013,0.8558,False,occupation,0.0,0.4763,0.6762,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,73,2,LogisticRegression,0.8756,0.8269,False,age,0.0319,0.2729,0.2884,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,73,2,LogisticRegression,0.8756,0.8269,False,sex,0.2842,0.1569,0.1263,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,73,2,LogisticRegression,0.8756,0.8269,False,race,0.2424,0.1575,0.2263,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,73,2,LogisticRegression,0.8756,0.8269,False,marital-status,0.0438,0.3231,0.3203,False,Married-AF-spouse=5,True,approve,violation remains but reroutes are exhausted
-adult,C,73,2,LogisticRegression,0.8756,0.8269,False,occupation,0.0452,0.3906,0.5882,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
-adult,C,128,0,XGBoost,0.9295,0.8775,False,age,0.0192,0.2457,0.2568,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,0,XGBoost,0.9295,0.8775,False,sex,0.309,0.184,0.1228,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,0,XGBoost,0.9295,0.8775,False,race,0.3179,0.1498,0.3873,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,0,XGBoost,0.9295,0.8775,False,marital-status,0.0486,0.3918,0.3228,False,Married-AF-spouse=8,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,0,XGBoost,0.9295,0.8775,False,occupation,0.0203,0.4815,0.6058,False,Armed-Forces=3,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,1,RandomForest,0.9061,0.8591,False,age,0.015,0.2368,0.3054,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,1,RandomForest,0.9061,0.8591,False,sex,0.3057,0.1765,0.1353,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,1,RandomForest,0.9061,0.8591,False,race,0.2205,0.1644,0.3721,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,1,RandomForest,0.9061,0.8591,False,marital-status,0.0409,0.3819,0.3601,False,Married-AF-spouse=8,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,1,RandomForest,0.9061,0.8591,False,occupation,0.0176,0.4457,0.6383,False,Armed-Forces=3,True,reject_model_or_fairness,fairness violation with reroutes remaining
-adult,C,128,2,LogisticRegression,0.8788,0.8271,False,age,0.0229,0.2557,0.3658,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,128,2,LogisticRegression,0.8788,0.8271,False,sex,0.3074,0.1471,0.0988,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,128,2,LogisticRegression,0.8788,0.8271,False,race,0.1907,0.1613,0.4362,True,,True,approve,violation remains but reroutes are exhausted
-adult,C,128,2,LogisticRegression,0.8788,0.8271,False,marital-status,0.0311,0.3276,0.2982,False,Married-AF-spouse=8,True,approve,violation remains but reroutes are exhausted
-adult,C,128,2,LogisticRegression,0.8788,0.8271,False,occupation,0.0458,0.3998,0.5637,False,Armed-Forces=3,True,approve,violation remains but reroutes are exhausted
-adult,D,42,0,XGBoost,0.9273,0.8734,False,age,0.0192,0.2449,0.1983,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,0,XGBoost,0.9273,0.8734,False,sex,0.3306,0.1739,0.0628,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,0,XGBoost,0.9273,0.8734,False,race,0.3193,0.1554,0.2385,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,0,XGBoost,0.9273,0.8734,False,marital-status,0.0435,0.3761,0.4447,False,Married-AF-spouse=7,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,0,XGBoost,0.9273,0.8734,False,occupation,0.0,0.4987,0.6081,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,1,XGBoost,0.926,0.8708,False,age,0.0714,0.2017,0.1527,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,1,XGBoost,0.926,0.8708,False,sex,0.3425,0.1509,0.0563,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,1,XGBoost,0.926,0.8708,False,race,0.2493,0.1569,0.228,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,1,XGBoost,0.926,0.8708,False,marital-status,0.049,0.3318,0.3853,False,Married-AF-spouse=7,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,1,XGBoost,0.926,0.8708,False,occupation,0.0,0.4584,0.5482,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,42,2,XGBoost,0.9246,0.8694,False,age,0.0963,0.1906,0.1634,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,42,2,XGBoost,0.9246,0.8694,False,sex,0.3478,0.1461,0.0464,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,42,2,XGBoost,0.9246,0.8694,False,race,0.3926,0.1289,0.0702,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,42,2,XGBoost,0.9246,0.8694,False,marital-status,0.0402,0.3275,0.3722,False,Married-AF-spouse=7,True,approve,violation remains but reroutes are exhausted
-adult,D,42,2,XGBoost,0.9246,0.8694,False,occupation,0.0,0.44,0.5318,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
-adult,D,7,0,XGBoost,0.9284,0.8733,False,age,0.0189,0.2442,0.3162,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,0,XGBoost,0.9284,0.8733,False,sex,0.3209,0.1752,0.0823,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,0,XGBoost,0.9284,0.8733,False,race,0.2352,0.1785,0.3637,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,0,XGBoost,0.9284,0.8733,False,marital-status,0.0608,0.3709,0.2633,False,Married-AF-spouse=6,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,0,XGBoost,0.9284,0.8733,False,occupation,0.0,0.5067,0.6108,False,Armed-Forces=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,1,XGBoost,0.926,0.8733,False,age,0.0762,0.2012,0.1791,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,1,XGBoost,0.926,0.8733,False,sex,0.3361,0.1517,0.0553,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,1,XGBoost,0.926,0.8733,False,race,0.3264,0.136,0.2177,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,1,XGBoost,0.926,0.8733,False,marital-status,0.0619,0.3306,0.2292,False,Married-AF-spouse=6,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,1,XGBoost,0.926,0.8733,False,occupation,0.0,0.459,0.5633,False,Armed-Forces=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,7,2,XGBoost,0.9249,0.8715,False,age,0.0635,0.2006,0.123,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,7,2,XGBoost,0.9249,0.8715,False,sex,0.3151,0.1552,0.0808,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,7,2,XGBoost,0.9249,0.8715,False,race,0.5355,0.0923,0.2385,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,7,2,XGBoost,0.9249,0.8715,False,marital-status,0.0602,0.326,0.2182,False,Married-AF-spouse=6,True,approve,violation remains but reroutes are exhausted
-adult,D,7,2,XGBoost,0.9249,0.8715,False,occupation,0.0,0.4506,0.558,False,Armed-Forces=5,True,approve,violation remains but reroutes are exhausted
-adult,D,19,0,XGBoost,0.9243,0.8724,False,age,0.0188,0.2454,0.3046,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,0,XGBoost,0.9243,0.8724,False,sex,0.3055,0.1816,0.09,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,0,XGBoost,0.9243,0.8724,False,race,0.212,0.1907,0.2146,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,0,XGBoost,0.9243,0.8724,False,marital-status,0.0553,0.3778,0.3456,False,Married-AF-spouse=4,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,0,XGBoost,0.9243,0.8724,False,occupation,0.0,0.4722,0.5952,False,Armed-Forces=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,1,XGBoost,0.9224,0.8695,False,age,0.1061,0.1996,0.1037,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,1,XGBoost,0.9224,0.8695,False,sex,0.2961,0.1697,0.1047,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,1,XGBoost,0.9224,0.8695,False,race,0.3216,0.1352,0.1377,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,1,XGBoost,0.9224,0.8695,False,marital-status,0.0578,0.3454,0.3457,False,Married-AF-spouse=4,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,1,XGBoost,0.9224,0.8695,False,occupation,0.0,0.4515,0.5619,False,Armed-Forces=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,19,2,XGBoost,0.9177,0.8669,False,age,0.0905,0.19,0.1354,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,19,2,XGBoost,0.9177,0.8669,False,sex,0.5441,0.092,0.121,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,19,2,XGBoost,0.9177,0.8669,False,race,0.3213,0.128,0.13,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,19,2,XGBoost,0.9177,0.8669,False,marital-status,0.0659,0.3135,0.3058,False,Married-AF-spouse=4,True,approve,violation remains but reroutes are exhausted
-adult,D,19,2,XGBoost,0.9177,0.8669,False,occupation,0.0,0.4126,0.5287,False,Armed-Forces=5,True,approve,violation remains but reroutes are exhausted
-adult,D,73,0,XGBoost,0.9242,0.8699,False,age,0.019,0.2479,0.2517,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,0,XGBoost,0.9242,0.8699,False,sex,0.2911,0.1887,0.1227,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,0,XGBoost,0.9242,0.8699,False,race,0.2927,0.18,0.2974,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,0,XGBoost,0.9242,0.8699,False,marital-status,0.0604,0.3812,0.3367,False,Married-AF-spouse=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,0,XGBoost,0.9242,0.8699,False,occupation,0.0,0.5065,0.6392,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,1,XGBoost,0.922,0.8703,False,age,0.0798,0.2017,0.1382,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,1,XGBoost,0.922,0.8703,False,sex,0.3051,0.1622,0.0947,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,1,XGBoost,0.922,0.8703,False,race,0.2921,0.1573,0.1649,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,1,XGBoost,0.922,0.8703,False,marital-status,0.059,0.3367,0.3111,False,Married-AF-spouse=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,1,XGBoost,0.922,0.8703,False,occupation,0.0,0.4673,0.6236,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,73,2,XGBoost,0.921,0.8672,False,age,0.0807,0.1994,0.1872,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,73,2,XGBoost,0.921,0.8672,False,sex,0.3123,0.1588,0.0836,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,73,2,XGBoost,0.921,0.8672,False,race,0.4941,0.1197,0.1456,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,73,2,XGBoost,0.921,0.8672,False,marital-status,0.0596,0.3329,0.3152,False,Married-AF-spouse=5,True,approve,violation remains but reroutes are exhausted
-adult,D,73,2,XGBoost,0.921,0.8672,False,occupation,0.0,0.4567,0.585,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
-adult,D,128,0,XGBoost,0.9295,0.8775,False,age,0.0192,0.2457,0.2568,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,0,XGBoost,0.9295,0.8775,False,sex,0.309,0.184,0.1228,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,0,XGBoost,0.9295,0.8775,False,race,0.3179,0.1498,0.3873,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,0,XGBoost,0.9295,0.8775,False,marital-status,0.0486,0.3918,0.3228,False,Married-AF-spouse=8,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,0,XGBoost,0.9295,0.8775,False,occupation,0.0203,0.4815,0.6058,False,Armed-Forces=3,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,1,XGBoost,0.9286,0.8741,False,age,0.0491,0.2091,0.1442,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,1,XGBoost,0.9286,0.8741,False,sex,0.3251,0.1588,0.0931,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,1,XGBoost,0.9286,0.8741,False,race,0.273,0.1547,0.3726,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,1,XGBoost,0.9286,0.8741,False,marital-status,0.0508,0.346,0.2737,False,Married-AF-spouse=8,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,1,XGBoost,0.9286,0.8741,False,occupation,0.0264,0.4425,0.5255,False,Armed-Forces=3,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-adult,D,128,2,XGBoost,0.9292,0.8779,False,age,0.0689,0.2026,0.0972,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,128,2,XGBoost,0.9292,0.8779,False,sex,0.3174,0.16,0.0993,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,128,2,XGBoost,0.9292,0.8779,False,race,0.4084,0.1179,0.3726,True,,True,approve,violation remains but reroutes are exhausted
-adult,D,128,2,XGBoost,0.9292,0.8779,False,marital-status,0.052,0.343,0.288,False,Married-AF-spouse=8,True,approve,violation remains but reroutes are exhausted
-adult,D,128,2,XGBoost,0.9292,0.8779,False,occupation,0.0262,0.4465,0.5133,False,Armed-Forces=3,True,approve,violation remains but reroutes are exhausted
-credit_g,A,42,0,RandomForest,0.7906,0.755,False,job,0.7507,0.225,0.1159,False,unemp/unskilled non res=5,True,approve,arm approves at the first gate
-credit_g,A,7,0,RandomForest,0.7968,0.745,False,age,0.7916,0.1667,0.2581,True,60+=10,True,approve,arm approves at the first gate
-credit_g,A,7,0,RandomForest,0.7968,0.745,False,job,0.8865,0.0956,0.0318,False,high qualif/self emp/mgmt=20,False,approve,arm approves at the first gate
-credit_g,A,19,0,RandomForest,0.778,0.76,,job,0.9327,0.0593,0.0717,False,high qualif/self emp/mgmt=24;unemp/unskilled non res=5,False,approve,arm approves at the first gate
-credit_g,A,73,0,RandomForest,0.7525,0.755,False,age,0.7173,0.2365,0.1918,True,60+=11,True,approve,arm approves at the first gate
-credit_g,A,73,0,RandomForest,0.7525,0.755,False,job,0.8482,0.1278,0.1984,False,unemp/unskilled non res=10,True,approve,arm approves at the first gate
-credit_g,A,128,0,XGBoost,0.7868,0.745,False,age,0.7992,0.1424,0.1276,True,60+=5,True,approve,arm approves at the first gate
-credit_g,A,128,0,XGBoost,0.7868,0.745,False,job,0.8754,0.0953,0.1793,False,unemp/unskilled non res=5,False,approve,arm approves at the first gate
-credit_g,B,42,0,RandomForest,0.7906,0.755,False,job,0.7507,0.225,0.1159,False,unemp/unskilled non res=5,True,approve,arm approves at the first gate
-credit_g,B,7,0,RandomForest,0.7968,0.745,False,age,0.7916,0.1667,0.2581,True,60+=10,True,approve,arm approves at the first gate
-credit_g,B,7,0,RandomForest,0.7968,0.745,False,job,0.8865,0.0956,0.0318,False,high qualif/self emp/mgmt=20,False,approve,arm approves at the first gate
-credit_g,B,19,0,RandomForest,0.778,0.76,,job,0.9327,0.0593,0.0717,False,high qualif/self emp/mgmt=24;unemp/unskilled non res=5,False,approve,arm approves at the first gate
-credit_g,B,73,0,RandomForest,0.7525,0.755,False,age,0.7173,0.2365,0.1918,True,60+=11,True,approve,arm approves at the first gate
-credit_g,B,73,0,RandomForest,0.7525,0.755,False,job,0.8482,0.1278,0.1984,False,unemp/unskilled non res=10,True,approve,arm approves at the first gate
-credit_g,B,128,0,XGBoost,0.7868,0.745,False,age,0.7992,0.1424,0.1276,True,60+=5,True,approve,arm approves at the first gate
-credit_g,B,128,0,XGBoost,0.7868,0.745,False,job,0.8754,0.0953,0.1793,False,unemp/unskilled non res=5,False,approve,arm approves at the first gate
-credit_g,C,42,0,RandomForest,0.7906,0.755,False,job,0.7507,0.225,0.1159,False,unemp/unskilled non res=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,42,1,LogisticRegression,0.7811,0.74,False,job,0.7507,0.225,0.1747,False,unemp/unskilled non res=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,42,2,XGBoost,0.7689,0.745,False,job,0.8016,0.1597,0.0838,False,unemp/unskilled non res=5,True,approve,violation remains but reroutes are exhausted
-credit_g,C,7,0,RandomForest,0.7968,0.745,False,age,0.7916,0.1667,0.2581,True,60+=10,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,7,0,RandomForest,0.7968,0.745,False,job,0.8865,0.0956,0.0318,False,high qualif/self emp/mgmt=20,False,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,7,1,LogisticRegression,0.7785,0.775,False,age,0.7273,0.225,0.1577,True,60+=10,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,7,1,LogisticRegression,0.7785,0.775,False,job,0.9259,0.059,0.0665,False,high qualif/self emp/mgmt=20,False,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,7,2,XGBoost,0.7671,0.755,False,age,0.8042,0.1542,0.1232,True,60+=10,True,approve,violation remains but reroutes are exhausted
-credit_g,C,7,2,XGBoost,0.7671,0.755,False,job,0.8434,0.136,0.0688,False,high qualif/self emp/mgmt=20,True,approve,violation remains but reroutes are exhausted
-credit_g,C,19,0,RandomForest,0.778,0.76,,job,0.9327,0.0593,0.0717,False,high qualif/self emp/mgmt=24;unemp/unskilled non res=5,False,approve,"no violation, but a protected attribute was not audited"
-credit_g,C,73,0,RandomForest,0.7525,0.755,False,age,0.7173,0.2365,0.1918,True,60+=11,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,73,0,RandomForest,0.7525,0.755,False,job,0.8482,0.1278,0.1984,False,unemp/unskilled non res=10,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,73,1,XGBoost,0.7406,0.74,False,age,0.5936,0.3195,0.1908,True,60+=11,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,73,1,XGBoost,0.7406,0.74,False,job,0.9117,0.0664,0.2168,False,unemp/unskilled non res=10,False,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,73,2,LogisticRegression,0.7225,0.73,False,age,0.6729,0.2592,0.1908,True,60+=11,True,approve,violation remains but reroutes are exhausted
-credit_g,C,73,2,LogisticRegression,0.7225,0.73,False,job,0.8931,0.09,0.114,False,unemp/unskilled non res=10,False,approve,violation remains but reroutes are exhausted
-credit_g,C,128,0,XGBoost,0.7868,0.745,False,age,0.7992,0.1424,0.1276,True,60+=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,128,0,XGBoost,0.7868,0.745,False,job,0.8754,0.0953,0.1793,False,unemp/unskilled non res=5,False,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,128,1,RandomForest,0.783,0.74,False,age,0.8294,0.1303,0.0534,True,60+=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,128,1,RandomForest,0.783,0.74,False,job,0.8205,0.1478,0.2563,False,unemp/unskilled non res=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
-credit_g,C,128,2,LogisticRegression,0.7792,0.74,False,age,0.9679,0.0243,0.0034,True,60+=5,False,approve,violation remains but reroutes are exhausted
-credit_g,C,128,2,LogisticRegression,0.7792,0.74,False,job,0.7922,0.1772,0.2963,False,unemp/unskilled non res=5,True,approve,violation remains but reroutes are exhausted
-credit_g,D,42,0,RandomForest,0.7906,0.755,False,job,0.7507,0.225,0.1159,False,unemp/unskilled non res=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,42,1,RandomForest,0.792,0.765,False,job,0.7309,0.2494,0.1159,False,unemp/unskilled non res=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,42,2,RandomForest,0.792,0.765,False,job,0.7309,0.2494,0.1159,False,unemp/unskilled non res=5,True,approve,violation remains but reroutes are exhausted
-credit_g,D,7,0,RandomForest,0.7968,0.745,False,age,0.7916,0.1667,0.2581,True,60+=10,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,7,0,RandomForest,0.7968,0.745,False,job,0.8865,0.0956,0.0318,False,high qualif/self emp/mgmt=20,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,7,1,RandomForest,0.7904,0.765,True,age,0.9765,0.0188,0.0142,True,60+=10,False,approve,no fairness violation
-credit_g,D,7,1,RandomForest,0.7904,0.765,True,job,0.9409,0.0482,0.0011,False,high qualif/self emp/mgmt=20,False,approve,no fairness violation
-credit_g,D,19,0,RandomForest,0.778,0.76,,job,0.9327,0.0593,0.0717,False,high qualif/self emp/mgmt=24;unemp/unskilled non res=5,False,approve,"no violation, but a protected attribute was not audited"
-credit_g,D,73,0,RandomForest,0.7525,0.755,False,age,0.7173,0.2365,0.1918,True,60+=11,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,73,0,RandomForest,0.7525,0.755,False,job,0.8482,0.1278,0.1984,False,unemp/unskilled non res=10,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,73,1,RandomForest,0.7691,0.73,False,age,0.8496,0.1239,0.0108,True,60+=11,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,73,1,RandomForest,0.7691,0.73,False,job,0.754,0.2331,0.2609,False,unemp/unskilled non res=10,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,73,2,RandomForest,0.7675,0.755,False,age,0.7173,0.2365,0.1301,True,60+=11,True,approve,violation remains but reroutes are exhausted
-credit_g,D,73,2,RandomForest,0.7675,0.755,False,job,0.8883,0.097,0.1049,False,unemp/unskilled non res=10,False,approve,violation remains but reroutes are exhausted
-credit_g,D,128,0,XGBoost,0.7868,0.745,False,age,0.7992,0.1424,0.1276,True,60+=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,128,0,XGBoost,0.7868,0.745,False,job,0.8754,0.0953,0.1793,False,unemp/unskilled non res=5,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-credit_g,D,128,1,XGBoost,0.7935,0.75,True,age,0.9565,0.0303,0.019,True,60+=5,False,approve,no fairness violation
-credit_g,D,128,1,XGBoost,0.7935,0.75,True,job,0.9189,0.0596,0.1393,False,unemp/unskilled non res=5,False,approve,no fairness violation
-bank_marketing,A,42,0,XGBoost,0.7576,0.8927,False,age,0.124,0.2007,0.2272,True,,True,approve,arm approves at the first gate
-bank_marketing,A,42,0,XGBoost,0.7576,0.8927,False,marital,0.6947,0.0145,0.0395,False,,True,approve,arm approves at the first gate
-bank_marketing,A,42,0,XGBoost,0.7576,0.8927,False,education,0.3486,0.0441,0.1609,False,,True,approve,arm approves at the first gate
-bank_marketing,A,7,0,XGBoost,0.7487,0.8904,False,age,0.111,0.2082,0.2194,True,,True,approve,arm approves at the first gate
-bank_marketing,A,7,0,XGBoost,0.7487,0.8904,False,marital,0.6311,0.0173,0.0873,False,,True,approve,arm approves at the first gate
-bank_marketing,A,7,0,XGBoost,0.7487,0.8904,False,education,0.584,0.0213,0.0535,False,,True,approve,arm approves at the first gate
-bank_marketing,A,19,0,XGBoost,0.7596,0.8923,False,age,0.111,0.2555,0.2557,True,,True,approve,arm approves at the first gate
-bank_marketing,A,19,0,XGBoost,0.7596,0.8923,False,marital,0.8214,0.0087,0.0565,False,,False,approve,arm approves at the first gate
-bank_marketing,A,19,0,XGBoost,0.7596,0.8923,False,education,0.2525,0.0678,0.1948,False,,True,approve,arm approves at the first gate
-bank_marketing,A,73,0,XGBoost,0.7426,0.8915,False,age,0.1001,0.2454,0.3636,True,,True,approve,arm approves at the first gate
-bank_marketing,A,73,0,XGBoost,0.7426,0.8915,False,marital,0.8811,0.0049,0.0581,False,,False,approve,arm approves at the first gate
-bank_marketing,A,73,0,XGBoost,0.7426,0.8915,False,education,0.3219,0.0512,0.1935,False,,True,approve,arm approves at the first gate
-bank_marketing,A,128,0,LogisticRegression,0.755,0.8938,False,age,0.1942,0.1033,0.136,True,,True,approve,arm approves at the first gate
-bank_marketing,A,128,0,LogisticRegression,0.755,0.8938,False,marital,0.5277,0.0196,0.0588,False,,True,approve,arm approves at the first gate
-bank_marketing,A,128,0,LogisticRegression,0.755,0.8938,False,education,0.3753,0.0283,0.0736,False,,True,approve,arm approves at the first gate
-bank_marketing,B,42,0,XGBoost,0.7576,0.8927,False,age,0.124,0.2007,0.2272,True,,True,approve,arm approves at the first gate
-bank_marketing,B,42,0,XGBoost,0.7576,0.8927,False,marital,0.6947,0.0145,0.0395,False,,True,approve,arm approves at the first gate
-bank_marketing,B,42,0,XGBoost,0.7576,0.8927,False,education,0.3486,0.0441,0.1609,False,,True,approve,arm approves at the first gate
-bank_marketing,B,7,0,XGBoost,0.7487,0.8904,False,age,0.111,0.2082,0.2194,True,,True,approve,arm approves at the first gate
-bank_marketing,B,7,0,XGBoost,0.7487,0.8904,False,marital,0.6311,0.0173,0.0873,False,,True,approve,arm approves at the first gate
-bank_marketing,B,7,0,XGBoost,0.7487,0.8904,False,education,0.584,0.0213,0.0535,False,,True,approve,arm approves at the first gate
-bank_marketing,B,19,0,XGBoost,0.7596,0.8923,False,age,0.111,0.2555,0.2557,True,,True,approve,arm approves at the first gate
-bank_marketing,B,19,0,XGBoost,0.7596,0.8923,False,marital,0.8214,0.0087,0.0565,False,,False,approve,arm approves at the first gate
-bank_marketing,B,19,0,XGBoost,0.7596,0.8923,False,education,0.2525,0.0678,0.1948,False,,True,approve,arm approves at the first gate
-bank_marketing,B,73,0,XGBoost,0.7426,0.8915,False,age,0.1001,0.2454,0.3636,True,,True,approve,arm approves at the first gate
-bank_marketing,B,73,0,XGBoost,0.7426,0.8915,False,marital,0.8811,0.0049,0.0581,False,,False,approve,arm approves at the first gate
-bank_marketing,B,73,0,XGBoost,0.7426,0.8915,False,education,0.3219,0.0512,0.1935,False,,True,approve,arm approves at the first gate
-bank_marketing,B,128,0,LogisticRegression,0.755,0.8938,False,age,0.1942,0.1033,0.136,True,,True,approve,arm approves at the first gate
-bank_marketing,B,128,0,LogisticRegression,0.755,0.8938,False,marital,0.5277,0.0196,0.0588,False,,True,approve,arm approves at the first gate
-bank_marketing,B,128,0,LogisticRegression,0.755,0.8938,False,education,0.3753,0.0283,0.0736,False,,True,approve,arm approves at the first gate
-bank_marketing,C,42,0,XGBoost,0.7576,0.8927,False,age,0.124,0.2007,0.2272,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,42,0,XGBoost,0.7576,0.8927,False,marital,0.6947,0.0145,0.0395,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,42,0,XGBoost,0.7576,0.8927,False,education,0.3486,0.0441,0.1609,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,42,1,LogisticRegression,0.7555,0.8957,False,age,0.2378,0.083,0.0834,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,42,1,LogisticRegression,0.7555,0.8957,False,marital,0.6735,0.0128,0.034,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,42,1,LogisticRegression,0.7555,0.8957,False,education,0.446,0.0231,0.0583,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,42,2,RandomForest,0.7229,0.8889,False,age,0.205,0.1466,0.2631,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,42,2,RandomForest,0.7229,0.8889,False,marital,0.5045,0.0334,0.0426,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,42,2,RandomForest,0.7229,0.8889,False,education,0.4319,0.0367,0.0759,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,7,0,XGBoost,0.7487,0.8904,False,age,0.111,0.2082,0.2194,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,7,0,XGBoost,0.7487,0.8904,False,marital,0.6311,0.0173,0.0873,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,7,0,XGBoost,0.7487,0.8904,False,education,0.584,0.0213,0.0535,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,7,1,LogisticRegression,0.744,0.8916,False,age,0.175,0.1136,0.1342,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,7,1,LogisticRegression,0.744,0.8916,False,marital,0.6397,0.0138,0.0708,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,7,1,LogisticRegression,0.744,0.8916,False,education,0.5129,0.0207,0.0581,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,7,2,RandomForest,0.7232,0.8833,False,age,0.14,0.2132,0.2012,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,7,2,RandomForest,0.7232,0.8833,False,marital,0.5745,0.0257,0.0928,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,7,2,RandomForest,0.7232,0.8833,False,education,0.5,0.0335,0.0486,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,19,0,XGBoost,0.7596,0.8923,False,age,0.111,0.2555,0.2557,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,19,0,XGBoost,0.7596,0.8923,False,marital,0.8214,0.0087,0.0565,False,,False,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,19,0,XGBoost,0.7596,0.8923,False,education,0.2525,0.0678,0.1948,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,19,1,LogisticRegression,0.7577,0.8934,False,age,0.2011,0.1148,0.1198,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,19,1,LogisticRegression,0.7577,0.8934,False,marital,0.7163,0.0118,0.0171,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,19,1,LogisticRegression,0.7577,0.8934,False,education,0.2574,0.0404,0.0902,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,19,2,RandomForest,0.7292,0.8875,False,age,0.1583,0.2142,0.2247,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,19,2,RandomForest,0.7292,0.8875,False,marital,0.6677,0.021,0.0055,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,19,2,RandomForest,0.7292,0.8875,False,education,0.3099,0.051,0.1092,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,73,0,XGBoost,0.7426,0.8915,False,age,0.1001,0.2454,0.3636,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,73,0,XGBoost,0.7426,0.8915,False,marital,0.8811,0.0049,0.0581,False,,False,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,73,0,XGBoost,0.7426,0.8915,False,education,0.3219,0.0512,0.1935,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,73,1,LogisticRegression,0.7332,0.8935,False,age,0.1732,0.1174,0.1721,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,73,1,LogisticRegression,0.7332,0.8935,False,marital,0.6494,0.0135,0.0569,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,73,1,LogisticRegression,0.7332,0.8935,False,education,0.3589,0.0284,0.0633,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,73,2,RandomForest,0.7067,0.8865,False,age,0.12,0.2375,0.2764,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,73,2,RandomForest,0.7067,0.8865,False,marital,0.6812,0.0176,0.0953,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,73,2,RandomForest,0.7067,0.8865,False,education,0.4097,0.0415,0.1203,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,128,0,LogisticRegression,0.755,0.8938,False,age,0.1942,0.1033,0.136,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,128,0,LogisticRegression,0.755,0.8938,False,marital,0.5277,0.0196,0.0588,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,128,0,LogisticRegression,0.755,0.8938,False,education,0.3753,0.0283,0.0736,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,128,1,XGBoost,0.7488,0.8891,False,age,0.1143,0.1968,0.3554,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,128,1,XGBoost,0.7488,0.8891,False,marital,0.5474,0.0229,0.0817,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,128,1,XGBoost,0.7488,0.8891,False,education,0.4788,0.0308,0.0513,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-bank_marketing,C,128,2,RandomForest,0.7227,0.886,False,age,0.1404,0.218,0.2968,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,128,2,RandomForest,0.7227,0.886,False,marital,0.53,0.0313,0.0969,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,C,128,2,RandomForest,0.7227,0.886,False,education,0.4993,0.0348,0.0289,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,42,0,XGBoost,0.7576,0.8927,False,age,0.124,0.2007,0.2272,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,42,0,XGBoost,0.7576,0.8927,False,marital,0.6947,0.0145,0.0395,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,42,0,XGBoost,0.7576,0.8927,False,education,0.3486,0.0441,0.1609,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,42,1,LogisticRegression,0.7464,0.8952,False,age,0.3053,0.0587,0.0876,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,42,1,LogisticRegression,0.7464,0.8952,False,marital,0.6111,0.0154,0.0076,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,42,1,LogisticRegression,0.7464,0.8952,False,education,0.3429,0.0274,0.1023,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,42,2,LogisticRegression,0.7414,0.8938,False,age,0.3152,0.0593,0.0854,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,42,2,LogisticRegression,0.7414,0.8938,False,marital,0.6675,0.0133,0.0113,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,42,2,LogisticRegression,0.7414,0.8938,False,education,0.4933,0.019,0.0795,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,7,0,XGBoost,0.7487,0.8904,False,age,0.111,0.2082,0.2194,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,7,0,XGBoost,0.7487,0.8904,False,marital,0.6311,0.0173,0.0873,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,7,0,XGBoost,0.7487,0.8904,False,education,0.584,0.0213,0.0535,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,7,1,LogisticRegression,0.7319,0.8914,False,age,0.2152,0.0886,0.0866,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,7,1,LogisticRegression,0.7319,0.8914,False,marital,0.5231,0.0186,0.0699,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,7,1,LogisticRegression,0.7319,0.8914,False,education,0.4371,0.0246,0.0607,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,7,2,XGBoost,0.7276,0.8916,False,age,0.2689,0.0685,0.0628,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,7,2,XGBoost,0.7276,0.8916,False,marital,0.5326,0.0179,0.0913,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,7,2,XGBoost,0.7276,0.8916,False,education,0.5421,0.0174,0.0322,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,19,0,XGBoost,0.7596,0.8923,False,age,0.111,0.2555,0.2557,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,19,0,XGBoost,0.7596,0.8923,False,marital,0.8214,0.0087,0.0565,False,,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,19,0,XGBoost,0.7596,0.8923,False,education,0.2525,0.0678,0.1948,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,19,1,LogisticRegression,0.7549,0.8928,False,age,0.2307,0.0967,0.0935,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,19,1,LogisticRegression,0.7549,0.8928,False,marital,0.6976,0.0127,0.0024,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,19,1,LogisticRegression,0.7549,0.8928,False,education,0.1853,0.0422,0.117,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,19,2,LogisticRegression,0.7413,0.8924,False,age,0.224,0.1022,0.0817,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,19,2,LogisticRegression,0.7413,0.8924,False,marital,0.7379,0.0108,0.0213,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,19,2,LogisticRegression,0.7413,0.8924,False,education,0.3798,0.0289,0.0527,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,73,0,XGBoost,0.7426,0.8915,False,age,0.1001,0.2454,0.3636,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,73,0,XGBoost,0.7426,0.8915,False,marital,0.8811,0.0049,0.0581,False,,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,73,0,XGBoost,0.7426,0.8915,False,education,0.3219,0.0512,0.1935,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,73,1,LogisticRegression,0.7308,0.893,False,age,0.1992,0.1001,0.1287,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,73,1,LogisticRegression,0.7308,0.893,False,marital,0.5663,0.017,0.0662,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,73,1,LogisticRegression,0.7308,0.893,False,education,0.2393,0.0337,0.11,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,73,2,XGBoost,0.7214,0.8895,False,age,0.3746,0.0444,0.0655,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,73,2,XGBoost,0.7214,0.8895,False,marital,0.4444,0.0205,0.1032,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,73,2,XGBoost,0.7214,0.8895,False,education,0.3813,0.0258,0.0487,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,128,0,LogisticRegression,0.755,0.8938,False,age,0.1942,0.1033,0.136,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,128,0,LogisticRegression,0.755,0.8938,False,marital,0.5277,0.0196,0.0588,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,128,0,LogisticRegression,0.755,0.8938,False,education,0.3753,0.0283,0.0736,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,128,1,LogisticRegression,0.7441,0.8935,False,age,0.2477,0.075,0.1349,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,128,1,LogisticRegression,0.7441,0.8935,False,marital,0.5012,0.0209,0.0435,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,128,1,LogisticRegression,0.7441,0.8935,False,education,0.2779,0.033,0.0984,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-bank_marketing,D,128,2,LogisticRegression,0.7353,0.894,False,age,0.2548,0.0743,0.1293,True,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,128,2,LogisticRegression,0.7353,0.894,False,marital,0.516,0.0197,0.055,False,,True,approve,violation remains but reroutes are exhausted
-bank_marketing,D,128,2,LogisticRegression,0.7353,0.894,False,education,0.4759,0.0207,0.0798,False,,True,approve,violation remains but reroutes are exhausted
-compas,A,42,0,LogisticRegression,0.7035,0.6534,False,sex,0.2489,0.3566,0.4402,True,,True,approve,arm approves at the first gate
-compas,A,42,0,LogisticRegression,0.7035,0.6534,False,age,0.2521,0.5766,0.3423,True,,True,approve,arm approves at the first gate
-compas,A,42,0,LogisticRegression,0.7035,0.6534,False,race,0.5101,0.2485,0.2841,True,,True,approve,arm approves at the first gate
-compas,A,42,0,LogisticRegression,0.7035,0.6534,False,age_cat,0.2594,0.571,0.4473,True,,True,approve,arm approves at the first gate
-compas,A,7,0,LogisticRegression,0.7479,0.6941,False,sex,0.289,0.3429,0.3279,True,,True,approve,arm approves at the first gate
-compas,A,7,0,LogisticRegression,0.7479,0.6941,False,age,0.305,0.5541,0.4602,True,,True,approve,arm approves at the first gate
-compas,A,7,0,LogisticRegression,0.7479,0.6941,False,race,0.4753,0.2785,0.2903,True,,True,approve,arm approves at the first gate
-compas,A,7,0,LogisticRegression,0.7479,0.6941,False,age_cat,0.1987,0.6389,0.5644,True,,True,approve,arm approves at the first gate
-compas,A,19,0,LogisticRegression,0.7401,0.6894,False,sex,0.3777,0.2885,0.2887,True,,True,approve,arm approves at the first gate
-compas,A,19,0,LogisticRegression,0.7401,0.6894,False,age,0.0961,0.7417,0.4437,True,,True,approve,arm approves at the first gate
-compas,A,19,0,LogisticRegression,0.7401,0.6894,False,race,0.4512,0.2807,0.2579,True,,True,approve,arm approves at the first gate
-compas,A,19,0,LogisticRegression,0.7401,0.6894,False,age_cat,0.1605,0.6889,0.6708,True,,True,approve,arm approves at the first gate
-compas,A,73,0,LogisticRegression,0.7271,0.6837,False,sex,0.2798,0.3575,0.3661,True,,True,approve,arm approves at the first gate
-compas,A,73,0,LogisticRegression,0.7271,0.6837,False,age,0.2042,0.6288,0.3992,True,,True,approve,arm approves at the first gate
-compas,A,73,0,LogisticRegression,0.7271,0.6837,False,race,0.4754,0.2829,0.3292,True,,True,approve,arm approves at the first gate
-compas,A,73,0,LogisticRegression,0.7271,0.6837,False,age_cat,0.1534,0.6689,0.7007,True,,True,approve,arm approves at the first gate
-compas,A,128,0,LogisticRegression,0.7028,0.6648,False,sex,0.3255,0.3112,0.3486,True,,True,approve,arm approves at the first gate
-compas,A,128,0,LogisticRegression,0.7028,0.6648,False,age,0.2067,0.606,0.5741,True,,True,approve,arm approves at the first gate
-compas,A,128,0,LogisticRegression,0.7028,0.6648,False,race,0.4046,0.3129,0.3609,True,,True,approve,arm approves at the first gate
-compas,A,128,0,LogisticRegression,0.7028,0.6648,False,age_cat,0.2,0.6111,0.5697,True,,True,approve,arm approves at the first gate
-compas,B,42,0,LogisticRegression,0.7035,0.6534,False,sex,0.2489,0.3566,0.4402,True,,True,approve,arm approves at the first gate
-compas,B,42,0,LogisticRegression,0.7035,0.6534,False,age,0.2521,0.5766,0.3423,True,,True,approve,arm approves at the first gate
-compas,B,42,0,LogisticRegression,0.7035,0.6534,False,race,0.5101,0.2485,0.2841,True,,True,approve,arm approves at the first gate
-compas,B,42,0,LogisticRegression,0.7035,0.6534,False,age_cat,0.2594,0.571,0.4473,True,,True,approve,arm approves at the first gate
-compas,B,7,0,LogisticRegression,0.7479,0.6941,False,sex,0.289,0.3429,0.3279,True,,True,approve,arm approves at the first gate
-compas,B,7,0,LogisticRegression,0.7479,0.6941,False,age,0.305,0.5541,0.4602,True,,True,approve,arm approves at the first gate
-compas,B,7,0,LogisticRegression,0.7479,0.6941,False,race,0.4753,0.2785,0.2903,True,,True,approve,arm approves at the first gate
-compas,B,7,0,LogisticRegression,0.7479,0.6941,False,age_cat,0.1987,0.6389,0.5644,True,,True,approve,arm approves at the first gate
-compas,B,19,0,LogisticRegression,0.7401,0.6894,False,sex,0.3777,0.2885,0.2887,True,,True,approve,arm approves at the first gate
-compas,B,19,0,LogisticRegression,0.7401,0.6894,False,age,0.0961,0.7417,0.4437,True,,True,approve,arm approves at the first gate
-compas,B,19,0,LogisticRegression,0.7401,0.6894,False,race,0.4512,0.2807,0.2579,True,,True,approve,arm approves at the first gate
-compas,B,19,0,LogisticRegression,0.7401,0.6894,False,age_cat,0.1605,0.6889,0.6708,True,,True,approve,arm approves at the first gate
-compas,B,73,0,LogisticRegression,0.7271,0.6837,False,sex,0.2798,0.3575,0.3661,True,,True,approve,arm approves at the first gate
-compas,B,73,0,LogisticRegression,0.7271,0.6837,False,age,0.2042,0.6288,0.3992,True,,True,approve,arm approves at the first gate
-compas,B,73,0,LogisticRegression,0.7271,0.6837,False,race,0.4754,0.2829,0.3292,True,,True,approve,arm approves at the first gate
-compas,B,73,0,LogisticRegression,0.7271,0.6837,False,age_cat,0.1534,0.6689,0.7007,True,,True,approve,arm approves at the first gate
-compas,B,128,0,LogisticRegression,0.7028,0.6648,False,sex,0.3255,0.3112,0.3486,True,,True,approve,arm approves at the first gate
-compas,B,128,0,LogisticRegression,0.7028,0.6648,False,age,0.2067,0.606,0.5741,True,,True,approve,arm approves at the first gate
-compas,B,128,0,LogisticRegression,0.7028,0.6648,False,race,0.4046,0.3129,0.3609,True,,True,approve,arm approves at the first gate
-compas,B,128,0,LogisticRegression,0.7028,0.6648,False,age_cat,0.2,0.6111,0.5697,True,,True,approve,arm approves at the first gate
-compas,C,42,0,LogisticRegression,0.7035,0.6534,False,sex,0.2489,0.3566,0.4402,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,0,LogisticRegression,0.7035,0.6534,False,age,0.2521,0.5766,0.3423,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,0,LogisticRegression,0.7035,0.6534,False,race,0.5101,0.2485,0.2841,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,0,LogisticRegression,0.7035,0.6534,False,age_cat,0.2594,0.571,0.4473,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,1,XGBoost,0.6902,0.6458,False,sex,0.4373,0.2599,0.2705,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,1,XGBoost,0.6902,0.6458,False,age,0.2682,0.4548,0.2267,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,1,XGBoost,0.6902,0.6458,False,race,0.6026,0.1952,0.1916,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,1,XGBoost,0.6902,0.6458,False,age_cat,0.3575,0.3993,0.4034,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,2,RandomForest,0.6647,0.6307,False,sex,0.437,0.2792,0.244,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,42,2,RandomForest,0.6647,0.6307,False,age,0.2359,0.4499,0.1374,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,42,2,RandomForest,0.6647,0.6307,False,race,0.6714,0.1677,0.1982,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,42,2,RandomForest,0.6647,0.6307,False,age_cat,0.4907,0.2999,0.2108,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,7,0,LogisticRegression,0.7479,0.6941,False,sex,0.289,0.3429,0.3279,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,7,0,LogisticRegression,0.7479,0.6941,False,age,0.305,0.5541,0.4602,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,7,0,LogisticRegression,0.7479,0.6941,False,race,0.4753,0.2785,0.2903,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,7,0,LogisticRegression,0.7479,0.6941,False,age_cat,0.1987,0.6389,0.5644,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,7,1,XGBoost,0.702,0.6723,False,sex,0.54,0.2007,0.1273,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,7,1,XGBoost,0.702,0.6723,False,age,0.2466,0.4955,0.6629,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,7,1,XGBoost,0.702,0.6723,False,race,0.6228,0.1776,0.1726,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,7,1,XGBoost,0.702,0.6723,False,age_cat,0.3027,0.4586,0.4462,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,7,2,RandomForest,0.6677,0.6335,False,sex,0.6235,0.1887,0.1624,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,7,2,RandomForest,0.6677,0.6335,False,age,0.2667,0.4459,0.5487,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,7,2,RandomForest,0.6677,0.6335,False,race,0.7503,0.1293,0.1241,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,7,2,RandomForest,0.6677,0.6335,False,age_cat,0.5134,0.2959,0.2779,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,19,0,LogisticRegression,0.7401,0.6894,False,sex,0.3777,0.2885,0.2887,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,19,0,LogisticRegression,0.7401,0.6894,False,age,0.0961,0.7417,0.4437,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,19,0,LogisticRegression,0.7401,0.6894,False,race,0.4512,0.2807,0.2579,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,19,0,LogisticRegression,0.7401,0.6894,False,age_cat,0.1605,0.6889,0.6708,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,19,1,XGBoost,0.7217,0.6752,False,sex,0.5805,0.1765,0.1479,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,19,1,XGBoost,0.7217,0.6752,False,age,0.2729,0.4206,0.1986,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,19,1,XGBoost,0.7217,0.6752,False,race,0.6096,0.1764,0.1947,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,19,1,XGBoost,0.7217,0.6752,False,age_cat,0.3035,0.4029,0.4089,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,19,2,RandomForest,0.6894,0.6487,False,sex,0.7047,0.1429,0.054,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,19,2,RandomForest,0.6894,0.6487,False,age,0.4076,0.3825,0.206,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,19,2,RandomForest,0.6894,0.6487,False,race,0.6875,0.1613,0.2001,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,19,2,RandomForest,0.6894,0.6487,False,age_cat,0.4987,0.3237,0.2955,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,73,0,LogisticRegression,0.7271,0.6837,False,sex,0.2798,0.3575,0.3661,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,73,0,LogisticRegression,0.7271,0.6837,False,age,0.2042,0.6288,0.3992,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,73,0,LogisticRegression,0.7271,0.6837,False,race,0.4754,0.2829,0.3292,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,73,0,LogisticRegression,0.7271,0.6837,False,age_cat,0.1534,0.6689,0.7007,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,73,1,XGBoost,0.7147,0.6648,False,sex,0.5392,0.2057,0.2225,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,73,1,XGBoost,0.7147,0.6648,False,age,0.4237,0.351,0.2425,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,73,1,XGBoost,0.7147,0.6648,False,race,0.543,0.2274,0.2772,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,73,1,XGBoost,0.7147,0.6648,False,age_cat,0.3316,0.4071,0.4634,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,73,2,RandomForest,0.6765,0.6364,False,sex,0.6209,0.1724,0.206,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,73,2,RandomForest,0.6765,0.6364,False,age,0.3919,0.3503,0.1641,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,73,2,RandomForest,0.6765,0.6364,False,race,0.6307,0.1826,0.2289,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,73,2,RandomForest,0.6765,0.6364,False,age_cat,0.4121,0.3387,0.364,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,128,0,LogisticRegression,0.7028,0.6648,False,sex,0.3255,0.3112,0.3486,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,128,0,LogisticRegression,0.7028,0.6648,False,age,0.2067,0.606,0.5741,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,128,0,LogisticRegression,0.7028,0.6648,False,race,0.4046,0.3129,0.3609,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,128,0,LogisticRegression,0.7028,0.6648,False,age_cat,0.2,0.6111,0.5697,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,128,1,XGBoost,0.6869,0.6468,False,sex,0.5362,0.1909,0.1521,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,128,1,XGBoost,0.6869,0.6468,False,age,0.289,0.3884,0.5623,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,128,1,XGBoost,0.6869,0.6468,False,race,0.4792,0.2463,0.2813,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,128,1,XGBoost,0.6869,0.6468,False,age_cat,0.2317,0.4197,0.4604,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,128,2,RandomForest,0.6662,0.6269,False,sex,0.8197,0.0785,0.0736,True,,False,approve,violation remains but reroutes are exhausted
-compas,C,128,2,RandomForest,0.6662,0.6269,False,age,0.34,0.3575,0.3644,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,128,2,RandomForest,0.6662,0.6269,False,race,0.5896,0.2065,0.2265,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,128,2,RandomForest,0.6662,0.6269,False,age_cat,0.3788,0.3365,0.3118,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,42,0,LogisticRegression,0.7035,0.6534,False,sex,0.2489,0.3566,0.4402,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,42,0,LogisticRegression,0.7035,0.6534,False,age,0.2521,0.5766,0.3423,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,42,0,LogisticRegression,0.7035,0.6534,False,race,0.5101,0.2485,0.2841,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,42,0,LogisticRegression,0.7035,0.6534,False,age_cat,0.2594,0.571,0.4473,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,42,1,LogisticRegression,0.7005,0.6581,False,sex,0.9549,0.0186,0.0391,True,,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,42,1,LogisticRegression,0.7005,0.6581,False,age,0.2491,0.586,0.3994,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,42,1,LogisticRegression,0.7005,0.6581,False,race,0.5428,0.2297,0.2426,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,42,1,LogisticRegression,0.7005,0.6581,False,age_cat,0.2619,0.576,0.499,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,42,2,LogisticRegression,0.701,0.6506,False,sex,0.8288,0.058,0.1094,True,,False,approve,violation remains but reroutes are exhausted
-compas,D,42,2,LogisticRegression,0.701,0.6506,False,age,0.5636,0.1505,0.0849,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,42,2,LogisticRegression,0.701,0.6506,False,race,0.4613,0.226,0.2509,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,42,2,LogisticRegression,0.701,0.6506,False,age_cat,0.6266,0.1404,0.1076,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,7,0,LogisticRegression,0.7479,0.6941,False,sex,0.289,0.3429,0.3279,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,7,0,LogisticRegression,0.7479,0.6941,False,age,0.305,0.5541,0.4602,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,7,0,LogisticRegression,0.7479,0.6941,False,race,0.4753,0.2785,0.2903,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,7,0,LogisticRegression,0.7479,0.6941,False,age_cat,0.1987,0.6389,0.5644,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,7,1,LogisticRegression,0.7437,0.6847,False,sex,0.3098,0.2678,0.2853,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,7,1,LogisticRegression,0.7437,0.6847,False,age,0.6997,0.1044,0.1439,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,7,1,LogisticRegression,0.7437,0.6847,False,race,0.5513,0.185,0.1701,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,7,1,LogisticRegression,0.7437,0.6847,False,age_cat,0.8734,0.0444,0.1414,True,,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,7,2,LogisticRegression,0.7303,0.6686,False,sex,0.7773,0.073,0.0367,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,7,2,LogisticRegression,0.7303,0.6686,False,age,0.7286,0.0906,0.2072,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,7,2,LogisticRegression,0.7303,0.6686,False,race,0.5471,0.175,0.1668,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,7,2,LogisticRegression,0.7303,0.6686,False,age_cat,0.7545,0.0821,0.2093,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,19,0,LogisticRegression,0.7401,0.6894,False,sex,0.3777,0.2885,0.2887,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,19,0,LogisticRegression,0.7401,0.6894,False,age,0.0961,0.7417,0.4437,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,19,0,LogisticRegression,0.7401,0.6894,False,race,0.4512,0.2807,0.2579,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,19,0,LogisticRegression,0.7401,0.6894,False,age_cat,0.1605,0.6889,0.6708,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,19,1,LogisticRegression,0.744,0.6856,False,sex,0.3953,0.2256,0.2043,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,19,1,LogisticRegression,0.744,0.6856,False,age,0.386,0.2093,0.0839,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,19,1,LogisticRegression,0.744,0.6856,False,race,0.4199,0.2434,0.2834,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,19,1,LogisticRegression,0.744,0.6856,False,age_cat,0.4448,0.2131,0.2029,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,19,2,LogisticRegression,0.7243,0.6686,False,sex,0.9914,0.0028,0.0986,True,,False,approve,violation remains but reroutes are exhausted
-compas,D,19,2,LogisticRegression,0.7243,0.6686,False,age,0.3832,0.2118,0.1321,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,19,2,LogisticRegression,0.7243,0.6686,False,race,0.4155,0.2444,0.2443,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,19,2,LogisticRegression,0.7243,0.6686,False,age_cat,0.4412,0.2162,0.229,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,73,0,LogisticRegression,0.7271,0.6837,False,sex,0.2798,0.3575,0.3661,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,73,0,LogisticRegression,0.7271,0.6837,False,age,0.2042,0.6288,0.3992,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,73,0,LogisticRegression,0.7271,0.6837,False,race,0.4754,0.2829,0.3292,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,73,0,LogisticRegression,0.7271,0.6837,False,age_cat,0.1534,0.6689,0.7007,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,73,1,LogisticRegression,0.7217,0.6714,False,sex,0.2329,0.305,0.3535,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,73,1,LogisticRegression,0.7217,0.6714,False,age,0.5532,0.1563,0.0449,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,73,1,LogisticRegression,0.7217,0.6714,False,race,0.427,0.2511,0.311,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,73,1,LogisticRegression,0.7217,0.6714,False,age_cat,0.7267,0.0969,0.1383,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,73,2,LogisticRegression,0.7081,0.6591,False,sex,0.684,0.1091,0.114,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,73,2,LogisticRegression,0.7081,0.6591,False,age,0.571,0.1454,0.111,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,73,2,LogisticRegression,0.7081,0.6591,False,race,0.4629,0.2224,0.2624,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,73,2,LogisticRegression,0.7081,0.6591,False,age_cat,0.6685,0.1202,0.1867,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,128,0,LogisticRegression,0.7028,0.6648,False,sex,0.3255,0.3112,0.3486,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,128,0,LogisticRegression,0.7028,0.6648,False,age,0.2067,0.606,0.5741,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,128,0,LogisticRegression,0.7028,0.6648,False,race,0.4046,0.3129,0.3609,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,128,0,LogisticRegression,0.7028,0.6648,False,age_cat,0.2,0.6111,0.5697,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,128,1,LogisticRegression,0.6956,0.643,False,sex,0.3321,0.2456,0.2735,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,128,1,LogisticRegression,0.6956,0.643,False,age,0.5604,0.1445,0.1143,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,128,1,LogisticRegression,0.6956,0.643,False,race,0.3862,0.26,0.3104,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,128,1,LogisticRegression,0.6956,0.643,False,age_cat,0.7809,0.0735,0.0749,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
-compas,D,128,2,LogisticRegression,0.6934,0.6402,False,sex,0.8931,0.0326,0.0228,True,,False,approve,violation remains but reroutes are exhausted
-compas,D,128,2,LogisticRegression,0.6934,0.6402,False,age,0.5932,0.1263,0.1309,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,128,2,LogisticRegression,0.6934,0.6402,False,race,0.4505,0.2109,0.2467,True,,True,approve,violation remains but reroutes are exhausted
-compas,D,128,2,LogisticRegression,0.6934,0.6402,False,age_cat,0.8167,0.0588,0.1372,True,,False,approve,violation remains but reroutes are exhausted
+adult,A,42,0,XGBoost,0.9297,0.8734,False,age,0.0148,0.2469,0.3145,True,,True,approve,arm approves at the first gate
+adult,A,42,0,XGBoost,0.9297,0.8734,False,sex,0.3116,0.1814,0.1005,True,,True,approve,arm approves at the first gate
+adult,A,42,0,XGBoost,0.9297,0.8734,False,race,0.1974,0.1878,0.2026,True,,True,approve,arm approves at the first gate
+adult,A,42,0,XGBoost,0.9297,0.8734,False,marital-status,0.0397,0.3943,0.368,False,Married-AF-spouse=4,True,approve,arm approves at the first gate
+adult,A,42,0,XGBoost,0.9297,0.8734,False,occupation,0.0,0.5196,0.6536,False,Armed-Forces=2,True,approve,arm approves at the first gate
+adult,A,7,0,XGBoost,0.9253,0.8706,False,age,0.0123,0.2404,0.3176,True,,True,approve,arm approves at the first gate
+adult,A,7,0,XGBoost,0.9253,0.8706,False,sex,0.2501,0.197,0.1792,True,,True,approve,arm approves at the first gate
+adult,A,7,0,XGBoost,0.9253,0.8706,False,race,0.2336,0.229,0.252,True,,True,approve,arm approves at the first gate
+adult,A,7,0,XGBoost,0.9253,0.8706,False,marital-status,0.0495,0.3785,0.312,False,Married-AF-spouse=9,True,approve,arm approves at the first gate
+adult,A,7,0,XGBoost,0.9253,0.8706,False,occupation,0.0,0.4586,0.6537,False,Armed-Forces=2,True,approve,arm approves at the first gate
+adult,A,19,0,XGBoost,0.9274,0.8756,False,age,0.0276,0.2363,0.1498,True,,True,approve,arm approves at the first gate
+adult,A,19,0,XGBoost,0.9274,0.8756,False,sex,0.3134,0.1788,0.0949,True,,True,approve,arm approves at the first gate
+adult,A,19,0,XGBoost,0.9274,0.8756,False,race,0.3185,0.1573,0.317,True,,True,approve,arm approves at the first gate
+adult,A,19,0,XGBoost,0.9274,0.8756,False,marital-status,0.0547,0.375,0.4718,False,Married-AF-spouse=8,True,approve,arm approves at the first gate
+adult,A,19,0,XGBoost,0.9274,0.8756,False,occupation,0.0,0.4931,0.5581,False,Armed-Forces=2,True,approve,arm approves at the first gate
+adult,A,73,0,XGBoost,0.9291,0.8711,False,age,0.033,0.2373,0.1825,True,,True,approve,arm approves at the first gate
+adult,A,73,0,XGBoost,0.9291,0.8711,False,sex,0.2988,0.1833,0.1093,True,,True,approve,arm approves at the first gate
+adult,A,73,0,XGBoost,0.9291,0.8711,False,race,0.2156,0.1681,0.3556,True,,True,approve,arm approves at the first gate
+adult,A,73,0,XGBoost,0.9291,0.8711,False,marital-status,0.0554,0.3785,0.3282,False,Married-AF-spouse=6,True,approve,arm approves at the first gate
+adult,A,73,0,XGBoost,0.9291,0.8711,False,occupation,0.0,0.4877,0.6664,False,Armed-Forces=5,True,approve,arm approves at the first gate
+adult,A,128,0,XGBoost,0.9259,0.8695,False,age,0.0234,0.2461,0.2393,True,,True,approve,arm approves at the first gate
+adult,A,128,0,XGBoost,0.9259,0.8695,False,sex,0.3268,0.1749,0.0339,True,,True,approve,arm approves at the first gate
+adult,A,128,0,XGBoost,0.9259,0.8695,False,race,0.2121,0.2218,0.3391,True,,True,approve,arm approves at the first gate
+adult,A,128,0,XGBoost,0.9259,0.8695,False,marital-status,0.0621,0.3745,0.3278,False,Married-AF-spouse=9,True,approve,arm approves at the first gate
+adult,A,128,0,XGBoost,0.9259,0.8695,False,occupation,0.0,0.535,0.6285,False,Armed-Forces=4,True,approve,arm approves at the first gate
+adult,B,42,0,XGBoost,0.9297,0.8734,False,age,0.0148,0.2469,0.3145,True,,True,approve,arm approves at the first gate
+adult,B,42,0,XGBoost,0.9297,0.8734,False,sex,0.3116,0.1814,0.1005,True,,True,approve,arm approves at the first gate
+adult,B,42,0,XGBoost,0.9297,0.8734,False,race,0.1974,0.1878,0.2026,True,,True,approve,arm approves at the first gate
+adult,B,42,0,XGBoost,0.9297,0.8734,False,marital-status,0.0397,0.3943,0.368,False,Married-AF-spouse=4,True,approve,arm approves at the first gate
+adult,B,42,0,XGBoost,0.9297,0.8734,False,occupation,0.0,0.5196,0.6536,False,Armed-Forces=2,True,approve,arm approves at the first gate
+adult,B,7,0,XGBoost,0.9253,0.8706,False,age,0.0123,0.2404,0.3176,True,,True,approve,arm approves at the first gate
+adult,B,7,0,XGBoost,0.9253,0.8706,False,sex,0.2501,0.197,0.1792,True,,True,approve,arm approves at the first gate
+adult,B,7,0,XGBoost,0.9253,0.8706,False,race,0.2336,0.229,0.252,True,,True,approve,arm approves at the first gate
+adult,B,7,0,XGBoost,0.9253,0.8706,False,marital-status,0.0495,0.3785,0.312,False,Married-AF-spouse=9,True,approve,arm approves at the first gate
+adult,B,7,0,XGBoost,0.9253,0.8706,False,occupation,0.0,0.4586,0.6537,False,Armed-Forces=2,True,approve,arm approves at the first gate
+adult,B,19,0,XGBoost,0.9274,0.8756,False,age,0.0276,0.2363,0.1498,True,,True,approve,arm approves at the first gate
+adult,B,19,0,XGBoost,0.9274,0.8756,False,sex,0.3134,0.1788,0.0949,True,,True,approve,arm approves at the first gate
+adult,B,19,0,XGBoost,0.9274,0.8756,False,race,0.3185,0.1573,0.317,True,,True,approve,arm approves at the first gate
+adult,B,19,0,XGBoost,0.9274,0.8756,False,marital-status,0.0547,0.375,0.4718,False,Married-AF-spouse=8,True,approve,arm approves at the first gate
+adult,B,19,0,XGBoost,0.9274,0.8756,False,occupation,0.0,0.4931,0.5581,False,Armed-Forces=2,True,approve,arm approves at the first gate
+adult,B,73,0,XGBoost,0.9291,0.8711,False,age,0.033,0.2373,0.1825,True,,True,approve,arm approves at the first gate
+adult,B,73,0,XGBoost,0.9291,0.8711,False,sex,0.2988,0.1833,0.1093,True,,True,approve,arm approves at the first gate
+adult,B,73,0,XGBoost,0.9291,0.8711,False,race,0.2156,0.1681,0.3556,True,,True,approve,arm approves at the first gate
+adult,B,73,0,XGBoost,0.9291,0.8711,False,marital-status,0.0554,0.3785,0.3282,False,Married-AF-spouse=6,True,approve,arm approves at the first gate
+adult,B,73,0,XGBoost,0.9291,0.8711,False,occupation,0.0,0.4877,0.6664,False,Armed-Forces=5,True,approve,arm approves at the first gate
+adult,B,128,0,XGBoost,0.9259,0.8695,False,age,0.0234,0.2461,0.2393,True,,True,approve,arm approves at the first gate
+adult,B,128,0,XGBoost,0.9259,0.8695,False,sex,0.3268,0.1749,0.0339,True,,True,approve,arm approves at the first gate
+adult,B,128,0,XGBoost,0.9259,0.8695,False,race,0.2121,0.2218,0.3391,True,,True,approve,arm approves at the first gate
+adult,B,128,0,XGBoost,0.9259,0.8695,False,marital-status,0.0621,0.3745,0.3278,False,Married-AF-spouse=9,True,approve,arm approves at the first gate
+adult,B,128,0,XGBoost,0.9259,0.8695,False,occupation,0.0,0.535,0.6285,False,Armed-Forces=4,True,approve,arm approves at the first gate
+adult,C,42,0,XGBoost,0.9297,0.8734,False,age,0.0148,0.2469,0.3145,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,0,XGBoost,0.9297,0.8734,False,sex,0.3116,0.1814,0.1005,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,0,XGBoost,0.9297,0.8734,False,race,0.1974,0.1878,0.2026,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,0,XGBoost,0.9297,0.8734,False,marital-status,0.0397,0.3943,0.368,False,Married-AF-spouse=4,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,0,XGBoost,0.9297,0.8734,False,occupation,0.0,0.5196,0.6536,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,1,RandomForest,0.905,0.8535,False,age,0.0151,0.2419,0.4069,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,1,RandomForest,0.905,0.8535,False,sex,0.2883,0.1837,0.1035,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,1,RandomForest,0.905,0.8535,False,race,0.2169,0.1668,0.0694,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,1,RandomForest,0.905,0.8535,False,marital-status,0.0408,0.3834,0.4253,False,Married-AF-spouse=4,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,1,RandomForest,0.905,0.8535,False,occupation,0.0,0.4793,0.6823,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,42,2,LogisticRegression,0.8798,0.8292,False,age,0.0301,0.2638,0.2465,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,42,2,LogisticRegression,0.8798,0.8292,False,sex,0.2856,0.1573,0.0939,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,42,2,LogisticRegression,0.8798,0.8292,False,race,0.201,0.1836,0.3042,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,42,2,LogisticRegression,0.8798,0.8292,False,marital-status,0.0333,0.3312,0.3633,False,Married-AF-spouse=4,True,approve,violation remains but reroutes are exhausted
+adult,C,42,2,LogisticRegression,0.8798,0.8292,False,occupation,0.0,0.4217,0.6788,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
+adult,C,7,0,XGBoost,0.9253,0.8706,False,age,0.0123,0.2404,0.3176,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,0,XGBoost,0.9253,0.8706,False,sex,0.2501,0.197,0.1792,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,0,XGBoost,0.9253,0.8706,False,race,0.2336,0.229,0.252,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,0,XGBoost,0.9253,0.8706,False,marital-status,0.0495,0.3785,0.312,False,Married-AF-spouse=9,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,0,XGBoost,0.9253,0.8706,False,occupation,0.0,0.4586,0.6537,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,1,RandomForest,0.9016,0.853,False,age,0.0191,0.2317,0.1815,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,1,RandomForest,0.9016,0.853,False,sex,0.2461,0.193,0.1671,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,1,RandomForest,0.9016,0.853,False,race,0.2655,0.1931,0.2425,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,1,RandomForest,0.9016,0.853,False,marital-status,0.0322,0.3813,0.347,False,Married-AF-spouse=9,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,1,RandomForest,0.9016,0.853,False,occupation,0.0,0.4265,0.6405,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,7,2,LogisticRegression,0.8748,0.8212,False,age,0.0316,0.2545,0.2545,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,7,2,LogisticRegression,0.8748,0.8212,False,sex,0.2676,0.1546,0.1088,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,7,2,LogisticRegression,0.8748,0.8212,False,race,0.1466,0.1938,0.4243,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,7,2,LogisticRegression,0.8748,0.8212,False,marital-status,0.0255,0.3245,0.3198,False,Married-AF-spouse=9,True,approve,violation remains but reroutes are exhausted
+adult,C,7,2,LogisticRegression,0.8748,0.8212,False,occupation,0.0,0.4389,0.6145,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
+adult,C,19,0,XGBoost,0.9274,0.8756,False,age,0.0276,0.2363,0.1498,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,0,XGBoost,0.9274,0.8756,False,sex,0.3134,0.1788,0.0949,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,0,XGBoost,0.9274,0.8756,False,race,0.3185,0.1573,0.317,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,0,XGBoost,0.9274,0.8756,False,marital-status,0.0547,0.375,0.4718,False,Married-AF-spouse=8,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,0,XGBoost,0.9274,0.8756,False,occupation,0.0,0.4931,0.5581,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,1,RandomForest,0.9047,0.858,False,age,0.0348,0.2274,0.1224,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,1,RandomForest,0.9047,0.858,False,sex,0.3101,0.1755,0.1224,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,1,RandomForest,0.9047,0.858,False,race,0.389,0.1316,0.2533,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,1,RandomForest,0.9047,0.858,False,marital-status,0.0463,0.3746,0.4285,False,Married-AF-spouse=8,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,1,RandomForest,0.9047,0.858,False,occupation,0.0,0.4665,0.4995,False,Armed-Forces=2,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,19,2,LogisticRegression,0.8775,0.8262,False,age,0.0357,0.2617,0.2098,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,19,2,LogisticRegression,0.8775,0.8262,False,sex,0.2597,0.1611,0.163,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,19,2,LogisticRegression,0.8775,0.8262,False,race,0.2097,0.1824,0.3,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,19,2,LogisticRegression,0.8775,0.8262,False,marital-status,0.0358,0.3205,0.3713,False,Married-AF-spouse=8,True,approve,violation remains but reroutes are exhausted
+adult,C,19,2,LogisticRegression,0.8775,0.8262,False,occupation,0.0,0.4185,0.5593,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
+adult,C,73,0,XGBoost,0.9291,0.8711,False,age,0.033,0.2373,0.1825,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,0,XGBoost,0.9291,0.8711,False,sex,0.2988,0.1833,0.1093,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,0,XGBoost,0.9291,0.8711,False,race,0.2156,0.1681,0.3556,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,0,XGBoost,0.9291,0.8711,False,marital-status,0.0554,0.3785,0.3282,False,Married-AF-spouse=6,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,0,XGBoost,0.9291,0.8711,False,occupation,0.0,0.4877,0.6664,False,Armed-Forces=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,1,RandomForest,0.9059,0.8534,False,age,0.0324,0.242,0.2001,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,1,RandomForest,0.9059,0.8534,False,sex,0.289,0.1904,0.1033,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,1,RandomForest,0.9059,0.8534,False,race,0.2134,0.1703,0.3218,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,1,RandomForest,0.9059,0.8534,False,marital-status,0.0487,0.3943,0.3659,False,Married-AF-spouse=6,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,1,RandomForest,0.9059,0.8534,False,occupation,0.0,0.4641,0.5348,False,Armed-Forces=5,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,73,2,LogisticRegression,0.8829,0.8317,False,age,0.0416,0.2375,0.1904,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,73,2,LogisticRegression,0.8829,0.8317,False,sex,0.2749,0.1625,0.1102,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,73,2,LogisticRegression,0.8829,0.8317,False,race,0.0773,0.1838,0.4588,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,73,2,LogisticRegression,0.8829,0.8317,False,marital-status,0.0379,0.335,0.3317,False,Married-AF-spouse=6,True,approve,violation remains but reroutes are exhausted
+adult,C,73,2,LogisticRegression,0.8829,0.8317,False,occupation,0.0,0.4802,0.6571,False,Armed-Forces=5,True,approve,violation remains but reroutes are exhausted
+adult,C,128,0,XGBoost,0.9259,0.8695,False,age,0.0234,0.2461,0.2393,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,0,XGBoost,0.9259,0.8695,False,sex,0.3268,0.1749,0.0339,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,0,XGBoost,0.9259,0.8695,False,race,0.2121,0.2218,0.3391,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,0,XGBoost,0.9259,0.8695,False,marital-status,0.0621,0.3745,0.3278,False,Married-AF-spouse=9,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,0,XGBoost,0.9259,0.8695,False,occupation,0.0,0.535,0.6285,False,Armed-Forces=4,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,1,RandomForest,0.902,0.8504,False,age,0.0238,0.242,0.296,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,1,RandomForest,0.902,0.8504,False,sex,0.2946,0.1817,0.0791,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,1,RandomForest,0.902,0.8504,False,race,0.1904,0.1905,0.2072,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,1,RandomForest,0.902,0.8504,False,marital-status,0.0434,0.3815,0.3582,False,Married-AF-spouse=9,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,1,RandomForest,0.902,0.8504,False,occupation,0.0,0.5015,0.5899,False,Armed-Forces=4,True,reject_model_or_fairness,fairness violation with reroutes remaining
+adult,C,128,2,LogisticRegression,0.8764,0.8235,False,age,0.0317,0.2721,0.2929,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,128,2,LogisticRegression,0.8764,0.8235,False,sex,0.2802,0.1603,0.0907,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,128,2,LogisticRegression,0.8764,0.8235,False,race,0.0622,0.2246,0.3652,True,,True,approve,violation remains but reroutes are exhausted
+adult,C,128,2,LogisticRegression,0.8764,0.8235,False,marital-status,0.0383,0.3317,0.2932,False,Married-AF-spouse=9,True,approve,violation remains but reroutes are exhausted
+adult,C,128,2,LogisticRegression,0.8764,0.8235,False,occupation,0.0,0.4125,0.5322,False,Armed-Forces=4,True,approve,violation remains but reroutes are exhausted
+adult,D,42,0,XGBoost,0.9297,0.8734,False,age,0.0148,0.2469,0.3145,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,0,XGBoost,0.9297,0.8734,False,sex,0.3116,0.1814,0.1005,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,0,XGBoost,0.9297,0.8734,False,race,0.1974,0.1878,0.2026,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,0,XGBoost,0.9297,0.8734,False,marital-status,0.0397,0.3943,0.368,False,Married-AF-spouse=4,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,0,XGBoost,0.9297,0.8734,False,occupation,0.0,0.5196,0.6536,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,1,XGBoost,0.9261,0.8706,False,age,0.102,0.1964,0.0626,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,1,XGBoost,0.9261,0.8706,False,sex,0.3229,0.1577,0.0753,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,1,XGBoost,0.9261,0.8706,False,race,0.2216,0.1623,0.15,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,1,XGBoost,0.9261,0.8706,False,marital-status,0.0441,0.3465,0.3647,False,Married-AF-spouse=4,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,1,XGBoost,0.9261,0.8706,False,occupation,0.0,0.4835,0.6534,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,42,2,XGBoost,0.9256,0.8715,False,age,0.1102,0.1914,0.0544,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,42,2,XGBoost,0.9256,0.8715,False,sex,0.3189,0.1574,0.0693,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,42,2,XGBoost,0.9256,0.8715,False,race,0.2459,0.1417,0.0857,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,42,2,XGBoost,0.9256,0.8715,False,marital-status,0.0423,0.3445,0.3628,False,Married-AF-spouse=4,True,approve,violation remains but reroutes are exhausted
+adult,D,42,2,XGBoost,0.9256,0.8715,False,occupation,0.0,0.4659,0.6409,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
+adult,D,7,0,XGBoost,0.9253,0.8706,False,age,0.0123,0.2404,0.3176,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,0,XGBoost,0.9253,0.8706,False,sex,0.2501,0.197,0.1792,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,0,XGBoost,0.9253,0.8706,False,race,0.2336,0.229,0.252,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,0,XGBoost,0.9253,0.8706,False,marital-status,0.0495,0.3785,0.312,False,Married-AF-spouse=9,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,0,XGBoost,0.9253,0.8706,False,occupation,0.0,0.4586,0.6537,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,1,XGBoost,0.9231,0.869,False,age,0.0491,0.2034,0.181,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,1,XGBoost,0.9231,0.869,False,sex,0.2722,0.1695,0.1163,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,1,XGBoost,0.9231,0.869,False,race,0.2025,0.2288,0.2879,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,1,XGBoost,0.9231,0.869,False,marital-status,0.0303,0.3456,0.2699,False,Married-AF-spouse=9,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,1,XGBoost,0.9231,0.869,False,occupation,0.0,0.4172,0.6208,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,7,2,XGBoost,0.9229,0.8682,False,age,0.0606,0.1983,0.1763,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,7,2,XGBoost,0.9229,0.8682,False,sex,0.2764,0.167,0.1069,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,7,2,XGBoost,0.9229,0.8682,False,race,0.3169,0.1796,0.2576,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,7,2,XGBoost,0.9229,0.8682,False,marital-status,0.0471,0.3361,0.2522,False,Married-AF-spouse=9,True,approve,violation remains but reroutes are exhausted
+adult,D,7,2,XGBoost,0.9229,0.8682,False,occupation,0.0,0.4151,0.6232,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
+adult,D,19,0,XGBoost,0.9274,0.8756,False,age,0.0276,0.2363,0.1498,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,0,XGBoost,0.9274,0.8756,False,sex,0.3134,0.1788,0.0949,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,0,XGBoost,0.9274,0.8756,False,race,0.3185,0.1573,0.317,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,0,XGBoost,0.9274,0.8756,False,marital-status,0.0547,0.375,0.4718,False,Married-AF-spouse=8,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,0,XGBoost,0.9274,0.8756,False,occupation,0.0,0.4931,0.5581,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,1,XGBoost,0.9246,0.8694,False,age,0.1113,0.1972,0.0764,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,1,XGBoost,0.9246,0.8694,False,sex,0.301,0.1649,0.1215,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,1,XGBoost,0.9246,0.8694,False,race,0.294,0.1765,0.3308,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,1,XGBoost,0.9246,0.8694,False,marital-status,0.0519,0.3401,0.3385,False,Married-AF-spouse=8,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,1,XGBoost,0.9246,0.8694,False,occupation,0.0,0.4494,0.481,False,Armed-Forces=2,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,19,2,XGBoost,0.9237,0.8694,False,age,0.0875,0.2107,0.1182,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,19,2,XGBoost,0.9237,0.8694,False,sex,0.3015,0.1626,0.1157,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,19,2,XGBoost,0.9237,0.8694,False,race,0.3746,0.1227,0.3142,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,19,2,XGBoost,0.9237,0.8694,False,marital-status,0.0515,0.3355,0.3322,False,Married-AF-spouse=8,True,approve,violation remains but reroutes are exhausted
+adult,D,19,2,XGBoost,0.9237,0.8694,False,occupation,0.0,0.4547,0.4685,False,Armed-Forces=2,True,approve,violation remains but reroutes are exhausted
+adult,D,73,0,XGBoost,0.9291,0.8711,False,age,0.033,0.2373,0.1825,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,0,XGBoost,0.9291,0.8711,False,sex,0.2988,0.1833,0.1093,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,0,XGBoost,0.9291,0.8711,False,race,0.2156,0.1681,0.3556,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,0,XGBoost,0.9291,0.8711,False,marital-status,0.0554,0.3785,0.3282,False,Married-AF-spouse=6,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,0,XGBoost,0.9291,0.8711,False,occupation,0.0,0.4877,0.6664,False,Armed-Forces=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,1,XGBoost,0.9273,0.8677,False,age,0.0812,0.2002,0.1648,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,1,XGBoost,0.9273,0.8677,False,sex,0.3248,0.1578,0.0575,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,1,XGBoost,0.9273,0.8677,False,race,0.2225,0.152,0.3088,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,1,XGBoost,0.9273,0.8677,False,marital-status,0.0675,0.3331,0.2623,False,Married-AF-spouse=6,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,1,XGBoost,0.9273,0.8677,False,occupation,0.0,0.4775,0.6512,False,Armed-Forces=5,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,73,2,XGBoost,0.9276,0.869,False,age,0.0905,0.192,0.1172,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,73,2,XGBoost,0.9276,0.869,False,sex,0.32,0.1549,0.0728,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,73,2,XGBoost,0.9276,0.869,False,race,0.3506,0.1343,0.2768,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,73,2,XGBoost,0.9276,0.869,False,marital-status,0.0612,0.3285,0.2464,False,Married-AF-spouse=6,True,approve,violation remains but reroutes are exhausted
+adult,D,73,2,XGBoost,0.9276,0.869,False,occupation,0.0,0.4714,0.5921,False,Armed-Forces=5,True,approve,violation remains but reroutes are exhausted
+adult,D,128,0,XGBoost,0.9259,0.8695,False,age,0.0234,0.2461,0.2393,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,0,XGBoost,0.9259,0.8695,False,sex,0.3268,0.1749,0.0339,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,0,XGBoost,0.9259,0.8695,False,race,0.2121,0.2218,0.3391,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,0,XGBoost,0.9259,0.8695,False,marital-status,0.0621,0.3745,0.3278,False,Married-AF-spouse=9,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,0,XGBoost,0.9259,0.8695,False,occupation,0.0,0.535,0.6285,False,Armed-Forces=4,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,1,XGBoost,0.9242,0.866,False,age,0.0761,0.2064,0.1346,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,1,XGBoost,0.9242,0.866,False,sex,0.3081,0.1633,0.0652,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,1,XGBoost,0.9242,0.866,False,race,0.2631,0.1672,0.0652,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,1,XGBoost,0.9242,0.866,False,marital-status,0.0572,0.3394,0.2756,False,Married-AF-spouse=9,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,1,XGBoost,0.9242,0.866,False,occupation,0.0,0.4954,0.5723,False,Armed-Forces=4,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+adult,D,128,2,XGBoost,0.9237,0.8658,False,age,0.0741,0.2038,0.1263,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,128,2,XGBoost,0.9237,0.8658,False,sex,0.3304,0.1546,0.0405,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,128,2,XGBoost,0.9237,0.8658,False,race,0.3808,0.1457,0.1812,True,,True,approve,violation remains but reroutes are exhausted
+adult,D,128,2,XGBoost,0.9237,0.8658,False,marital-status,0.0579,0.335,0.27,False,Married-AF-spouse=9,True,approve,violation remains but reroutes are exhausted
+adult,D,128,2,XGBoost,0.9237,0.8658,False,occupation,0.0,0.4934,0.5785,False,Armed-Forces=4,True,approve,violation remains but reroutes are exhausted
+credit_g,A,42,0,LogisticRegression,0.7617,0.7375,,job,0.8537,0.1274,0.0594,False,high qualif/self emp/mgmt=26;unemp/unskilled non res=2,True,approve,arm approves at the first gate
+credit_g,A,7,0,LogisticRegression,0.8211,0.8,,,,,,,,,approve,arm approves at the first gate
+credit_g,A,19,0,RandomForest,0.8452,0.7625,,job,0.9961,0.0035,0.0459,False,high qualif/self emp/mgmt=22;unemp/unskilled non res=6,False,approve,arm approves at the first gate
+credit_g,A,73,0,RandomForest,0.8031,0.7688,,job,0.9392,0.0513,0.0598,False,high qualif/self emp/mgmt=19;unemp/unskilled non res=3,False,approve,arm approves at the first gate
+credit_g,A,128,0,RandomForest,0.794,0.7625,,,,,,,,,approve,arm approves at the first gate
+credit_g,B,42,0,LogisticRegression,0.7617,0.7375,,job,0.8537,0.1274,0.0594,False,high qualif/self emp/mgmt=26;unemp/unskilled non res=2,True,approve,arm approves at the first gate
+credit_g,B,7,0,LogisticRegression,0.8211,0.8,,,,,,,,,approve,arm approves at the first gate
+credit_g,B,19,0,RandomForest,0.8452,0.7625,,job,0.9961,0.0035,0.0459,False,high qualif/self emp/mgmt=22;unemp/unskilled non res=6,False,approve,arm approves at the first gate
+credit_g,B,73,0,RandomForest,0.8031,0.7688,,job,0.9392,0.0513,0.0598,False,high qualif/self emp/mgmt=19;unemp/unskilled non res=3,False,approve,arm approves at the first gate
+credit_g,B,128,0,RandomForest,0.794,0.7625,,,,,,,,,approve,arm approves at the first gate
+credit_g,C,42,0,LogisticRegression,0.7617,0.7375,,job,0.8537,0.1274,0.0594,False,high qualif/self emp/mgmt=26;unemp/unskilled non res=2,True,approve,"no violation, but a protected attribute was not audited"
+credit_g,C,7,0,LogisticRegression,0.8211,0.8,,,,,,,,,approve,fairness not evaluated: no evidence to reject on
+credit_g,C,19,0,RandomForest,0.8452,0.7625,,job,0.9961,0.0035,0.0459,False,high qualif/self emp/mgmt=22;unemp/unskilled non res=6,False,approve,"no violation, but a protected attribute was not audited"
+credit_g,C,73,0,RandomForest,0.8031,0.7688,,job,0.9392,0.0513,0.0598,False,high qualif/self emp/mgmt=19;unemp/unskilled non res=3,False,approve,"no violation, but a protected attribute was not audited"
+credit_g,C,128,0,RandomForest,0.794,0.7625,,,,,,,,,approve,fairness not evaluated: no evidence to reject on
+credit_g,D,42,0,LogisticRegression,0.7617,0.7375,,job,0.8537,0.1274,0.0594,False,high qualif/self emp/mgmt=26;unemp/unskilled non res=2,True,approve,"no violation, but a protected attribute was not audited"
+credit_g,D,7,0,LogisticRegression,0.8211,0.8,,,,,,,,,approve,fairness not evaluated: no evidence to reject on
+credit_g,D,19,0,RandomForest,0.8452,0.7625,,job,0.9961,0.0035,0.0459,False,high qualif/self emp/mgmt=22;unemp/unskilled non res=6,False,approve,"no violation, but a protected attribute was not audited"
+credit_g,D,73,0,RandomForest,0.8031,0.7688,,job,0.9392,0.0513,0.0598,False,high qualif/self emp/mgmt=19;unemp/unskilled non res=3,False,approve,"no violation, but a protected attribute was not audited"
+credit_g,D,128,0,RandomForest,0.794,0.7625,,,,,,,,,approve,fairness not evaluated: no evidence to reject on
+bank_marketing,A,42,0,LogisticRegression,0.7566,0.8941,False,age,0.1482,0.1374,0.2293,True,,True,approve,arm approves at the first gate
+bank_marketing,A,42,0,LogisticRegression,0.7566,0.8941,False,marital,0.6593,0.0139,0.0375,False,,True,approve,arm approves at the first gate
+bank_marketing,A,42,0,LogisticRegression,0.7566,0.8941,False,education,0.2317,0.0431,0.1234,False,,True,approve,arm approves at the first gate
+bank_marketing,A,7,0,LogisticRegression,0.7515,0.894,False,age,0.1645,0.1285,0.1622,True,,True,approve,arm approves at the first gate
+bank_marketing,A,7,0,LogisticRegression,0.7515,0.894,False,marital,0.6658,0.0133,0.02,False,,True,approve,arm approves at the first gate
+bank_marketing,A,7,0,LogisticRegression,0.7515,0.894,False,education,0.3515,0.0297,0.1335,False,,True,approve,arm approves at the first gate
+bank_marketing,A,19,0,LogisticRegression,0.7341,0.8923,False,age,0.2147,0.0896,0.1261,True,,True,approve,arm approves at the first gate
+bank_marketing,A,19,0,LogisticRegression,0.7341,0.8923,False,marital,0.4791,0.0237,0.0398,False,,True,approve,arm approves at the first gate
+bank_marketing,A,19,0,LogisticRegression,0.7341,0.8923,False,education,0.3204,0.0297,0.0769,False,,True,approve,arm approves at the first gate
+bank_marketing,A,73,0,LogisticRegression,0.7611,0.8938,False,age,0.1629,0.1295,0.1897,True,,True,approve,arm approves at the first gate
+bank_marketing,A,73,0,LogisticRegression,0.7611,0.8938,False,marital,0.5995,0.0159,0.0463,False,,True,approve,arm approves at the first gate
+bank_marketing,A,73,0,LogisticRegression,0.7611,0.8938,False,education,0.3037,0.0337,0.1097,False,,True,approve,arm approves at the first gate
+bank_marketing,A,128,0,XGBoost,0.7425,0.8908,False,age,0.0948,0.2138,0.2108,True,,True,approve,arm approves at the first gate
+bank_marketing,A,128,0,XGBoost,0.7425,0.8908,False,marital,0.5297,0.0214,0.0248,False,,True,approve,arm approves at the first gate
+bank_marketing,A,128,0,XGBoost,0.7425,0.8908,False,education,0.2508,0.0442,0.1376,False,,True,approve,arm approves at the first gate
+bank_marketing,B,42,0,LogisticRegression,0.7566,0.8941,False,age,0.1482,0.1374,0.2293,True,,True,approve,arm approves at the first gate
+bank_marketing,B,42,0,LogisticRegression,0.7566,0.8941,False,marital,0.6593,0.0139,0.0375,False,,True,approve,arm approves at the first gate
+bank_marketing,B,42,0,LogisticRegression,0.7566,0.8941,False,education,0.2317,0.0431,0.1234,False,,True,approve,arm approves at the first gate
+bank_marketing,B,7,0,LogisticRegression,0.7515,0.894,False,age,0.1645,0.1285,0.1622,True,,True,approve,arm approves at the first gate
+bank_marketing,B,7,0,LogisticRegression,0.7515,0.894,False,marital,0.6658,0.0133,0.02,False,,True,approve,arm approves at the first gate
+bank_marketing,B,7,0,LogisticRegression,0.7515,0.894,False,education,0.3515,0.0297,0.1335,False,,True,approve,arm approves at the first gate
+bank_marketing,B,19,0,LogisticRegression,0.7341,0.8923,False,age,0.2147,0.0896,0.1261,True,,True,approve,arm approves at the first gate
+bank_marketing,B,19,0,LogisticRegression,0.7341,0.8923,False,marital,0.4791,0.0237,0.0398,False,,True,approve,arm approves at the first gate
+bank_marketing,B,19,0,LogisticRegression,0.7341,0.8923,False,education,0.3204,0.0297,0.0769,False,,True,approve,arm approves at the first gate
+bank_marketing,B,73,0,LogisticRegression,0.7611,0.8938,False,age,0.1629,0.1295,0.1897,True,,True,approve,arm approves at the first gate
+bank_marketing,B,73,0,LogisticRegression,0.7611,0.8938,False,marital,0.5995,0.0159,0.0463,False,,True,approve,arm approves at the first gate
+bank_marketing,B,73,0,LogisticRegression,0.7611,0.8938,False,education,0.3037,0.0337,0.1097,False,,True,approve,arm approves at the first gate
+bank_marketing,B,128,0,XGBoost,0.7425,0.8908,False,age,0.0948,0.2138,0.2108,True,,True,approve,arm approves at the first gate
+bank_marketing,B,128,0,XGBoost,0.7425,0.8908,False,marital,0.5297,0.0214,0.0248,False,,True,approve,arm approves at the first gate
+bank_marketing,B,128,0,XGBoost,0.7425,0.8908,False,education,0.2508,0.0442,0.1376,False,,True,approve,arm approves at the first gate
+bank_marketing,C,42,0,LogisticRegression,0.7566,0.8941,False,age,0.1482,0.1374,0.2293,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,42,0,LogisticRegression,0.7566,0.8941,False,marital,0.6593,0.0139,0.0375,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,42,0,LogisticRegression,0.7566,0.8941,False,education,0.2317,0.0431,0.1234,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,42,1,XGBoost,0.7504,0.8878,False,age,0.1149,0.2157,0.318,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,42,1,XGBoost,0.7504,0.8878,False,marital,0.6503,0.0185,0.0216,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,42,1,XGBoost,0.7504,0.8878,False,education,0.3494,0.0365,0.0965,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,42,2,RandomForest,0.727,0.8837,False,age,0.1296,0.2371,0.3229,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,42,2,RandomForest,0.727,0.8837,False,marital,0.5267,0.0319,0.0823,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,42,2,RandomForest,0.727,0.8837,False,education,0.3362,0.046,0.1265,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,7,0,LogisticRegression,0.7515,0.894,False,age,0.1645,0.1285,0.1622,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,7,0,LogisticRegression,0.7515,0.894,False,marital,0.6658,0.0133,0.02,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,7,0,LogisticRegression,0.7515,0.894,False,education,0.3515,0.0297,0.1335,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,7,1,XGBoost,0.7481,0.8925,False,age,0.093,0.2525,0.2832,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,7,1,XGBoost,0.7481,0.8925,False,marital,0.6798,0.0154,0.0112,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,7,1,XGBoost,0.7481,0.8925,False,education,0.3732,0.0346,0.111,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,7,2,RandomForest,0.7228,0.8857,False,age,0.126,0.2401,0.2635,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,7,2,RandomForest,0.7228,0.8857,False,marital,0.6244,0.0234,0.0542,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,7,2,RandomForest,0.7228,0.8857,False,education,0.3951,0.0398,0.1458,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,19,0,LogisticRegression,0.7341,0.8923,False,age,0.2147,0.0896,0.1261,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,19,0,LogisticRegression,0.7341,0.8923,False,marital,0.4791,0.0237,0.0398,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,19,0,LogisticRegression,0.7341,0.8923,False,education,0.3204,0.0297,0.0769,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,19,1,XGBoost,0.7333,0.8901,False,age,0.1389,0.1637,0.2445,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,19,1,XGBoost,0.7333,0.8901,False,marital,0.4872,0.0281,0.0476,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,19,1,XGBoost,0.7333,0.8901,False,education,0.3962,0.032,0.0653,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,19,2,RandomForest,0.711,0.8835,False,age,0.1768,0.169,0.2566,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,19,2,RandomForest,0.711,0.8835,False,marital,0.4185,0.0421,0.1087,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,19,2,RandomForest,0.711,0.8835,False,education,0.3978,0.0383,0.0471,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,73,0,LogisticRegression,0.7611,0.8938,False,age,0.1629,0.1295,0.1897,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,73,0,LogisticRegression,0.7611,0.8938,False,marital,0.5995,0.0159,0.0463,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,73,0,LogisticRegression,0.7611,0.8938,False,education,0.3037,0.0337,0.1097,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,73,1,XGBoost,0.7515,0.8897,False,age,0.0939,0.2701,0.3212,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,73,1,XGBoost,0.7515,0.8897,False,marital,0.6271,0.0198,0.0625,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,73,1,XGBoost,0.7515,0.8897,False,education,0.3745,0.0339,0.0877,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,73,2,RandomForest,0.7264,0.8869,False,age,0.1161,0.2702,0.3575,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,73,2,RandomForest,0.7264,0.8869,False,marital,0.7116,0.0169,0.0835,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,73,2,RandomForest,0.7264,0.8869,False,education,0.3425,0.0478,0.0853,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,128,0,XGBoost,0.7425,0.8908,False,age,0.0948,0.2138,0.2108,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,128,0,XGBoost,0.7425,0.8908,False,marital,0.5297,0.0214,0.0248,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,128,0,XGBoost,0.7425,0.8908,False,education,0.2508,0.0442,0.1376,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,128,1,LogisticRegression,0.7399,0.8922,False,age,0.1736,0.0976,0.0796,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,128,1,LogisticRegression,0.7399,0.8922,False,marital,0.546,0.0158,0.0365,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,128,1,LogisticRegression,0.7399,0.8922,False,education,0.1724,0.0312,0.1313,False,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+bank_marketing,C,128,2,RandomForest,0.7194,0.8844,False,age,0.1446,0.1987,0.1884,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,128,2,RandomForest,0.7194,0.8844,False,marital,0.5109,0.0291,0.0191,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,C,128,2,RandomForest,0.7194,0.8844,False,education,0.2663,0.046,0.097,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,42,0,LogisticRegression,0.7566,0.8941,False,age,0.1482,0.1374,0.2293,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,42,0,LogisticRegression,0.7566,0.8941,False,marital,0.6593,0.0139,0.0375,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,42,0,LogisticRegression,0.7566,0.8941,False,education,0.2317,0.0431,0.1234,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,42,1,LogisticRegression,0.75,0.8933,False,age,0.185,0.111,0.1848,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,42,1,LogisticRegression,0.75,0.8933,False,marital,0.5922,0.0168,0.0556,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,42,1,LogisticRegression,0.75,0.8933,False,education,0.1591,0.0444,0.1383,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,42,2,LogisticRegression,0.75,0.8933,False,age,0.185,0.111,0.1848,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,42,2,LogisticRegression,0.75,0.8933,False,marital,0.5922,0.0168,0.0556,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,42,2,LogisticRegression,0.75,0.8933,False,education,0.1591,0.0444,0.1383,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,7,0,LogisticRegression,0.7515,0.894,False,age,0.1645,0.1285,0.1622,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,7,0,LogisticRegression,0.7515,0.894,False,marital,0.6658,0.0133,0.02,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,7,0,LogisticRegression,0.7515,0.894,False,education,0.3515,0.0297,0.1335,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,7,1,LogisticRegression,0.7456,0.8948,False,age,0.1986,0.1057,0.1325,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,7,1,LogisticRegression,0.7456,0.8948,False,marital,0.6526,0.014,0.0184,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,7,1,LogisticRegression,0.7456,0.8948,False,education,0.2891,0.0332,0.105,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,7,2,LogisticRegression,0.7456,0.8948,False,age,0.1986,0.1057,0.1325,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,7,2,LogisticRegression,0.7456,0.8948,False,marital,0.6526,0.014,0.0184,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,7,2,LogisticRegression,0.7456,0.8948,False,education,0.2891,0.0332,0.105,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,19,0,LogisticRegression,0.7341,0.8923,False,age,0.2147,0.0896,0.1261,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,19,0,LogisticRegression,0.7341,0.8923,False,marital,0.4791,0.0237,0.0398,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,19,0,LogisticRegression,0.7341,0.8923,False,education,0.3204,0.0297,0.0769,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,19,1,LogisticRegression,0.7223,0.8918,False,age,0.2826,0.0655,0.1494,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,19,1,LogisticRegression,0.7223,0.8918,False,marital,0.4739,0.0242,0.0398,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,19,1,LogisticRegression,0.7223,0.8918,False,education,0.2303,0.0351,0.1289,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,19,2,LogisticRegression,0.7223,0.8918,False,age,0.2826,0.0655,0.1494,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,19,2,LogisticRegression,0.7223,0.8918,False,marital,0.4739,0.0242,0.0398,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,19,2,LogisticRegression,0.7223,0.8918,False,education,0.2303,0.0351,0.1289,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,73,0,LogisticRegression,0.7611,0.8938,False,age,0.1629,0.1295,0.1897,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,73,0,LogisticRegression,0.7611,0.8938,False,marital,0.5995,0.0159,0.0463,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,73,0,LogisticRegression,0.7611,0.8938,False,education,0.3037,0.0337,0.1097,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,73,1,LogisticRegression,0.7618,0.8944,False,age,0.1792,0.1177,0.1728,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,73,1,LogisticRegression,0.7618,0.8944,False,marital,0.5323,0.0188,0.0486,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,73,1,LogisticRegression,0.7618,0.8944,False,education,0.2932,0.0311,0.0763,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,73,2,LogisticRegression,0.7618,0.8944,False,age,0.1792,0.1177,0.1728,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,73,2,LogisticRegression,0.7618,0.8944,False,marital,0.5323,0.0188,0.0486,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,73,2,LogisticRegression,0.7618,0.8944,False,education,0.2932,0.0311,0.0763,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,128,0,XGBoost,0.7425,0.8908,False,age,0.0948,0.2138,0.2108,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,128,0,XGBoost,0.7425,0.8908,False,marital,0.5297,0.0214,0.0248,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,128,0,XGBoost,0.7425,0.8908,False,education,0.2508,0.0442,0.1376,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,128,1,LogisticRegression,0.7321,0.892,False,age,0.2307,0.0727,0.0677,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,128,1,LogisticRegression,0.7321,0.892,False,marital,0.5234,0.0173,0.025,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,128,1,LogisticRegression,0.7321,0.892,False,education,0.1189,0.0341,0.1426,False,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+bank_marketing,D,128,2,LogisticRegression,0.7321,0.892,False,age,0.2307,0.0727,0.0677,True,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,128,2,LogisticRegression,0.7321,0.892,False,marital,0.5234,0.0173,0.025,False,,True,approve,violation remains but reroutes are exhausted
+bank_marketing,D,128,2,LogisticRegression,0.7321,0.892,False,education,0.1189,0.0341,0.1426,False,,True,approve,violation remains but reroutes are exhausted
+compas,A,42,0,LogisticRegression,0.7589,0.7053,False,sex,0.4595,0.2663,0.263,True,,True,approve,arm approves at the first gate
+compas,A,42,0,LogisticRegression,0.7589,0.7053,False,age,0.2099,0.6453,0.332,True,,True,approve,arm approves at the first gate
+compas,A,42,0,LogisticRegression,0.7589,0.7053,False,race,0.436,0.3204,0.3994,True,,True,approve,arm approves at the first gate
+compas,A,42,0,LogisticRegression,0.7589,0.7053,False,age_cat,0.2336,0.6259,0.5265,True,,True,approve,arm approves at the first gate
+compas,A,7,0,LogisticRegression,0.7281,0.6698,False,sex,0.4736,0.255,0.2107,True,,True,approve,arm approves at the first gate
+compas,A,7,0,LogisticRegression,0.7281,0.6698,False,age,0.476,0.3865,0.2864,True,60+=25,True,approve,arm approves at the first gate
+compas,A,7,0,LogisticRegression,0.7281,0.6698,False,race,0.585,0.2139,0.2397,True,,True,approve,arm approves at the first gate
+compas,A,7,0,LogisticRegression,0.7281,0.6698,False,age_cat,0.1734,0.6097,0.5139,True,,True,approve,arm approves at the first gate
+compas,A,19,0,LogisticRegression,0.7183,0.6805,False,sex,0.3607,0.3296,0.3609,True,,True,approve,arm approves at the first gate
+compas,A,19,0,LogisticRegression,0.7183,0.6805,False,age,0.451,0.4324,0.3069,True,60+=27,True,approve,arm approves at the first gate
+compas,A,19,0,LogisticRegression,0.7183,0.6805,False,race,0.4808,0.2939,0.2402,True,,True,approve,arm approves at the first gate
+compas,A,19,0,LogisticRegression,0.7183,0.6805,False,age_cat,0.2482,0.5921,0.5188,True,,True,approve,arm approves at the first gate
+compas,A,73,0,LogisticRegression,0.7492,0.6757,False,sex,0.3453,0.324,0.3285,True,,True,approve,arm approves at the first gate
+compas,A,73,0,LogisticRegression,0.7492,0.6757,False,age,0.3735,0.5221,0.3857,True,60+=24,True,approve,arm approves at the first gate
+compas,A,73,0,LogisticRegression,0.7492,0.6757,False,race,0.4992,0.2728,0.3514,True,,True,approve,arm approves at the first gate
+compas,A,73,0,LogisticRegression,0.7492,0.6757,False,age_cat,0.2324,0.6396,0.5248,True,,True,approve,arm approves at the first gate
+compas,A,128,0,LogisticRegression,0.7229,0.6722,False,sex,0.2693,0.3392,0.3868,True,,True,approve,arm approves at the first gate
+compas,A,128,0,LogisticRegression,0.7229,0.6722,False,age,0.1494,0.6157,0.3072,True,,True,approve,arm approves at the first gate
+compas,A,128,0,LogisticRegression,0.7229,0.6722,False,race,0.4575,0.2733,0.2734,True,,True,approve,arm approves at the first gate
+compas,A,128,0,LogisticRegression,0.7229,0.6722,False,age_cat,0.1962,0.5818,0.5001,True,,True,approve,arm approves at the first gate
+compas,B,42,0,LogisticRegression,0.7589,0.7053,False,sex,0.4595,0.2663,0.263,True,,True,approve,arm approves at the first gate
+compas,B,42,0,LogisticRegression,0.7589,0.7053,False,age,0.2099,0.6453,0.332,True,,True,approve,arm approves at the first gate
+compas,B,42,0,LogisticRegression,0.7589,0.7053,False,race,0.436,0.3204,0.3994,True,,True,approve,arm approves at the first gate
+compas,B,42,0,LogisticRegression,0.7589,0.7053,False,age_cat,0.2336,0.6259,0.5265,True,,True,approve,arm approves at the first gate
+compas,B,7,0,LogisticRegression,0.7281,0.6698,False,sex,0.4736,0.255,0.2107,True,,True,approve,arm approves at the first gate
+compas,B,7,0,LogisticRegression,0.7281,0.6698,False,age,0.476,0.3865,0.2864,True,60+=25,True,approve,arm approves at the first gate
+compas,B,7,0,LogisticRegression,0.7281,0.6698,False,race,0.585,0.2139,0.2397,True,,True,approve,arm approves at the first gate
+compas,B,7,0,LogisticRegression,0.7281,0.6698,False,age_cat,0.1734,0.6097,0.5139,True,,True,approve,arm approves at the first gate
+compas,B,19,0,LogisticRegression,0.7183,0.6805,False,sex,0.3607,0.3296,0.3609,True,,True,approve,arm approves at the first gate
+compas,B,19,0,LogisticRegression,0.7183,0.6805,False,age,0.451,0.4324,0.3069,True,60+=27,True,approve,arm approves at the first gate
+compas,B,19,0,LogisticRegression,0.7183,0.6805,False,race,0.4808,0.2939,0.2402,True,,True,approve,arm approves at the first gate
+compas,B,19,0,LogisticRegression,0.7183,0.6805,False,age_cat,0.2482,0.5921,0.5188,True,,True,approve,arm approves at the first gate
+compas,B,73,0,LogisticRegression,0.7492,0.6757,False,sex,0.3453,0.324,0.3285,True,,True,approve,arm approves at the first gate
+compas,B,73,0,LogisticRegression,0.7492,0.6757,False,age,0.3735,0.5221,0.3857,True,60+=24,True,approve,arm approves at the first gate
+compas,B,73,0,LogisticRegression,0.7492,0.6757,False,race,0.4992,0.2728,0.3514,True,,True,approve,arm approves at the first gate
+compas,B,73,0,LogisticRegression,0.7492,0.6757,False,age_cat,0.2324,0.6396,0.5248,True,,True,approve,arm approves at the first gate
+compas,B,128,0,LogisticRegression,0.7229,0.6722,False,sex,0.2693,0.3392,0.3868,True,,True,approve,arm approves at the first gate
+compas,B,128,0,LogisticRegression,0.7229,0.6722,False,age,0.1494,0.6157,0.3072,True,,True,approve,arm approves at the first gate
+compas,B,128,0,LogisticRegression,0.7229,0.6722,False,race,0.4575,0.2733,0.2734,True,,True,approve,arm approves at the first gate
+compas,B,128,0,LogisticRegression,0.7229,0.6722,False,age_cat,0.1962,0.5818,0.5001,True,,True,approve,arm approves at the first gate
+compas,C,42,0,LogisticRegression,0.7589,0.7053,False,sex,0.4595,0.2663,0.263,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,42,0,LogisticRegression,0.7589,0.7053,False,age,0.2099,0.6453,0.332,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,42,0,LogisticRegression,0.7589,0.7053,False,race,0.436,0.3204,0.3994,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,42,0,LogisticRegression,0.7589,0.7053,False,age_cat,0.2336,0.6259,0.5265,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,42,1,XGBoost,0.7409,0.6994,False,sex,0.6387,0.1601,0.1609,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,42,1,XGBoost,0.7409,0.6994,False,age,0.1789,0.5246,0.1719,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,42,1,XGBoost,0.7409,0.6994,False,race,0.5477,0.227,0.2049,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,42,1,XGBoost,0.7409,0.6994,False,age_cat,0.3166,0.4366,0.397,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,42,2,RandomForest,0.704,0.6462,False,sex,0.695,0.1463,0.1812,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,42,2,RandomForest,0.704,0.6462,False,age,0.3956,0.3492,0.0549,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,42,2,RandomForest,0.704,0.6462,False,race,0.636,0.1919,0.1711,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,42,2,RandomForest,0.704,0.6462,False,age_cat,0.4901,0.2946,0.2342,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,7,0,LogisticRegression,0.7281,0.6698,False,sex,0.4736,0.255,0.2107,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,7,0,LogisticRegression,0.7281,0.6698,False,age,0.476,0.3865,0.2864,True,60+=25,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,7,0,LogisticRegression,0.7281,0.6698,False,race,0.585,0.2139,0.2397,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,7,0,LogisticRegression,0.7281,0.6698,False,age_cat,0.1734,0.6097,0.5139,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,7,1,XGBoost,0.6987,0.6497,False,sex,0.6169,0.1754,0.131,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,7,1,XGBoost,0.6987,0.6497,False,age,0.6191,0.2319,0.1865,True,60+=25,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,7,1,XGBoost,0.6987,0.6497,False,race,0.6847,0.1516,0.2009,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,7,1,XGBoost,0.6987,0.6497,False,age_cat,0.2769,0.4403,0.4274,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,7,2,RandomForest,0.6648,0.6249,False,sex,0.7491,0.1182,0.1103,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,7,2,RandomForest,0.6648,0.6249,False,age,0.7147,0.1667,0.1411,True,60+=25,True,approve,violation remains but reroutes are exhausted
+compas,C,7,2,RandomForest,0.6648,0.6249,False,race,0.7625,0.1169,0.1451,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,7,2,RandomForest,0.6648,0.6249,False,age_cat,0.4379,0.3284,0.3251,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,19,0,LogisticRegression,0.7183,0.6805,False,sex,0.3607,0.3296,0.3609,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,19,0,LogisticRegression,0.7183,0.6805,False,age,0.451,0.4324,0.3069,True,60+=27,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,19,0,LogisticRegression,0.7183,0.6805,False,race,0.4808,0.2939,0.2402,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,19,0,LogisticRegression,0.7183,0.6805,False,age_cat,0.2482,0.5921,0.5188,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,19,1,XGBoost,0.6723,0.6284,False,sex,0.6079,0.18,0.2251,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,19,1,XGBoost,0.6723,0.6284,False,age,0.5893,0.2554,0.2776,True,60+=27,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,19,1,XGBoost,0.6723,0.6284,False,race,0.5517,0.2308,0.2375,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,19,1,XGBoost,0.6723,0.6284,False,age_cat,0.3684,0.3927,0.4581,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,19,2,RandomForest,0.6541,0.6118,False,sex,0.7322,0.1297,0.1606,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,19,2,RandomForest,0.6541,0.6118,False,age,0.6373,0.2349,0.2196,True,60+=27,True,approve,violation remains but reroutes are exhausted
+compas,C,19,2,RandomForest,0.6541,0.6118,False,race,0.6579,0.1815,0.1607,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,19,2,RandomForest,0.6541,0.6118,False,age_cat,0.3451,0.4242,0.4252,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,73,0,LogisticRegression,0.7492,0.6757,False,sex,0.3453,0.324,0.3285,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,73,0,LogisticRegression,0.7492,0.6757,False,age,0.3735,0.5221,0.3857,True,60+=24,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,73,0,LogisticRegression,0.7492,0.6757,False,race,0.4992,0.2728,0.3514,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,73,0,LogisticRegression,0.7492,0.6757,False,age_cat,0.2324,0.6396,0.5248,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,73,1,XGBoost,0.7264,0.6722,False,sex,0.5436,0.2126,0.1424,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,73,1,XGBoost,0.7264,0.6722,False,age,0.642,0.2106,0.2307,True,60+=24,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,73,1,XGBoost,0.7264,0.6722,False,race,0.6904,0.1508,0.2073,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,73,1,XGBoost,0.7264,0.6722,False,age_cat,0.4272,0.3369,0.402,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,73,2,RandomForest,0.6816,0.6473,False,sex,0.6339,0.1828,0.1599,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,73,2,RandomForest,0.6816,0.6473,False,age,0.6586,0.2142,0.2251,True,60+=24,True,approve,violation remains but reroutes are exhausted
+compas,C,73,2,RandomForest,0.6816,0.6473,False,race,0.7959,0.1035,0.0931,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,73,2,RandomForest,0.6816,0.6473,False,age_cat,0.4755,0.3291,0.3286,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,128,0,LogisticRegression,0.7229,0.6722,False,sex,0.2693,0.3392,0.3868,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,128,0,LogisticRegression,0.7229,0.6722,False,age,0.1494,0.6157,0.3072,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,128,0,LogisticRegression,0.7229,0.6722,False,race,0.4575,0.2733,0.2734,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,128,0,LogisticRegression,0.7229,0.6722,False,age_cat,0.1962,0.5818,0.5001,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,128,1,XGBoost,0.704,0.658,False,sex,0.4636,0.2459,0.2199,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,128,1,XGBoost,0.704,0.658,False,age,0.3965,0.3701,0.1948,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,128,1,XGBoost,0.704,0.658,False,race,0.6399,0.1718,0.1597,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,128,1,XGBoost,0.704,0.658,False,age_cat,0.2871,0.4372,0.3803,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
+compas,C,128,2,RandomForest,0.6778,0.6331,False,sex,0.6529,0.1728,0.1938,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,128,2,RandomForest,0.6778,0.6331,False,age,0.3731,0.4087,0.2132,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,128,2,RandomForest,0.6778,0.6331,False,race,0.7704,0.117,0.1288,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,128,2,RandomForest,0.6778,0.6331,False,age_cat,0.4271,0.3735,0.3735,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,42,0,LogisticRegression,0.7589,0.7053,False,sex,0.4595,0.2663,0.263,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,42,0,LogisticRegression,0.7589,0.7053,False,age,0.2099,0.6453,0.332,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,42,0,LogisticRegression,0.7589,0.7053,False,race,0.436,0.3204,0.3994,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,42,0,LogisticRegression,0.7589,0.7053,False,age_cat,0.2336,0.6259,0.5265,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,42,1,LogisticRegression,0.7534,0.6994,False,sex,0.5453,0.1783,0.1687,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,42,1,LogisticRegression,0.7534,0.6994,False,age,0.4576,0.2032,0.1262,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,42,1,LogisticRegression,0.7534,0.6994,False,race,0.3994,0.2816,0.3281,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,42,1,LogisticRegression,0.7534,0.6994,False,age_cat,0.5299,0.1949,0.185,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,42,2,LogisticRegression,0.7458,0.6888,False,sex,0.5214,0.1905,0.1597,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,42,2,LogisticRegression,0.7458,0.6888,False,age,0.4595,0.2016,0.1929,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,42,2,LogisticRegression,0.7458,0.6888,False,race,0.788,0.0837,0.0507,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,42,2,LogisticRegression,0.7458,0.6888,False,age_cat,0.5159,0.2007,0.2169,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,7,0,LogisticRegression,0.7281,0.6698,False,sex,0.4736,0.255,0.2107,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,7,0,LogisticRegression,0.7281,0.6698,False,age,0.476,0.3865,0.2864,True,60+=25,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,7,0,LogisticRegression,0.7281,0.6698,False,race,0.585,0.2139,0.2397,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,7,0,LogisticRegression,0.7281,0.6698,False,age_cat,0.1734,0.6097,0.5139,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,7,1,LogisticRegression,0.726,0.6734,False,sex,0.379,0.241,0.2656,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,7,1,LogisticRegression,0.726,0.6734,False,age,0.8544,0.0523,0.1319,True,60+=25,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,7,1,LogisticRegression,0.726,0.6734,False,race,0.64,0.1419,0.1604,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,7,1,LogisticRegression,0.726,0.6734,False,age_cat,0.7624,0.0888,0.1539,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,7,2,LogisticRegression,0.7079,0.6639,False,sex,0.9577,0.0143,0.0639,True,,False,approve,violation remains but reroutes are exhausted
+compas,D,7,2,LogisticRegression,0.7079,0.6639,False,age,0.9064,0.0327,0.098,True,60+=25,False,approve,violation remains but reroutes are exhausted
+compas,D,7,2,LogisticRegression,0.7079,0.6639,False,race,0.5873,0.1643,0.1596,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,7,2,LogisticRegression,0.7079,0.6639,False,age_cat,0.7687,0.084,0.1114,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,19,0,LogisticRegression,0.7183,0.6805,False,sex,0.3607,0.3296,0.3609,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,19,0,LogisticRegression,0.7183,0.6805,False,age,0.451,0.4324,0.3069,True,60+=27,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,19,0,LogisticRegression,0.7183,0.6805,False,race,0.4808,0.2939,0.2402,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,19,0,LogisticRegression,0.7183,0.6805,False,age_cat,0.2482,0.5921,0.5188,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,19,1,LogisticRegression,0.724,0.6757,False,sex,0.3317,0.281,0.2986,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,19,1,LogisticRegression,0.724,0.6757,False,age,0.8982,0.0406,0.0133,True,60+=27,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,19,1,LogisticRegression,0.724,0.6757,False,race,0.468,0.2455,0.2193,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,19,1,LogisticRegression,0.724,0.6757,False,age_cat,0.7702,0.0917,0.0353,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,19,2,LogisticRegression,0.7171,0.6651,False,sex,0.9905,0.0034,0.0598,True,,False,approve,violation remains but reroutes are exhausted
+compas,D,19,2,LogisticRegression,0.7171,0.6651,False,age,0.8742,0.0502,0.0341,True,60+=27,False,approve,violation remains but reroutes are exhausted
+compas,D,19,2,LogisticRegression,0.7171,0.6651,False,race,0.5133,0.216,0.1819,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,19,2,LogisticRegression,0.7171,0.6651,False,age_cat,0.7561,0.0973,0.0413,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,73,0,LogisticRegression,0.7492,0.6757,False,sex,0.3453,0.324,0.3285,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,73,0,LogisticRegression,0.7492,0.6757,False,age,0.3735,0.5221,0.3857,True,60+=24,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,73,0,LogisticRegression,0.7492,0.6757,False,race,0.4992,0.2728,0.3514,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,73,0,LogisticRegression,0.7492,0.6757,False,age_cat,0.2324,0.6396,0.5248,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,73,1,LogisticRegression,0.7563,0.6828,False,sex,0.2607,0.2873,0.3434,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,73,1,LogisticRegression,0.7563,0.6828,False,age,0.9732,0.0092,0.0269,True,60+=24,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,73,1,LogisticRegression,0.7563,0.6828,False,race,0.5695,0.1746,0.2162,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,73,1,LogisticRegression,0.7563,0.6828,False,age_cat,0.9612,0.0133,0.0616,True,,False,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,73,2,LogisticRegression,0.7498,0.6828,False,sex,0.7515,0.0879,0.0462,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,73,2,LogisticRegression,0.7498,0.6828,False,age,0.9825,0.006,0.0799,True,60+=24,False,approve,violation remains but reroutes are exhausted
+compas,D,73,2,LogisticRegression,0.7498,0.6828,False,race,0.5942,0.1638,0.1743,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,73,2,LogisticRegression,0.7498,0.6828,False,age_cat,0.9583,0.0144,0.1241,True,,False,approve,violation remains but reroutes are exhausted
+compas,D,128,0,LogisticRegression,0.7229,0.6722,False,sex,0.2693,0.3392,0.3868,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,128,0,LogisticRegression,0.7229,0.6722,False,age,0.1494,0.6157,0.3072,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,128,0,LogisticRegression,0.7229,0.6722,False,race,0.4575,0.2733,0.2734,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,128,0,LogisticRegression,0.7229,0.6722,False,age_cat,0.1962,0.5818,0.5001,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,128,1,LogisticRegression,0.7154,0.6544,False,sex,0.2605,0.2839,0.3189,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,128,1,LogisticRegression,0.7154,0.6544,False,age,0.385,0.2158,0.1288,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,128,1,LogisticRegression,0.7154,0.6544,False,race,0.4663,0.221,0.1912,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,128,1,LogisticRegression,0.7154,0.6544,False,age_cat,0.4267,0.2291,0.1985,True,,True,reject_and_mitigate,fairness violation with reroutes remaining: mitigate
+compas,D,128,2,LogisticRegression,0.7051,0.6497,False,sex,0.9367,0.0207,0.0031,True,,False,approve,violation remains but reroutes are exhausted
+compas,D,128,2,LogisticRegression,0.7051,0.6497,False,age,0.473,0.1807,0.1591,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,128,2,LogisticRegression,0.7051,0.6497,False,race,0.4118,0.2447,0.2102,True,,True,approve,violation remains but reroutes are exhausted
+compas,D,128,2,LogisticRegression,0.7051,0.6497,False,age_cat,0.4189,0.2286,0.1962,True,,True,approve,violation remains but reroutes are exhausted
