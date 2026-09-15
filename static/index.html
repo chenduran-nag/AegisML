@@ -929,7 +929,8 @@
 
     function updateDAGTopologyNodes(data) {
       const isPaused = data.status === 'paused';
-      const payload = data.review_payload || {};
+      // A finished run has no live payload; its stages ran, so read the kept one.
+      const payload = data.review_payload || data.last_review_payload || {};
 
       const nPlanner = document.getElementById('node-planner');
       const pPlanner = document.getElementById('pill-planner');
@@ -1606,6 +1607,38 @@
         viewer.textContent = `Could not load ${filename}: ${err}`;
       }
     }
+
+    // Deep link: #run=<thread id>&page=<setup|profile|review|audit>&tab=<tab id>&scroll=<element id>
+    // opens a recorded run directly, so a run can be linked to, reviewed later, or documented.
+    async function openFromHash() {
+      const params = new URLSearchParams(location.hash.slice(1));
+      const runId = params.get('run');
+      if (!runId) return;
+      const status = await fetch('/api/pipeline/status/' + encodeURIComponent(runId))
+        .then(r => r.ok ? r.json() : null).catch(() => null);
+      if (!status) return;
+      const eda = await fetch('/api/pipeline/eda/' + encodeURIComponent(runId))
+        .then(r => r.ok ? r.json() : null).catch(() => null);
+      renderPipelineResults(eda ? {...status, eda_report: eda} : status);
+
+      const pages = {
+        setup: ['page-home', 'btn-nav-home'], profile: ['page-eda', 'btn-nav-eda'],
+        review: ['page-results', 'btn-nav-results'], audit: ['page-audit', 'btn-nav-audit'],
+      };
+      const [pageId, buttonId] = pages[params.get('page')] || pages.review;
+      showPage(pageId, document.getElementById(buttonId));
+      if (pageId === 'page-audit') await fetchAuditTrail(runId);
+
+      const tab = params.get('tab');
+      if (tab) document.querySelector(`button[onclick*="'${CSS.escape(tab)}'"]`)?.click();
+      const target = params.get('scroll') && document.getElementById(params.get('scroll'));
+      if (target) {
+        target.scrollIntoView({block: 'start'});
+        window.scrollBy(0, -70);  // clear the sticky header
+      }
+    }
+    window.addEventListener('hashchange', openFromHash);
+    openFromHash();
 
     async function fetchAuditTrail(threadId) {
       try {

@@ -6,18 +6,19 @@
 [![Groq](https://img.shields.io/badge/Groq_LLM-GPT-OSS_20B-FF4B4B?style=for-the-badge)](https://groq.com)
 [![SQLite](https://img.shields.io/badge/SQLite-Hash_Chained_Audit-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
 
-**AegisML** is an enterprise-grade, state-checkpointed multi-agent machine learning platform designed to bridge automated AI data science with human governance, algorithmic fairness auditing, and immutable compliance logging.
+**AegisML** is a governed AutoML pipeline for tabular data. A LangGraph graph profiles an uploaded CSV, has an LLM plan the preprocessing from aggregate statistics, cleans the data deterministically, trains a model leaderboard, audits fairness on protected attributes, and then stops for a human decision. Every step goes to a hash-chained audit log, and an approved model ships with a model card, an AI Bill of Materials and a draft EU AI Act Annex IV pack.
 
 ---
 
 ## 🌟 Architecture & Key Highlights
 
-- **6 Specialized Pipeline Nodes**: Seamlessly orchestrates Exploratory Data Analysis, LLM Model Strategy Planning, Deterministic Data Cleaning, Ensemble Model Training & SHAP, Subgroup Fairness Auditing, and Governance Gate Interrupts.
-- **State Checkpointing & Resumption**: Built on **LangGraph** with a persistent SQLite checkpointer (`pipeline_state.db`), enabling crash-recovery and zero-latency human-in-the-loop interrupts.
-- **Human-in-the-Loop Governance Gates**: Pauses execution before model deployment to present evaluation reports to human auditors with custom prompt directive injection and model candidate exclusion.
-- **3-Loop Resilience System**: Features automated quality retry loops and two interactive human reroute loops.
-- **Tamper-Evident Audit Logger**: Every agent execution event, metric evaluation, and human reviewer decision is appended to `audit_log.db`, each entry SHA-256 hashed together with its predecessor. `verify_audit_chain()` re-derives the chain and reports the exact entry at which any edit, deletion or reordering occurred. See [Audit Chain Guarantees](#-audit-chain-what-is-and-is-not-guaranteed) for what this does and does not prove.
-- **No Train/Test Leakage**: The train/test split is drawn by the Data Agent *before* any parameter is fitted. Imputation fill values, frequency-encoding maps and the feature scaler are all learned from the train rows only; fairness is measured on the held-out rows.
+- **A trust boundary around the LLM**: the planner is the only LLM call. It sees aggregates, never rows, and its plan is keyword-matched by deterministic code, never executed.
+- **Checkpointed human gate**: built on **LangGraph** with a SQLite checkpointer (`pipeline_state.db`), so a run paused for review survives a server restart.
+- **Four feedback loops and five endings**: an automatic data-quality retry, three reviewer rejections (data quality, model, and bias mitigation by reweighing), and runs that end approved or terminated by the quality cap, a training failure, the rejection cap, or the governance policy.
+- **Honest fairness measurement**: groups come from raw uploaded values, the verdict covers protected attributes only, pairs of protected attributes are audited together, and a verdict that could not be measured is never shown as a pass.
+- **No leakage, and an untouched test set**: train / validation / test rows are separated before anything is fitted. Every gate decision uses the validation rows; the approved model is scored once on the test rows.
+- **Policy as code**: every threshold and rule lives in [`policy.yaml`](policy.yaml), validated at startup and recorded with a SHA-256 on every run. By default, a model whose fairness was not measured cannot be approved.
+- **Tamper-evident audit log**: each entry in `audit_log.db` is SHA-256 hashed together with its predecessor. `verify_audit_chain()` names the first entry that was edited, deleted or reordered. See [Audit Chain Guarantees](#-audit-chain-what-is-and-is-not-guaranteed) for what this does and does not prove.
 
 ---
 
@@ -27,114 +28,139 @@
 
 ```mermaid
 flowchart TD
-    START(["START: USER CSV UPLOAD + TARGET COLUMN & TASK SELECTION"]) --> EDA["[1. Data Analysis Agent]<br/>Profiling + routed findings: identifiers, zero-inflation,<br/>redundancy, target leakage, proxy variables"]
-    EDA --> PLAN["[2. Planner Agent]<br/>Groq LLM generates JSON plan & strategy"]
-    PLAN --> DATA["[3. Data Agent]<br/>Imputation, frequency encoding, feature scaling"]
-    DATA --> CHECK{"Quality Check Passed?"}
-    
-    CHECK -- "No, Retry Count < 2<br/>[LOOP 1: Auto Quality Retry]<br/>(Data Agent Quality Fail, Pass last_failure_reason)" --> PLAN
-    CHECK -- "Yes" --> TRAIN["[4. Training Agent]<br/>RandomForest, XGBoost, LabelEncoder, SHAP"]
-    
-    TRAIN --> FAIR["[5. Fairness Agent]<br/>Disparate Impact >= 0.80 & Parity Diff <= 0.10"]
-    FAIR --> GATE["[6. Governance Gate Node]<br/>Pauses execution via LangGraph interrupt"]
-    
-    GATE --> DECISION{"Reviewer Decision?"}
-    
-    DECISION -- "Approve" --> END(["[END: APPROVED DEPLOYMENT]<br/>Logs state to audit_log.db & saves model"])
-    DECISION -- "Reject - Data Quality Concerns<br/>[LOOP 2: Human Directives]<br/>(reject_data_quality + human_feedback)" --> PLAN
-    DECISION -- "Reject - Model Choice / Fairness<br/>[LOOP 3: Human Model Exclusion]<br/>(reject_model_or_fairness, Append rejected_models)" --> TRAIN
+    START(["CSV upload + target column + task type<br/>(optional: extra protected attributes)"]) --> EDA["1. Data Analysis<br/>profiling + routed findings"]
+    EDA --> PLAN["2. Planner (the only LLM call)<br/>JSON plan from aggregate statistics"]
+    PLAN --> DATA["3. Data Agent<br/>train / validation / test split,<br/>everything fitted on train rows"]
+    DATA --> CHECK{"Quality gate passed?"}
 
-    classDef startNode fill:#7c3aed,stroke:#6366f1,stroke-width:2px,color:#fff;
-    classDef agentNode fill:#1e293b,stroke:#6366f1,stroke-width:2px,color:#fff;
-    classDef gateNode fill:#371e00,stroke:#f59e0b,stroke-width:2px,color:#fff;
-    classDef endNode fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;
-    
+    CHECK -- "no, retries left<br/>LOOP 1: automatic retry" --> PLAN
+    CHECK -- "no, retry cap reached" --> QCAP(["END: terminated<br/>(quality cap)"])
+    CHECK -- "yes" --> TRAIN["4. Training Agent<br/>leaderboard on validation rows + SHAP"]
+
+    TRAIN --> TRAINED{"A model trained?"}
+    TRAINED -- "no" --> TFAIL(["END: terminated<br/>(training failure)"])
+    TRAINED -- "yes" --> FAIR["5. Fairness Agent<br/>protected attributes, raw-value groups,<br/>validation rows"]
+    FAIR --> GATE["6. Governance gate<br/>LangGraph interrupt()"]
+
+    GATE --> DECISION{"Reviewer decision"}
+
+    DECISION -- "approve" --> BLOCK{"Fairness measured?<br/>(policy.yaml)"}
+    BLOCK -- "yes, or regression" --> SAVE["Save model, score once on test rows,<br/>write model card / AIBOM / Annex IV"]
+    SAVE --> DONE(["END: approved"])
+    BLOCK -- "no (default policy)" --> BLOCKED(["END: approval blocked<br/>by policy"])
+    DECISION -- "reject: data quality<br/>LOOP 2: notes to the planner" --> PLAN
+    DECISION -- "reject: model<br/>LOOP 3: exclude this model" --> TRAIN
+    DECISION -- "reject: mitigate bias<br/>LOOP 4: reweighing" --> MIT["Mitigation<br/>train-only reweighing weights"]
+    MIT --> TRAIN
+    DECISION -- "any rejection, cap reached" --> HCAP(["END: terminated<br/>(rejection cap)"])
+
+    classDef startNode fill:#f5f5f5,stroke:#f5f5f5,color:#0b0b0b;
+    classDef agentNode fill:#131313,stroke:#8a8a8a,color:#ededed;
+    classDef gateNode fill:#0b0b0b,stroke:#f5f5f5,stroke-dasharray:4 3,color:#ededed;
+    classDef endNode fill:#1b1b1b,stroke:#b8b8b8,color:#ededed;
+    classDef stopNode fill:#0b0b0b,stroke:#5e5e5e,color:#b8b8b8;
+
     class START startNode;
-    class EDA,PLAN,DATA,TRAIN,FAIR agentNode;
-    class GATE,CHECK,DECISION gateNode;
-    class END endNode;
+    class EDA,PLAN,DATA,TRAIN,FAIR,MIT,SAVE agentNode;
+    class GATE,CHECK,TRAINED,DECISION,BLOCK gateNode;
+    class DONE endNode;
+    class QCAP,TFAIL,HCAP,BLOCKED stopNode;
 ```
 
-### 6 Pipeline Agent Nodes
+### Pipeline stages
 
-1. **`Data Analysis Agent` (`data_analysis_agent.py`, `eda_insights.py`)**: The first graph node. Profiles the raw data for the dashboard, then derives structured **findings**, each routed to the stage allowed to act on it. Structural issues (identifier and constant columns) go to the Data Agent, which drops them. Judgement-light issues (zero-inflated or outlier-heavy features, redundant pairs, a skewed target) go to the Planner, which must address each by name. Suspected target leakage and **proxy variables** for protected attributes (Cramér's V / correlation ratio) are held for the human reviewer and never sent to the LLM. Every finding is shown at the gate with what each stage actually did with it.
-2. **`Planner Agent` (`planner_agent.py`)**: Uses Groq LLM (`openai/gpt-oss-20b` by default; override with the `GROQ_MODEL` env var) in JSON mode at `temperature=0.2`. Only aggregate statistics are sent — never raw rows. Column metadata is capped at 40 representative columns (target, sensitive and high-null columns prioritised) to stay inside the request size limit on wide datasets. The response is validated against 5 required keys, with one retry on parse failure.
-3. **`Data Agent` (`data_agent.py`)**: Executes deterministic data cleaning. Drops columns above 50% missing and rows with a null target, then **draws the train/test split** and fits every subsequent parameter — median/mode imputation, frequency-encoding maps, `StandardScaler` — on the train rows only, applying them to all rows. Returns `train_index` / `test_index` so the Training Agent reuses the identical split.
-4. **`Training Agent` (`training_agent.py`)**: Converts target `y` using `LabelEncoder` (0..N-1) for 100% XGBoost compatibility across binary and multi-class tasks. Fits ensemble models (`RandomForest`, `XGBoost`, `LogisticRegression`/`Ridge`), ranks leaderboards, and extracts top-5 SHAP feature importances.
-5. **`Fairness Agent` (`fairness_agent.py`)**: Evaluates subgroup equity across demographic candidates (gender, race, age) on the **held-out test rows**, enforcing Disparate Impact ($\ge 0.80$) and Demographic Parity Difference ($\le 0.10$). One-hot-encoded attributes are reconstructed by prefix matching. Regression tasks and runs where no candidate resolves to a usable subgroup column return `overall_fairness_passed = None` with `fairness_evaluated = False` — reported in the dashboard as **NOT EVALUATED**, never as a pass.
-6. **`Governance Gate Node` (`pipeline_graph.py`)**: Calls `interrupt(payload)`, pausing graph execution to present evaluation reports to human auditors on the web dashboard.
+1. **Data Analysis (`data_analysis_agent.py`, `eda_insights.py`).** The first graph node profiles the raw data for the dashboard, then derives structured **findings**, each routed to the stage allowed to act on it:
+   - identifier and constant columns go to the **Data Agent**, which drops them;
+   - zero-inflated or outlier-heavy features, redundant pairs and a skewed target go to the **Planner**, which must address each by name;
+   - suspected target leakage and **proxy variables** for protected attributes (Cramér's V / correlation ratio) are held for the **human reviewer** and never sent to the LLM.
 
-### 3-Loop Resilience System
+   Every finding is shown at the gate with what each stage actually did with it. Columns the reviewer declares protected at run start take part in proxy detection too.
+2. **Planner (`planner_agent.py`).** The only LLM call: Groq (`openai/gpt-oss-20b` by default, override with `GROQ_MODEL`), JSON mode, `temperature=0.2`. Only aggregate statistics are sent, never rows; column metadata is capped at 40 representative columns. The response is validated against its required keys, with one retry. Prompt hashes and token usage are recorded for the AIBOM, and a record/replay cache makes the evaluation reproducible without an API key.
+3. **Data Agent (`data_agent.py`).** Deterministic cleaning. After structural drops, it draws a stratified **train / validation / test split (64 / 16 / 20)** before fitting anything; imputation values, frequency-encoding maps, winsorisation bounds and the scaler are all learned from train rows only. The planner's text is read by keyword rules (clauses, hedges, scope terminators), never executed. Limits come from `policy.yaml`.
+4. **Training Agent (`training_agent.py`).** Trains the allowed models from the planner's recommendations (LogisticRegression, RandomForest, XGBoost, GradientBoosting; Ridge and Lasso for regression), ranks them on the **validation rows** and extracts top-5 SHAP features. It accepts per-row sample weights for mitigation. A run in which no model trains ends instead of reaching the gate.
+5. **Fairness Agent (`fairness_agent.py`).** Audits the model on the validation rows:
+   - **Groups come from the raw uploaded values**, not the cleaned data, so scaled or encoded columns (COMPAS `sex`, Adult `occupation`) are still audited; missing values form their own group; `age` is banded (<25, 25–59, 60+); groups under 30 rows are excluded and listed.
+   - **The verdict covers protected attributes only**: columns named like sex, race, age and similar, plus any the reviewer declares. Other columns the planner proposes are audited and shown as **advisory**.
+   - An attribute violates when disparate impact is below 0.80 or demographic parity difference is above 0.10. Equal-opportunity and equalized-odds gaps are reported alongside.
+   - **Combined subgroups**: every pair of protected attributes (for example `sex × race`) is audited with the same rules and reported, but does not change the verdict.
+   - The verdict has three states: passed, violation, or `None`. `None` is **NOT EVALUATED** (nothing protected could be measured) or **NOT FULLY EVALUATED** (a protected attribute in the data could not be audited), and it is never shown as a pass.
+6. **Governance gate (`pipeline_graph.py`).** Calls `interrupt(payload)` and waits. The reviewer can approve, reject for data quality, reject the model, or ask for mitigation. Approving saves the model, scores it once on the untouched test rows, and writes the compliance artifacts.
+7. **Mitigation (`mitigation.py`).** Triggered only by the reviewer. It reweights training rows so the label is independent of the worst-violating protected attribute (reweighing: P(group) × P(label) / P(group, label), computed on train rows only), then retrains the same candidates. The next gate shows before against now. A second mitigation reweights the intersection of both attributes.
+8. **Governance policy (`policy.py`, `policy.yaml`).** Validated at startup, recorded per run, and read by every stage above; see the Governance Policy section below.
 
-- **Loop 1: Automated Data Quality Retry Loop**: If `Data Agent` detects `quality_check_passed == False` (e.g. unhandled missing values $>5\%$), it automatically loops back to `Planner Agent` (max 2x) passing `last_failure_reason`.
-- **Loop 2: Human Data Directives Loop**: If a human reviewer selects **Reject (Data Quality)** with optional custom text directives (`human_feedback`), execution reroutes to `Planner Agent`, injecting instructions into the Groq LLM system prompt.
-- **Loop 3: Human Model Exclusion Loop**: If a human reviewer selects **Reject (Model Choice / Fairness)**, the currently winning model is added to `rejected_models`, and execution reroutes to `Training Agent` to train and select the next best algorithm.
+### Feedback loops and endings
 
----
+- **Loop 1: automatic retry.** If the Data Agent's quality gate fails, the run goes back to the Planner with the failure reason, up to 2 times.
+- **Loop 2: reject — data quality.** Back to the Planner, with the reviewer's notes injected into the prompt.
+- **Loop 3: reject — model.** The selected model is excluded and training runs again on the remaining candidates.
+- **Loop 4: reject — mitigate bias.** Reweighing on the worst-violating protected attribute, then training runs again on the same candidates.
 
-## 🖼️ Visual Feature Walkthrough
-
-### 1. Dataset Upload & Pipeline Setup
-Upload any tabular CSV dataset, select target column (with auto-detected classification or regression task type), and view real-time DAG node execution status.
-
-![Dataset Upload & Pipeline Setup](images/input.png)
-
----
-
-### 2. Exploratory Data Profiling
-Dedicated **Data Analysis & Profiling** dashboard page displaying summary KPI banners, column data types, null counts, cardinality, range, mean, std, and IQR outlier detection.
-
-![Data Analysis Profiling](images/data_analysis.png)
-
----
-
-### 3. Interactive Data Analysis Visualizations (Chart.js)
-Real-time visual chart panels rendering target class/value distribution histograms, top feature correlation strength bars, and data quality ratios.
-
-![Data Analysis Visualizations](images/data_vis.png)
+Loops 2–4 share one rejection cap (2 by default). A run ends in one of five ways: **approved**, or terminated by the **quality cap**, a **training failure**, the **rejection cap**, or the **approval block**: if a classification model's fairness could not be measured, the policy refuses the approval and the run ends without a model. Every terminated run shows a "Run ended without approval" banner with its reason, never an approved one.
 
 ---
 
-### 4. LLM Model Strategy & Proposal
-Groq LLM-generated plan displaying data quality concerns, recommended preprocessing steps, model algorithms, and sensitive attribute candidates.
+## 🖼️ Dashboard Walkthrough
 
-![Planner Proposal Page 1](images/planner.png)
+Screenshots from real UCI Adult Income runs. Any recorded run opens directly from a link such
+as `http://localhost:8000/#run=<run id>&page=review&tab=tab-fairness`, where `page` is `setup`,
+`profile`, `review` or `audit`.
 
-![Planner Proposal Page 2](images/planner_2.png)
+### 1. Setup
+Upload a CSV, choose the target column and task, and optionally name extra protected attributes
+(for example `personal_status`). The pipeline strip shows each stage's status; the panel beside it
+says what a run does.
 
----
+![Setup page](images/setup.png)
 
-### 5. Governance Gate & Human-in-the-Loop Decision Panel
-Paused pipeline execution checkpoint giving human auditors 3 governance decision paths: **Approve**, **Reject Data Quality** (with custom text prompt directives), or **Reject Model Choice** (with candidate exclusion).
+### 2. Data profile
+Dataset figures, then every exploratory finding with the stage it was routed to. Here
+`relationship` and `marital-status` stand in for `sex` and `age`, so they are held for the
+reviewer rather than sent to the LLM.
 
-![Governance Gate Panel](images/human_in_the_loop.png)
+![Data profile: figures and routed findings](images/data_profile.png)
 
----
+The target distribution, top correlations, data quality ratio and the per-column profile. The
+correlation chart is empty here because no pair of numeric Adult features reaches |r| ≥ 0.20.
 
-### 6. Resumed Execution & Pipeline State Progress
-Real-time topology status updating as the graph resumes execution following a governance decision.
+![Data profile: charts and column profile](images/data_profile_charts.png)
 
-![Resumed Execution Topology](images/after_human_interruption.png)
+### 3. Planner proposal
+The LLM's reasoning, the data quality concerns it identified, the preprocessing it recommends
+and the attributes it considers sensitive. The Data Agent applies only its unconditional steps.
 
----
+![Planner proposal](images/review_planner.png)
 
-### 7. Approved Model Deployment & Disk Serialization
-Formally approves the winning model. `audit_log_node` writes the serialised `.joblib` artifact to `saved_models/<run_id>_<model>.joblib` and records the real path in both the pipeline state and the audit entry; the dashboard displays that path, or an explicit **NOT SAVED** message with the failure reason. Serialisation happens only on the approve path — a model rejected at the gate never reaches disk.
+### 4. Leaderboard and your decision
+Models ranked on the validation rows. The run is paused until you approve, reject for data
+quality, reject the model, or ask for bias mitigation.
 
-![Approved Model Saved](images/model_accepted.png)
+![Leaderboard and decision panel](images/review_gate.png)
 
----
+### 5. Fairness assessment
+The verdict covers protected attributes only. `age`, `sex` and `race` violate (solid white
+labels); `marital-status` and `occupation` are advisory (dashed); `native-country` could not be
+audited and is named. Below the table, combined subgroups such as `age × sex` are reported
+without changing the verdict.
 
-### 8. Immutable Governance Audit Trail
-Chronological event audit log persisted into SQLite (`audit_log.db`), recording agent events, metrics, human reviewer decisions, and feedback text.
+![Fairness assessment](images/review_fairness.png)
 
-![Immutable Audit Log](images/audit.png)
+### 6. Bias mitigation
+After "Reject: mitigate bias", the next gate shows what was reweighted and the numbers before
+mitigation against now.
 
----
+![Mitigation before and after](images/review_mitigation.png)
 
-### 9. System Pipeline Architecture Flow Reference
+### 7. Approved
+Approving saves the model, scores it once on the untouched test rows, and writes its model card,
+AIBOM and Annex IV draft. Each artifact's SHA-256 is checked against the audit chain.
 
-![Pipeline Architecture Reference](images/Screenshot%202026-08-18%20at%2010.46.15%E2%80%AFPM.png)
+![Approved run with compliance artifacts](images/approved.png)
+
+### 8. Audit log
+Every event for the run, starting with the governance policy that applied, each hashed together
+with its predecessor. The banner re-verifies the chain.
+
+![Audit log](images/audit_log.png)
 
 ---
 
@@ -183,24 +209,33 @@ http://localhost:8000
 ## 📁 Repository Structure
 
 ```text
-├── server.py                   # FastAPI REST application & endpoint handlers
-├── pipeline_graph.py           # LangGraph stateful DAG orchestration & interrupt logic
-├── graph_state.py              # PipelineState TypedDict & DataFrame serialization helpers
-├── data_analysis_agent.py      # Exploratory Data Analysis profiler & Chart.js generator
-├── planner_agent.py            # Groq LLM metadata reasoning agent & prompt compression
-├── data_agent.py               # Deterministic data cleaning, imputation & scaling agent
-├── training_agent.py           # LabelEncoding, ensemble training, leaderboard & SHAP agent
-├── fairness_agent.py           # Demographic subgroup equity auditing agent
-├── audit_log.py                # Immutable SQLite audit logger (audit_log.db)
+├── server.py                   # FastAPI app: start / resume / status / EDA / audit / artifact endpoints
+├── pipeline_graph.py           # LangGraph graph: nodes, routers, loops, approval block, checkpointer
+├── graph_state.py              # PipelineState TypedDict and serialisation helpers
+├── data_analysis_agent.py      # Raw data profiling and chart payloads
+├── eda_insights.py             # Routed findings, proxy and leakage detection, protected-attribute names
+├── planner_agent.py            # The only LLM call; prompt provenance; record/replay cache
+├── data_agent.py               # Train/validation/test split, train-only fitting, plan-step parser
+├── training_agent.py           # Model registry, validation-row leaderboard, SHAP, sample weights
+├── fairness_agent.py           # Raw-value groups, protected-only verdict, combined subgroups
+├── mitigation.py               # Reweighing for the "reject and mitigate" decision
+├── audit_log.py                # Append-only, SHA-256 hash-chained audit log and verification
+├── compliance_artifacts.py     # Model card, AIBOM, Annex IV draft, artifact verification
+├── policy.py                   # Policy loader: validation, version, SHA-256
+├── policy.yaml                 # Thresholds and governance rules
+├── static/
+│   └── index.html              # Dashboard (vanilla JS + Chart.js)
+├── tests/                      # Offline pytest suite (251 tests)
 ├── experiments/
 │   ├── run_governance_eval.py  # Governance evaluation harness (record / replay / --summarise-only)
-│   ├── planner_cache/          # Recorded planner responses — makes the results reproducible without a key
-│   └── results/                # Committed results: runs, per-gate trajectory, summary, figure
-├── static/
-│   └── index.html              # Dark slate glassmorphism web UI with Chart.js
-├── images/                     # Screenshot documentation assets
-└── saved_models/               # Serialized joblib production model artifacts
+│   ├── planner_cache/          # Recorded planner responses, so results reproduce without a key
+│   └── results/                # Committed results: runs, per-gate trajectory, summary, figures
+├── images/                     # Dashboard screenshots used in this README
+├── app.py                      # Superseded Streamlit UI
+└── test_*.py                   # Original manual scripts (live Groq and network; not run by pytest)
 ```
+
+Created at runtime and gitignored: `.env`, `pipeline_state.db`, `audit_log.db`, `saved_models/`, `artifacts/`.
 
 ---
 
@@ -442,7 +477,24 @@ may be approved.
 pytest
 ```
 
-The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. 165 tests covering the governance evaluation (the record/replay planner cache, the scripted reviewer, and CSV round-tripping), feature-name sanitisation, the no-model termination route, the EDA finding routes (including a captured-prompt check that proxy and leakage findings never reach the LLM), plan-step parsing against real planner phrasings, the leakage boundary, the audit chain (including tampering and the documented truncation gap), fairness reporting honesty, compliance artifact generation and integrity verification, and an end-to-end graph run through interrupt, resume and both reroute loops.
+The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. **251 tests**, and a GitHub Actions workflow runs them on every push.
+
+| File | Tests | Covers |
+|---|---:|---|
+| `test_eda_insights.py` | 56 | Finding routes, proxy detection, plan-step parsing against real planner phrasings, a captured prompt proving reviewer findings never reach the LLM |
+| `test_governance_eval.py` | 44 | Record/replay cache, scripted reviewers for all four arms, metrics, CSV round trip, summaries, charts |
+| `test_fairness_groups.py` | 29 | Minimum group size, raw-value groups, age bands, protected-only verdict, declared attributes, coverage rule |
+| `test_policy.py` | 25 | Policy validation and hashing, thresholds changing behaviour, approval block, regression exemption |
+| `test_graph_end_to_end.py` | 19 | Interrupt/resume, every reroute loop, caps, training failure, model saving, artifacts, audit chain |
+| `test_compliance_artifacts.py` | 18 | Artifact contents, NOT EVALUATED wording, digests, tamper detection |
+| `test_leakage.py` | 13 | Split before fit; parameters learned from train rows only |
+| `test_audit_chain.py` | 12 | Hash chain, edit/delete/reorder detection, the documented truncation gap |
+| `test_mitigation.py` | 12 | Weight arithmetic, train-only fitting, attribute choice, the graph path, the model card |
+| `test_validation_split.py` | 7 | Three-way split, gate on validation rows, one final scoring on test rows |
+| `test_intersectional.py` | 6 | Combined subgroups: hidden disparities, small combinations, never in the verdict |
+| `test_feature_names.py` | 5 | XGBoost-safe one-hot column names |
+| `test_fairness_honesty.py` | 3 | Unmeasured fairness never reported as passed |
+| `test_completed_run.py` | 2 | A finished run keeps the payload its reviewer decided on |
 
 The `test_*.py` scripts in the repository root are the original manual integration walkthroughs — they download the UCI Adult dataset and call the live Groq API, so they are run by hand and are excluded from `pytest` collection.
 
