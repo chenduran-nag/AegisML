@@ -31,14 +31,16 @@ def cleaned(toy_df, fake_plan):
 
 
 def test_data_agent_returns_a_split(cleaned):
-    assert "train_index" in cleaned and "test_index" in cleaned
-    train, test = cleaned["train_index"], cleaned["test_index"]
+    assert {"train_index", "validation_index", "test_index"} <= set(cleaned)
+    train, validation, test = (cleaned["train_index"], cleaned["validation_index"],
+                               cleaned["test_index"])
 
-    assert len(train) > 0 and len(test) > 0
+    assert len(train) > 0 and len(validation) > 0 and len(test) > 0
     assert set(train).isdisjoint(test), "train and test rows must not overlap"
+    assert set(train).isdisjoint(validation) and set(validation).isdisjoint(test)
 
     total = len(cleaned["cleaned_df"])
-    assert len(train) + len(test) == total
+    assert len(train) + len(validation) + len(test) == total
     assert abs(len(test) / total - TEST_SIZE) < 0.02
 
 

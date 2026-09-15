@@ -64,7 +64,7 @@ from graph_state import (
 )
 from planner_agent import plan_pipeline
 from data_agent import run_data_agent
-from training_agent import run_training_agent
+from training_agent import evaluate_model, run_training_agent
 from fairness_agent import run_fairness_agent
 from mitigation import (
     INTERSECTION_SEPARATOR,
@@ -256,6 +256,7 @@ def data_agent_node(state: PipelineState, config: RunnableConfig) -> dict:
     # swamp every audit entry. They live in their own state key instead.
     split_index = {
         "train": result.pop("train_index"),
+        "validation": result.pop("validation_index", None),
         "test": result.pop("test_index"),
     }
 
@@ -317,6 +318,22 @@ def route_after_data_agent(state: PipelineState) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _gate_index(split: dict) -> list | None:
+    """
+    The rows every gate decision is based on: the validation split.
+
+    Leaderboard ranking, the fairness audit and the reviewer's decisions all look at
+    these rows, so the test rows stay untouched until audit_log_node scores the
+    approved model on them. State recorded before the validation split existed falls
+    back to the test rows.
+    """
+    return split.get("validation") or split.get("test")
+
+
+def _gate_label(split: dict) -> str:
+    return "validation" if split.get("validation") else "test"
+
+
 def training_node(state: PipelineState, config: RunnableConfig) -> dict:
     run_id = _get_run_id(config)
     cleaned_df = bytes_to_df(state["cleaned_df_bytes"])
@@ -358,8 +375,9 @@ def training_node(state: PipelineState, config: RunnableConfig) -> dict:
             task_type=state["task_type"],
             recommended_models=recommended_models,
             train_index=split.get("train"),
-            test_index=split.get("test"),
+            test_index=_gate_index(split),
             sample_weight=sample_weight,
+            eval_label=_gate_label(split),
         )
     except RuntimeError as exc:
         print(f"[training_node] Training failed entirely: {exc}")
@@ -496,7 +514,7 @@ def fairness_node(state: PipelineState, config: RunnableConfig) -> dict:
         target_column=state["target_column"],
         sensitive_attribute_candidates=sensitive_candidates,
         task_type=state["task_type"],
-        eval_index=split.get("test"),
+        eval_index=_gate_index(split),
         proxy_findings=findings_for_route(state.get("eda_findings"), "reviewer"),
         # Group membership is read from the raw upload: scaling and encoding in the
         # cleaned frame destroy it (a 0/1 sex column becomes a float).
@@ -611,6 +629,60 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _final_test_evaluation(state: PipelineState, run_id: str) -> dict | None:
+    """
+    Score the approved model once on the untouched test rows. Approve path only.
+
+    No gate decision looked at these rows, so these are the numbers to report. Returns
+    None when there is no separate validation split (the gate already used the test
+    rows) or no model. A failure is recorded, not raised: it must not undo an approval.
+    """
+    split = state.get("split_index") or {}
+    if not split.get("validation") or not split.get("test") or not state.get("selected_model_bytes"):
+        return None
+    plan = state.get("plan") or {}
+    try:
+        cleaned_df = bytes_to_df(state["cleaned_df_bytes"])
+        model = bytes_to_model(state["selected_model_bytes"])
+        metrics = evaluate_model(model, cleaned_df, state["target_column"],
+                                 state["task_type"], split["test"])
+        fairness = run_fairness_agent(
+            cleaned_df=cleaned_df,
+            fitted_model=model,
+            target_column=state["target_column"],
+            sensitive_attribute_candidates=plan.get("sensitive_attribute_candidates") or [],
+            task_type=state["task_type"],
+            eval_index=split["test"],
+            raw_frame=bytes_to_df(state["df_bytes"]),
+            declared_protected=state.get("declared_protected_attributes"),
+        )
+        result = {
+            "split": "test",
+            "rows": len(split["test"]),
+            "metrics": metrics,
+            "fairness": {k: fairness.get(k) for k in (
+                "overall_fairness_passed", "fairness_evaluated", "fairness_coverage",
+                "fairness_report", "advisory_violations", "protected_attributes_unaudited",
+                "attributes_skipped", "evaluated_rows", "min_group_size")},
+        }
+        summary = (f"Final evaluation of the approved model on {result['rows']:,} untouched "
+                   f"test rows: {metrics}; fairness overall_passed="
+                   f"{fairness.get('overall_fairness_passed')}")
+    except Exception as exc:
+        result = {"split": "test", "error": f"{type(exc).__name__}: {exc}"}
+        summary = f"Final test evaluation FAILED: {result['error']}"
+    print(f"[audit_log_node] {summary}")
+    log_audit_event(
+        run_id=run_id,
+        db_path=AUDIT_DB_PATH,
+        event_type="final_test_evaluation",
+        event_source="automated",
+        summary=summary,
+        details=result,
+    )
+    return result
+
+
 def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
     """
     Final node on the approve path. Serialises the approved model to disk and
@@ -657,6 +729,8 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
             saved_path = None
             print(f"[audit_log_node] FAILED to save model: {save_error}")
 
+    final_evaluation = _final_test_evaluation(state, run_id)
+
     log_audit_event(
         run_id=run_id,
         db_path=AUDIT_DB_PATH,
@@ -680,6 +754,9 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
             ],
             "model_saved_path": saved_path,
             "model_save_error": save_error,
+            "final_test_metrics": (final_evaluation or {}).get("metrics"),
+            "final_test_fairness_passed": ((final_evaluation or {}).get("fairness") or {}).get(
+                "overall_fairness_passed"),
             "total_retries_used": state.get("retry_count", 0),
             "total_human_reroutes_used": state.get("rejection_reroute_count", 0),
         },
@@ -695,7 +772,7 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
     artifacts = None
     try:
         artifacts = generate_artifacts(
-            state={**state, "model_saved_path": saved_path},
+            state={**state, "model_saved_path": saved_path, "final_evaluation": final_evaluation},
             run_id=run_id,
             out_root=ARTIFACTS_DIR,
             audit_db_path=AUDIT_DB_PATH,
@@ -740,6 +817,7 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
         "model_saved_path": saved_path,
         "model_save_error": save_error,
         "artifacts_manifest": artifacts,
+        "final_evaluation": final_evaluation,
     }
 
 

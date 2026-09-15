@@ -118,6 +118,7 @@ def _build_pipeline_response(thread_id: str) -> dict:
             "protected_attributes_unaudited": fairness_result.get("protected_attributes_unaudited", []),
             "advisory_violations": fairness_result.get("advisory_violations", []),
             "declared_protected_attributes": values.get("declared_protected_attributes") or [],
+            "final_evaluation": values.get("final_evaluation"),
         },
     }
 

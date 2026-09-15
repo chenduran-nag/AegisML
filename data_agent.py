@@ -66,6 +66,9 @@ NULL_PCT_QUALITY_LIMIT = 5.0        # quality fails if missing_pct >= 5%
 # verbatim by the Training Agent so that the split boundary is identical in both
 # agents. See _split_indices() for why this must happen in the Data Agent.
 TEST_SIZE = 0.20
+# Carved out of the non-test rows (0.20 of 80% = 16% overall). Models are compared and
+# reviewed on these rows, so the test rows stay untouched until after approval.
+VALIDATION_SIZE = 0.20
 SPLIT_RANDOM_STATE = 42
 
 # Winsorization — applied only to columns a plan step names explicitly. Percentile
@@ -198,9 +201,16 @@ def _split_indices(
     task_type: str,
     actions: list[str],
     random_state: int = SPLIT_RANDOM_STATE,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Compute train/test row indices BEFORE any statistic is fitted.
+    Compute train/validation/test row indices BEFORE any statistic is fitted.
+
+    WHY A VALIDATION SPLIT:
+      The governance gate — the leaderboard ranking, the fairness audit, and every
+      reviewer decision including rejections and mitigation — looks at the rows it is
+      evaluated on. If those were the test rows, the approved model's reported metrics
+      would be selected on the same rows they are reported on. Decisions use the
+      validation rows; the test rows are scored once, after approval.
 
     WHY THIS LIVES IN THE DATA AGENT:
       Imputation fill values, frequency-encoding maps and StandardScaler
@@ -215,7 +225,7 @@ def _split_indices(
       indices are returned so the Training Agent reuses this exact split rather
       than drawing a second, inconsistent one.
 
-    Returns (train_index, test_index) as arrays of DataFrame index labels.
+    Returns (train_index, validation_index, test_index) as arrays of index labels.
     """
     y = df[target_column]
     stratify = None
@@ -230,20 +240,34 @@ def _split_indices(
                 "than 2 rows)"
             )
 
-    train_idx, test_idx = train_test_split(
+    rest_idx, test_idx = train_test_split(
         df.index.to_numpy(),
         test_size=TEST_SIZE,
         random_state=random_state,
         stratify=stratify,
     )
 
-    actions.append(
-        f"Train/test split (seed {random_state}) computed before fitting: "
-        f"{len(train_idx):,} train / "
-        f"{len(test_idx):,} test rows. All imputation, frequency-encoding and "
-        f"scaling parameters below are fitted on the train rows ONLY."
+    rest_stratify = None
+    if stratify is not None:
+        rest_counts = y.loc[rest_idx].value_counts(dropna=False)
+        if len(rest_counts) >= 2 and int(rest_counts.min()) >= 2:
+            rest_stratify = y.loc[rest_idx]
+    train_idx, validation_idx = train_test_split(
+        rest_idx,
+        test_size=VALIDATION_SIZE,
+        random_state=random_state,
+        stratify=rest_stratify,
     )
-    return train_idx, test_idx
+
+    actions.append(
+        f"Train/validation/test split (seed {random_state}) computed before fitting: "
+        f"{len(train_idx):,} train / {len(validation_idx):,} validation / "
+        f"{len(test_idx):,} test rows. All imputation, frequency-encoding and "
+        f"scaling parameters below are fitted on the train rows ONLY. Models are "
+        f"compared and reviewed on the validation rows; the test rows are scored once, "
+        f"after approval."
+    )
+    return train_idx, validation_idx, test_idx
 
 
 def _drop_eda_structural_columns(
@@ -730,7 +754,7 @@ def run_data_agent(
     # repeat a run over several partitions. It is recorded in the quality report,
     # so every result states which partition produced it.
     split_seed = SPLIT_RANDOM_STATE if split_seed is None else int(split_seed)
-    train_idx, test_idx = _split_indices(
+    train_idx, validation_idx, test_idx = _split_indices(
         df, target_column, task_type, actions, random_state=split_seed,
     )
 
@@ -776,6 +800,7 @@ def run_data_agent(
         columns_dropped=columns_dropped_total,
     )
     quality_report["train_rows"] = int(len(train_idx))
+    quality_report["validation_rows"] = int(len(validation_idx))
     quality_report["test_rows"] = int(len(test_idx))
     quality_report["split_seed"] = split_seed
 
@@ -794,5 +819,6 @@ def run_data_agent(
         # into PipelineState["split_index"] so they never reach the audit log
         # (a 30k-element list would swamp every audit entry).
         "train_index": train_idx.tolist(),
+        "validation_index": validation_idx.tolist(),
         "test_index": test_idx.tolist(),
     }

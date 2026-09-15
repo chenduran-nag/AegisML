@@ -204,6 +204,28 @@ def _regression_metrics(model: Any, X_test: np.ndarray,
     }
 
 
+def evaluate_model(model: Any, cleaned_df: pd.DataFrame, target_column: str,
+                   task_type: str, index: list) -> dict:
+    """
+    Score an already-fitted model on the given rows exactly as run_training_agent
+    scores its evaluation rows: the same target encoding and bool-to-int conversion.
+
+    Used once, after approval, on the untouched test rows (pipeline_graph.audit_log_node).
+    """
+    X = cleaned_df.drop(columns=[target_column])
+    y = cleaned_df[target_column]
+    if task_type == "classification":
+        y = pd.Series(LabelEncoder().fit_transform(y), index=y.index)
+    bool_cols = [c for c in X.columns if pd.api.types.is_bool_dtype(X[c])]
+    if bool_cols:
+        X = X.copy()
+        X[bool_cols] = X[bool_cols].astype(int)
+    rows = pd.Index(index)
+    if task_type == "classification":
+        return _classification_metrics(model, X.loc[rows], y.loc[rows])
+    return _regression_metrics(model, X.loc[rows], y.loc[rows])
+
+
 # ---------------------------------------------------------------------------
 # SHAP explainability summary
 # ---------------------------------------------------------------------------
@@ -300,6 +322,7 @@ def run_training_agent(
     train_index: list | None = None,
     test_index: list | None = None,
     sample_weight: pd.Series | None = None,
+    eval_label: str = "test",
 ) -> dict:
     """
     Train, evaluate, and rank models recommended by the Planner Agent.
@@ -377,8 +400,9 @@ def run_training_agent(
         X_train, X_test = X.loc[train_idx], X.loc[test_idx]
         y_train, y_test = y.loc[train_idx], y.loc[test_idx]
         actions.append(
-            f"Train/test split: reused the Data Agent's split "
-            f"({len(X_train):,} train / {len(X_test):,} test rows). Imputation, "
+            f"Train/{eval_label} split: reused the Data Agent's split "
+            f"({len(X_train):,} train / {len(X_test):,} {eval_label} rows; the leaderboard "
+            f"ranks models on the {eval_label} rows). Imputation, "
             f"encoding and scaling parameters were fitted on these train rows only."
         )
     else:

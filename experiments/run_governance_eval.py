@@ -97,13 +97,13 @@ MAX_GATES_PER_RUN = 10
 
 RUN_FIELDS = [
     "dataset", "arm", "seed", "status", "error", "gates", "final_model",
-    "accuracy", "f1", "auc_roc",
+    "accuracy", "f1", "auc_roc", "gate_auc_roc", "evaluated_on",
     "fairness_evaluated", "overall_fairness_passed", "attributes_evaluated",
     "n_violations", "n_advisory_violations", "min_disparate_impact", "max_parity_difference",
     "max_equal_opportunity_difference", "protected_attributes_evaluated",
     "protected_attributes_unaudited", "mitigated_attributes",
     "retries", "reroutes", "eda_findings", "columns_dropped",
-    "train_rows", "test_rows", "split_seed_recorded",
+    "train_rows", "validation_rows", "test_rows", "split_seed_recorded",
     "planner_calls", "planner_cache_hits", "planner_tokens_recorded", "planner_model",
     "dataset_rows", "dataset_sha256", "wall_clock_s",
 ]
@@ -397,9 +397,14 @@ def _gate_rows(dataset: str, arm: Arm, seed: int, gate_index: int,
 
 def _final_metrics(values: dict, gates: int) -> dict:
     training = values.get("training_result") or {}
-    fairness = values.get("fairness_result") or {}
     quality = (values.get("data_agent_result") or {}).get("quality_report") or {}
-    metrics = training.get("selected_model_metrics") or {}
+    gate_metrics = training.get("selected_model_metrics") or {}
+    # An approved run is reported on the untouched test rows (final_evaluation); every
+    # gate decision used the validation rows. Runs that never reached approval keep
+    # their gate numbers.
+    final = values.get("final_evaluation") or {}
+    fairness = final.get("fairness") or values.get("fairness_result") or {}
+    metrics = final.get("metrics") or gate_metrics
     report = fairness.get("fairness_report") or []
     verdict_rows = [r for r in report
                     if r.get("counts_toward_verdict", r.get("protected")) is not False]
@@ -426,6 +431,8 @@ def _final_metrics(values: dict, gates: int) -> dict:
         "accuracy": metrics.get("accuracy"),
         "f1": metrics.get("f1"),
         "auc_roc": metrics.get("auc_roc"),
+        "gate_auc_roc": gate_metrics.get("auc_roc"),
+        "evaluated_on": "test" if final.get("metrics") else "gate",
         "fairness_evaluated": bool(fairness.get("fairness_evaluated")),
         "overall_fairness_passed": fairness.get("overall_fairness_passed"),
         "attributes_evaluated": ";".join(str(r.get("attribute")) for r in report),
@@ -451,6 +458,7 @@ def _final_metrics(values: dict, gates: int) -> dict:
         "eda_findings": len(values.get("eda_findings") or []),
         "columns_dropped": ";".join(quality.get("columns_dropped") or []),
         "train_rows": quality.get("train_rows"),
+        "validation_rows": quality.get("validation_rows"),
         "test_rows": quality.get("test_rows"),
         "split_seed_recorded": quality.get("split_seed"),
     }
@@ -915,7 +923,7 @@ def render_charts(runs: list[dict], out_dir: Path, arms: dict[str, Arm] = ARMS,
                 label_x = max(aucs) + pad * 1.4
                 ax.text(ax.get_xlim()[1], DI_THRESHOLD + 0.015, "DI 0.80 threshold",
                         ha="right", va="bottom", fontsize=8, color=theme["muted"])
-                ax.set_xlabel("AUC (held-out rows)", fontsize=9)
+                ax.set_xlabel("AUC (untouched test rows)", fontsize=9)
                 ax.set_ylabel("Minimum disparate impact", fontsize=9)
 
                 means: dict[str, tuple[float, float]] = {}
@@ -1135,6 +1143,12 @@ def write_report(out_dir: Path, runs: list[dict], trajectory: list[dict],
   ({manifest.get('planner_cache_hits', '?')} of {manifest.get('planner_calls', '?')} planner
   calls served from `experiments/planner_cache/`).
 - **Rejection cap:** {manifest.get('max_human_reroutes', '?')} human reroutes per run.
+- **Gate decisions use validation rows; results are reported on test rows.** The Data
+  Agent splits train / validation / test (64 / 16 / 20). The leaderboard, the fairness
+  audit and the scripted reviewer's decisions (including every reroute and mitigation)
+  use the validation rows; the per-gate trajectory records those. The approved model is
+  then scored once on the untouched test rows, and every AUC, accuracy and fairness
+  column in the tables below comes from that final evaluation.
 - **The verdict covers protected attributes only**, and so do the fairness columns:
   **min disparate impact** is the lowest DI across the protected attributes audited for
   that run, **max parity difference** the largest demographic parity difference, and

@@ -173,6 +173,11 @@ class PipelineState(TypedDict, total=False):
         Columns the reviewer declared protected at run start. They are audited, count
         toward the fairness verdict, and feed EDA proxy detection, in addition to the
         columns detected by name.
+    final_evaluation : Optional[dict]
+        Written by audit_log_node on approval only: the approved model scored once on
+        the untouched test rows ({split, rows, metrics, fairness}). Everything before
+        approval — leaderboard, fairness audit, reviewer decisions — uses the
+        validation rows in split_index["validation"].
     """
 
     df_bytes: bytes
@@ -205,3 +210,4 @@ class PipelineState(TypedDict, total=False):
     model_save_error: Optional[str]
     mitigation: Optional[dict]
     declared_protected_attributes: Optional[list[str]]
+    final_evaluation: Optional[dict]

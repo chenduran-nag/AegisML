@@ -109,8 +109,10 @@ def test_split_is_carried_through_state(graph, toy_df):
     values = graph.g.get_state(config).values
 
     split = values["split_index"]
-    assert set(split) == {"train", "test"}
+    assert set(split) == {"train", "validation", "test"}
     assert set(split["train"]).isdisjoint(split["test"])
+    assert set(split["train"]).isdisjoint(split["validation"])
+    assert set(split["validation"]).isdisjoint(split["test"])
 
     # And it must NOT have leaked into the audit-log-bound result dict.
     assert "train_index" not in values["data_agent_result"]

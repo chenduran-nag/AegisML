@@ -118,6 +118,46 @@ def fairness_verdict(fairness_result: dict | None) -> str:
     return "PASSED" if passed else "VIOLATION DETECTED"
 
 
+def _final_test_section(final_evaluation: Any) -> Any:
+    """The post-approval test evaluation, or NOT_RECORDED when none was made."""
+    if not isinstance(final_evaluation, dict):
+        return NOT_RECORDED
+    if final_evaluation.get("error"):
+        return {"error": final_evaluation["error"]}
+    fairness = final_evaluation.get("fairness") or {}
+    return {
+        "rows": final_evaluation.get("rows"),
+        "metrics": final_evaluation.get("metrics") or {},
+        "fairness_verdict": fairness_verdict(fairness),
+        "fairness_report": fairness.get("fairness_report") or [],
+        "advisory_violations": fairness.get("advisory_violations") or [],
+        "protected_attributes_unaudited": fairness.get("protected_attributes_unaudited") or [],
+    }
+
+
+def _final_test_md(section: Any) -> str:
+    if not isinstance(section, dict):
+        return ("**Final test evaluation:** not recorded. Without a separate validation "
+                "split, the gate metrics above are the held-out metrics.")
+    if section.get("error"):
+        return f"**Final test evaluation FAILED:** {_md_cell(section['error'])}"
+    rows = [[r.get("attribute"), {True: "yes", False: "no (advisory)"}.get(
+                r.get("counts_toward_verdict", r.get("protected")), NOT_RECORDED),
+             r.get("disparate_impact"), r.get("demographic_parity_difference"),
+             ("VIOLATION" if r.get("counts_toward_verdict", r.get("protected")) is not False
+              else "advisory violation") if r.get("violation") else "passed"]
+            for r in section.get("fairness_report") or []]
+    return (
+        f"**Final evaluation on untouched test rows** — scored once, after approval, on "
+        f"{section.get('rows')} rows that no leaderboard ranking, fairness check or reviewer "
+        f"decision looked at. These are the numbers to report.\n\n"
+        f"**Metrics:** `{json.dumps(section.get('metrics'))}`\n\n"
+        f"**Fairness verdict on the test rows:** {section.get('fairness_verdict')}\n\n"
+        + _md_table(["Attribute", "Counts toward verdict", "Disparate impact",
+                     "Parity difference", "Status"], rows)
+    )
+
+
 def _mitigation_text(record: Any) -> str:
     if not isinstance(record, dict):
         return "none"
@@ -285,6 +325,7 @@ def build_model_card(
             "columns_total": eda_summary.get("total_columns", NOT_RECORDED),
             "missing_cells_pct": eda_summary.get("missing_pct", NOT_RECORDED),
             "train_rows": quality.get("train_rows", NOT_RECORDED),
+            "validation_rows": quality.get("validation_rows", NOT_RECORDED),
             "test_rows": quality.get("test_rows", NOT_RECORDED),
             "class_balance_ratio": quality.get("class_balance_ratio"),
             "rows_dropped": quality.get("rows_dropped", NOT_RECORDED),
@@ -304,11 +345,18 @@ def build_model_card(
         },
 
         "evaluation": {
+            # What the reviewer saw at the gate.
             "metrics": train_res.get("selected_model_metrics", {}),
             "evaluated_on": (
+                f"{quality.get('validation_rows')} validation rows, used for model "
+                f"selection and governance review, and excluded from every fitted "
+                f"preprocessing parameter and from model training"
+                if quality.get("validation_rows") else
                 f"{quality.get('test_rows', '?')} held-out rows, excluded from "
                 f"every fitted preprocessing parameter and from model training"
             ),
+            # Scored once, after approval, on rows no decision looked at.
+            "final_test": _final_test_section(state.get("final_evaluation")),
         },
 
         "fairness": {
@@ -442,7 +490,7 @@ def render_model_card_md(card: dict) -> str:
 |---|---|
 | Rows / columns | {data['rows_total']} / {data['columns_total']} |
 | Missing cells | {data['missing_cells_pct']}% |
-| Train / test rows | {data['train_rows']} / {data['test_rows']} |
+| Train / validation / test rows | {data['train_rows']} / {data.get('validation_rows', NOT_RECORDED)} / {data['test_rows']} |
 | Class balance (majority:minority) | {data['class_balance_ratio']} |
 | Rows dropped | {data['rows_dropped']} |
 | Columns dropped | {data['columns_dropped'] or 'none'} |
@@ -469,9 +517,11 @@ proxy variables to the human reviewer only.
 
 ## 4. Evaluation
 
-**Metrics:** `{json.dumps(ev['metrics'])}`
+**Metrics at the governance gate:** `{json.dumps(ev['metrics'])}`
 
 **Evaluated on:** {ev['evaluated_on']}
+
+{_final_test_md(ev.get('final_test'))}
 
 ---
 
@@ -481,7 +531,7 @@ proxy variables to the human reviewer only.
 {fair['thresholds']['disparate_impact_min']}, Demographic Parity Difference <= \
 {fair['thresholds']['demographic_parity_difference_max']}.
 
-Measured on {fair['evaluated_rows']} held-out rows. Groups with fewer than {fair['thresholds'].get('min_group_size')} rows are excluded from the comparison. Equal-opportunity difference is reported but does not affect the verdict.
+Measured at the governance gate on {fair['evaluated_rows']} validation rows (the verdict on the untouched test rows is in section 4). Groups with fewer than {fair['thresholds'].get('min_group_size')} rows are excluded from the comparison. Equal-opportunity difference is reported but does not affect the verdict.
 
 The verdict covers **protected attributes only** (detected by column name or declared by the reviewer); violations on other audited attributes are advisory.
 
@@ -691,12 +741,13 @@ Generated: {card['generated_at']}
   Step 5. An approval currently records the decision but not a verified approver.
 - **(f) Pre-determined changes and continuous compliance.** None. Each run is
   independent; the system performs no online learning.
-- **(g) Validation and testing procedures.** Single stratified 80/20 hold-out.
-  Every fitted preprocessing parameter (imputation values, frequency maps,
-  feature scaler) is fitted on the train rows only; fairness is measured on the
-  held-out rows. Metrics: `{json.dumps(card['evaluation']['metrics'])}`.
-  **No cross-validation and no separate validation set**, so model selection and
-  reporting share one hold-out split.
+- **(g) Validation and testing procedures.** Stratified train / validation / test
+  split (64 / 16 / 20). Every fitted preprocessing parameter (imputation values,
+  frequency maps, feature scaler) is fitted on the train rows only. Model selection,
+  the fairness audit and every reviewer decision use the validation rows (metrics:
+  `{json.dumps(card['evaluation']['metrics'])}`); the approved model is scored once on
+  the untouched test rows (see the model card, section 4). **No cross-validation**:
+  each estimate rests on a single split.
 - **(h) Cybersecurity measures.** None implemented. The API is unauthenticated and
   intended for localhost research use. Uploaded data is processed in memory and
   checkpointed to a local SQLite file. **Not suitable for deployment as-is.**

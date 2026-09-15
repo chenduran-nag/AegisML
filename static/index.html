@@ -1231,6 +1231,30 @@
               : 'NOT SAVED';
             pathEl.style.color = '#fca5a5';
           }
+          // The numbers to report: the approved model scored once on test rows that no
+          // gate decision looked at. Everything at the gate used validation rows.
+          let finalEl = document.getElementById('approved-final-eval');
+          if (!finalEl) {
+            finalEl = document.createElement('div');
+            finalEl.id = 'approved-final-eval';
+            finalEl.style.cssText = 'font-size: 0.82rem; margin-top: 10px; color: var(--text-muted);';
+            pathEl.parentElement.appendChild(finalEl);
+          }
+          const fe = vals.final_evaluation;
+          if (fe && fe.metrics) {
+            const fv = (fe.fairness || {}).overall_fairness_passed;
+            const cov = (fe.fairness || {}).fairness_coverage;
+            const verdict = fv === true ? 'PASSED' : fv === false ? 'VIOLATION DETECTED'
+              : (cov === 'partial' ? 'NOT FULLY EVALUATED' : 'NOT EVALUATED');
+            const m = fe.metrics;
+            const shown = Object.entries(m).filter(([, v]) => v !== null && v !== undefined)
+              .map(([k, v]) => `${escHtml(k)} ${escHtml(v)}`).join(' · ');
+            finalEl.innerHTML = `<strong>Final evaluation on ${escHtml(fe.rows)} untouched test rows:</strong> ${shown} · fairness ${escHtml(verdict)}`;
+          } else if (fe && fe.error) {
+            finalEl.innerHTML = `<strong style="color: #fca5a5;">Final test evaluation failed:</strong> ${escHtml(fe.error)}`;
+          } else {
+            finalEl.innerHTML = '';
+          }
           fetchArtifacts(currentThreadId);
         }
       }
@@ -1244,10 +1268,11 @@
 
       // Render Planner
       document.getElementById('plan-reasoning').innerText = plan.reasoning || 'N/A';
-      document.getElementById('plan-concerns').innerHTML = (plan.data_quality_concerns || []).map(c => `<li>${c}</li>`).join('') || '<li>None</li>';
-      document.getElementById('plan-models').innerHTML = (plan.recommended_models || []).map(m => `<li>${m}</li>`).join('') || '<li>None</li>';
-      document.getElementById('plan-steps').innerHTML = (plan.recommended_preprocessing_steps || []).map(s => `<li>${s}</li>`).join('') || '<li>None</li>';
-      document.getElementById('plan-sensitive').innerHTML = (plan.sensitive_attribute_candidates || []).map(a => `<li>${a}</li>`).join('') || '<li style="color: var(--text-muted);">None identified</li>';
+      // Planner text is LLM output: untrusted, so escaped before it becomes markup.
+      document.getElementById('plan-concerns').innerHTML = (plan.data_quality_concerns || []).map(c => `<li>${escHtml(c)}</li>`).join('') || '<li>None</li>';
+      document.getElementById('plan-models').innerHTML = (plan.recommended_models || []).map(m => `<li>${escHtml(m)}</li>`).join('') || '<li>None</li>';
+      document.getElementById('plan-steps').innerHTML = (plan.recommended_preprocessing_steps || []).map(s => `<li>${escHtml(s)}</li>`).join('') || '<li>None</li>';
+      document.getElementById('plan-sensitive').innerHTML = (plan.sensitive_attribute_candidates || []).map(a => `<li>${escHtml(a)}</li>`).join('') || '<li style="color: var(--text-muted);">None identified</li>';
 
       // Render Data
       document.getElementById('data-missing').innerText = (quality.missing_pct_after_cleaning || 0) + '%';
