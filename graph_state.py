@@ -164,6 +164,11 @@ class PipelineState(TypedDict, total=False):
         path on disk — never construct a display path from other fields.
     model_save_error : Optional[str]
         Reason the serialisation failed, when model_saved_path is None.
+    mitigation : Optional[dict]
+        Set by mitigation_node after a "reject_and_mitigate" decision:
+        {method, attributes, applications: [{attribute, status, reason, cells,
+        before}]}. Cells are per-(group, label) weights, never per-row data. While
+        attributes is non-empty, training_node trains with reweighing weights.
     """
 
     df_bytes: bytes
@@ -194,3 +199,4 @@ class PipelineState(TypedDict, total=False):
     human_feedback: Optional[str]
     model_saved_path: Optional[str]
     model_save_error: Optional[str]
+    mitigation: Optional[dict]

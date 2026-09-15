@@ -116,6 +116,19 @@ def fairness_verdict(fairness_result: dict | None) -> str:
     return "PASSED" if passed else "VIOLATION DETECTED"
 
 
+def _mitigation_text(record: Any) -> str:
+    if not isinstance(record, dict):
+        return "none"
+    applied = [a for a in record.get("applications") or [] if a.get("status") == "applied"]
+    skipped = [a for a in record.get("applications") or [] if a.get("status") != "applied"]
+    text = (f"{record.get('method')} on {', '.join(record.get('attributes') or [])} "
+            f"(weights from training rows only)" if applied else
+            f"{record.get('method')} requested but not applied")
+    if skipped:
+        text += "; skipped: " + "; ".join(str(a.get("reason")) for a in skipped)
+    return text
+
+
 def _md_cell(value: Any) -> str:
     """
     Render one table cell.
@@ -220,6 +233,15 @@ def build_model_card(
             + ("them" if len(unaudited) > 1 else "it")
             + " is supported, and no overall pass was recorded."
         )
+    mitigated = (state.get("mitigation") or {}).get("attributes") or []
+    if mitigated:
+        limitations.append(
+            "The model was trained with reweighing on " + ", ".join(mitigated)
+            + " (weights computed on training rows only). Reweighing targets the "
+            "positive-rate gap for the reweighted attribute(s) only: other attributes "
+            "and error-rate gaps are not targeted, and the fairness results in this "
+            "document are measured after mitigation, on held-out rows."
+        )
     if state.get("unresolved_quality_issue"):
         limitations.append(
             "The data-quality gate never passed; the retry cap was reached. "
@@ -261,6 +283,15 @@ def build_model_card(
             "quality_check_passed": data_res.get("quality_check_passed"),
             "identified_concerns": plan.get("data_quality_concerns", []),
             "preprocessing_applied": data_res.get("actions_taken", []),
+            # Recorded, never inferred: "none" only when no mitigation was ever requested.
+            "bias_mitigation": ({
+                "method": (state.get("mitigation") or {}).get("method", NOT_RECORDED),
+                "attributes": (state.get("mitigation") or {}).get("attributes", []),
+                "applications": [
+                    {k: app.get(k) for k in ("attribute", "status", "reason", "cells")}
+                    for app in (state.get("mitigation") or {}).get("applications", [])
+                ],
+            } if (state.get("mitigation") or {}).get("applications") else "none"),
         },
 
         "evaluation": {
@@ -401,6 +432,7 @@ def render_model_card_md(card: dict) -> str:
 | Rows dropped | {data['rows_dropped']} |
 | Columns dropped | {data['columns_dropped'] or 'none'} |
 | Quality gate passed | {data['quality_check_passed']} |
+| Bias mitigation | {_md_cell(_mitigation_text(data.get('bias_mitigation')))} |
 
 ### Data quality concerns identified
 

@@ -66,6 +66,14 @@ from planner_agent import plan_pipeline
 from data_agent import run_data_agent
 from training_agent import run_training_agent
 from fairness_agent import run_fairness_agent
+from mitigation import (
+    INTERSECTION_SEPARATOR,
+    METHOD as MITIGATION_METHOD,
+    choose_attribute as choose_mitigation_attribute,
+    row_weights,
+    snapshot as mitigation_snapshot,
+    summary as mitigation_summary,
+)
 from audit_log import DEFAULT_AUDIT_DB, log_audit_event
 from compliance_artifacts import ARTIFACT_EVENT_TYPE, generate_artifacts
 from data_analysis_agent import analyze_raw_dataset
@@ -329,6 +337,17 @@ def training_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     split = state.get("split_index") or {}
 
+    # After a reject_and_mitigate decision, every later training pass is reweighted.
+    # Weights are rebuilt from the logged cells' rule on the train rows only.
+    sample_weight = None
+    mitigated = (state.get("mitigation") or {}).get("attributes") or []
+    if mitigated:
+        sample_weight, _ = row_weights(
+            bytes_to_df(state["df_bytes"]), mitigated, split.get("train"),
+            cleaned_df[state["target_column"]],
+        )
+        print(f"[training_node] Reweighing on {mitigated}")
+
     try:
         raw = run_training_agent(
             cleaned_df=cleaned_df,
@@ -337,6 +356,7 @@ def training_node(state: PipelineState, config: RunnableConfig) -> dict:
             recommended_models=recommended_models,
             train_index=split.get("train"),
             test_index=split.get("test"),
+            sample_weight=sample_weight,
         )
     except RuntimeError as exc:
         print(f"[training_node] Training failed entirely: {exc}")
@@ -520,7 +540,10 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     payload = {
         "question": "Governance Review: Please evaluate pipeline outputs and select a decision.",
-        "allowed_decisions": ["approve", "reject_data_quality", "reject_model_or_fairness"],
+        "allowed_decisions": ["approve", "reject_data_quality", "reject_model_or_fairness",
+                              "reject_and_mitigate"],
+        # Pure function of recorded state, so safe before interrupt() (invariant 6).
+        "mitigation": mitigation_summary(state.get("mitigation"), train_res, fair_res),
         "plan_summary": {
             "data_quality_concerns": plan.get("data_quality_concerns", []),
             "recommended_preprocessing_steps": plan.get("recommended_preprocessing_steps", []),
@@ -754,6 +777,13 @@ def route_after_human_approval(state: PipelineState) -> str:
         )
         return "reroute_training"
 
+    if decision == "reject_and_mitigate":
+        print(
+            f"[router] Human decision: REJECT_AND_MITIGATE → reroute {reroute_count + 1}/{MAX_HUMAN_REROUTES} "
+            "to mitigation_node, then retraining with reweighing"
+        )
+        return "reroute_mitigation"
+
     print(f"[router] Unrecognized human decision '{decision}' → routing to audit_log_node")
     return "audit_log_node"
 
@@ -823,6 +853,70 @@ def _increment_human_reroute_training(state: PipelineState) -> dict:
     }
 
 
+def _increment_human_reroute_mitigation(state: PipelineState) -> dict:
+    """
+    Called when the human chooses reject_and_mitigate. Counts against the same cap
+    as the other rejections. The selected model is NOT excluded: the same candidates
+    are retrained with weights, so the comparison isolates the mitigation.
+    """
+    new_count = state.get("rejection_reroute_count", 0) + 1
+    print(f"[increment_human_reroute_mitigation] rejection_reroute_count: {new_count - 1} → {new_count}")
+    return {"rejection_reroute_count": new_count}
+
+
+def mitigation_node(state: PipelineState, config: RunnableConfig) -> dict:
+    """
+    Choose the attribute to mitigate and compute reweighing cell weights.
+
+    Deterministic, no LLM. Records the numbers the reviewer saw at the gate as
+    `before`, so the next gate can show before against after.
+    """
+    run_id = _get_run_id(config)
+    previous = state.get("mitigation") or {}
+    attributes = list(previous.get("attributes") or [])
+    applications = list(previous.get("applications") or [])
+    fair_res = state.get("fairness_result") or {}
+    before = mitigation_snapshot(state.get("training_result"), fair_res)
+
+    chosen = choose_mitigation_attribute(fair_res, attributes)
+    if chosen is None:
+        application = {"attribute": None, "status": "skipped", "before": before,
+                       "reason": "no violated attribute that has not already been mitigated"}
+    else:
+        split = state.get("split_index") or {}
+        cleaned_df = bytes_to_df(state["cleaned_df_bytes"])
+        try:
+            _, cells = row_weights(
+                bytes_to_df(state["df_bytes"]), attributes + [chosen], split.get("train"),
+                cleaned_df[state["target_column"]],
+            )
+            attributes.append(chosen)
+            application = {"attribute": chosen, "status": "applied", "cells": cells,
+                           "before": before}
+        except ValueError as exc:
+            application = {"attribute": chosen, "status": "skipped", "reason": str(exc),
+                           "before": before}
+    applications.append(application)
+
+    applied = application["status"] == "applied"
+    print(f"[mitigation_node] {application['status']}: {application.get('attribute')} "
+          f"| mitigated attributes now {attributes}")
+    log_audit_event(
+        run_id=run_id,
+        db_path=AUDIT_DB_PATH,
+        event_type="mitigation_applied" if applied else "mitigation_skipped",
+        event_source="automated",
+        summary=(
+            f"Reweighing on {INTERSECTION_SEPARATOR.join(attributes)} "
+            f"({len(application['cells'])} group-label cells, train rows only)"
+            if applied else f"Mitigation skipped: {application['reason']}"
+        ),
+        details={"method": MITIGATION_METHOD, "attributes": attributes, **application},
+    )
+    return {"mitigation": {"method": MITIGATION_METHOD, "attributes": attributes,
+                           "applications": applications}}
+
+
 def _mark_human_cap_failure(state: PipelineState, config: RunnableConfig) -> dict:
     """Called when human rejection cap is reached."""
     run_id = _get_run_id(config)
@@ -878,6 +972,8 @@ def build_graph(db_path: str = "pipeline_state.db"):
     builder.add_node("mark_cap_failure", _mark_cap_failure)
     builder.add_node("increment_human_reroute_planner", _increment_human_reroute_planner)
     builder.add_node("increment_human_reroute_training", _increment_human_reroute_training)
+    builder.add_node("increment_human_reroute_mitigation", _increment_human_reroute_mitigation)
+    builder.add_node("mitigation_node", mitigation_node)
     builder.add_node("mark_human_cap_failure", _mark_human_cap_failure)
     builder.add_node("mark_training_failure", _mark_training_failure)
 
@@ -917,9 +1013,12 @@ def build_graph(db_path: str = "pipeline_state.db"):
             "audit_log_node": "audit_log_node",
             "reroute_planner": "increment_human_reroute_planner",
             "reroute_training": "increment_human_reroute_training",
+            "reroute_mitigation": "increment_human_reroute_mitigation",
             "human_cap_failure": "mark_human_cap_failure",
         },
     )
+    builder.add_edge("increment_human_reroute_mitigation", "mitigation_node")
+    builder.add_edge("mitigation_node", "training_node")
 
     builder.add_edge("audit_log_node", END)
     builder.add_edge("increment_human_reroute_planner", "planner_node")

@@ -299,9 +299,14 @@ def run_training_agent(
     recommended_models: list[str],
     train_index: list | None = None,
     test_index: list | None = None,
+    sample_weight: pd.Series | None = None,
 ) -> dict:
     """
     Train, evaluate, and rank models recommended by the Planner Agent.
+
+    sample_weight, when given, is a Series of per-row training weights indexed by
+    train-row labels (reweighing mitigation, see mitigation.py). Every registry model
+    accepts it in fit(). Evaluation metrics stay unweighted.
 
     Parameters
     ----------
@@ -398,6 +403,20 @@ def run_training_agent(
     leaderboard: list[dict] = []
     trained_models: dict[str, Any] = {}
 
+    fit_kwargs: dict[str, Any] = {}
+    if sample_weight is not None:
+        missing = len(X_train.index.difference(sample_weight.index))
+        if missing:
+            raise ValueError(
+                f"Training Agent: sample_weight has no weight for {missing} train row(s)."
+            )
+        weights = sample_weight.loc[X_train.index]
+        fit_kwargs["sample_weight"] = weights.to_numpy()
+        actions.append(
+            f"Training with bias-mitigation sample weights on {len(weights):,} train rows "
+            f"(min {weights.min():.4f}, max {weights.max():.4f}); evaluation is unweighted"
+        )
+
     for model_name in recommended_models:
         model, resolved = _resolve_model(model_name, task_type)
 
@@ -412,7 +431,7 @@ def run_training_agent(
             continue
 
         try:
-            model.fit(X_train, y_train)
+            model.fit(X_train, y_train, **fit_kwargs)
             metrics = (
                 _classification_metrics(model, X_test, y_test)
                 if task_type == "classification"

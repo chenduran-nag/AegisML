@@ -184,6 +184,18 @@ def _groups_from_raw(
     return groups.astype(object), "raw values", None
 
 
+def resolve_groups_from_raw(
+    attribute: str,
+    raw_rows: pd.DataFrame,
+) -> tuple[pd.Series | None, str | None, str | None]:
+    """
+    Public entry to the audit's grouping rules (raw values, age bands, a missing
+    group). Mitigation uses it so the attribute it reweights is grouped exactly as
+    the attribute that was audited.
+    """
+    return _groups_from_raw(attribute, raw_rows)
+
+
 def _groups_from_cleaned(
     attribute: str,
     df: pd.DataFrame,

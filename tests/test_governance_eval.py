@@ -175,6 +175,11 @@ def test_split_seed_changes_the_partition_and_is_recorded(toy_df, fake_plan):
     ("C", False, 2, "approve"),            # reroutes exhausted
     ("C", True, 0, "approve"),
     ("C", None, 0, "approve"),             # not evaluated: nothing to reject on
+    ("D", False, 0, "reject_and_mitigate"),
+    ("D", False, 1, "reject_and_mitigate"),
+    ("D", False, 2, "approve"),            # reroutes exhausted
+    ("D", True, 0, "approve"),
+    ("D", None, 0, "approve"),
 ])
 def test_scripted_decision(arm, passed, reroutes, expected):
     decision = ev.scripted_decision(ev.ARMS[arm], {"overall_fairness_passed": passed},

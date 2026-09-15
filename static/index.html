@@ -654,6 +654,7 @@
           </tbody>
         </table>
         <div style="margin-top: 14px; font-size: 0.8rem; color: var(--text-muted);" id="fairness-skipped"></div>
+        <div id="fairness-mitigation"></div>
         <div id="fairness-proxy-warnings"></div>
       </div>
 
@@ -695,6 +696,13 @@
           </div>
           <div id="model-reroute-note" style="display: none; font-size: 0.78rem; color: var(--text-muted); padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-left: 2px solid var(--accent-amber); border-radius: 4px; margin-top: 6px;">
             Note: The currently selected top model will be excluded, and the Training Agent will evaluate and select the next best candidate.
+          </div>
+
+          <div class="radio-option" id="opt-mitigate" onclick="setDecision('reject_and_mitigate')">
+            Reject — Mitigate bias (Retrain with reweighing)
+          </div>
+          <div id="mitigate-note" style="display: none; font-size: 0.78rem; color: var(--text-muted); padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-left: 2px solid var(--accent-amber); border-radius: 4px; margin-top: 6px;">
+            Note: The protected attribute with the lowest disparate impact among the violations is chosen (otherwise the worst violated attribute). Training rows are reweighted so the label is independent of that group, the same candidate models are retrained, and the next gate shows before and after. Counts as one reroute.
           </div>
         </div>
       </div>
@@ -824,11 +832,14 @@
       document.getElementById('opt-approve').classList.toggle('selected', dec === 'approve');
       document.getElementById('opt-reject-data').classList.toggle('selected', dec === 'reject_data_quality');
       document.getElementById('opt-reject-model').classList.toggle('selected', dec === 'reject_model_or_fairness');
+      document.getElementById('opt-mitigate').classList.toggle('selected', dec === 'reject_and_mitigate');
 
       const fbBox = document.getElementById('feedback-container');
       const noteBox = document.getElementById('model-reroute-note');
+      const mitigateBox = document.getElementById('mitigate-note');
       if (fbBox) fbBox.style.display = (dec === 'reject_data_quality') ? 'block' : 'none';
       if (noteBox) noteBox.style.display = (dec === 'reject_model_or_fairness') ? 'block' : 'none';
+      if (mitigateBox) mitigateBox.style.display = (dec === 'reject_and_mitigate') ? 'block' : 'none';
     }
 
     function switchTab(evt, tabId) {
@@ -1353,6 +1364,44 @@
           ? (unauditedNames ? `<div style="color: #fbbf24; margin-bottom: 6px;"><strong>Protected attributes not audited:</strong> ${unauditedNames} — no overall pass can be recorded while these are unmeasured.</div>` : '')
             + `<strong>Not audited:</strong><ul style="margin: 6px 0 0 18px;">${skipped.map(s => `<li>${escHtml(s)}</li>`).join('')}</ul>`
           : '';
+      }
+
+      // Mitigation: what was reweighted, and the latest before against now, so the
+      // reviewer sees the cost (AUC) next to the effect (disparate impact).
+      const mitigation = payload.mitigation;
+      const mitigationEl = document.getElementById('fairness-mitigation');
+      if (mitigationEl) {
+        if (!mitigation) {
+          mitigationEl.innerHTML = '';
+        } else {
+          const b = mitigation.before || {}, a = mitigation.after || {};
+          const num = v => (v === null || v === undefined) ? 'n/a' : escHtml(v);
+          const verdict = v => v === true ? 'passed' : (v === false ? 'violation' : 'not (fully) evaluated');
+          const attrRows = (mitigation.attributes || []).map(name => {
+            const ba = (b.attributes || {})[name] || {}, aa = (a.attributes || {})[name] || {};
+            return `<tr><td>${escHtml(name)}: disparate impact</td><td>${num(ba.disparate_impact)}</td><td>${num(aa.disparate_impact)}</td></tr>
+                    <tr><td>${escHtml(name)}: parity difference</td><td>${num(ba.demographic_parity_difference)}</td><td>${num(aa.demographic_parity_difference)}</td></tr>`;
+          }).join('');
+          const apps = (mitigation.applications || []).map(p => p.status === 'applied'
+            ? `<li>Reweighed on <strong>${escHtml(p.attribute)}</strong> (${escHtml(p.cells)} group-label cells, weights ${num(p.weight_min)}–${num(p.weight_max)})</li>`
+            : `<li>Skipped${p.attribute ? ` <strong>${escHtml(p.attribute)}</strong>` : ''}: ${escHtml(p.reason)}</li>`).join('');
+          mitigationEl.innerHTML = `
+            <div style="margin-top: 16px; padding: 12px 14px; border: 1px solid var(--card-border); border-radius: 8px;">
+              <strong style="font-size: 0.85rem;">Bias mitigation (${escHtml(mitigation.method)})</strong>
+              <ul style="margin: 6px 0 8px 18px; font-size: 0.8rem;">${apps}</ul>
+              <div style="overflow-x: auto;"><table style="font-size: 0.8rem;">
+                <thead><tr><th></th><th>Before mitigation</th><th>Now</th></tr></thead>
+                <tbody>
+                  <tr><td>Selected model</td><td>${num(b.model)}</td><td>${num(a.model)}</td></tr>
+                  <tr><td>AUC</td><td>${num(b.auc_roc)}</td><td>${num(a.auc_roc)}</td></tr>
+                  <tr><td>Accuracy</td><td>${num(b.accuracy)}</td><td>${num(a.accuracy)}</td></tr>
+                  <tr><td>Violated attributes</td><td>${num(b.violated_attributes)}</td><td>${num(a.violated_attributes)}</td></tr>
+                  <tr><td>Overall verdict</td><td>${verdict(b.overall_fairness_passed)}</td><td>${verdict(a.overall_fairness_passed)}</td></tr>
+                  ${attrRows}
+                </tbody>
+              </table></div>
+            </div>`;
+        }
       }
 
       // EDA findings, each annotated with how every stage used it

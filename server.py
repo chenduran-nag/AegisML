@@ -214,7 +214,7 @@ async def resume_pipeline(req: ResumeRequest):
     """
     Submit human governance decision to resume graph execution.
     """
-    allowed = ("approve", "reject_data_quality", "reject_model_or_fairness")
+    allowed = ("approve", "reject_data_quality", "reject_model_or_fairness", "reject_and_mitigate")
     if req.decision not in allowed:
         raise HTTPException(status_code=400, detail=f"Decision must be one of {allowed}")
 

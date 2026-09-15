@@ -12,12 +12,14 @@ QUESTION:
 DESIGN:
   Every run drives the real compiled graph (pipeline_graph.build_graph) end to end:
   EDA, planner, Data Agent, Training, Fairness and the governance gate. Only the
-  human reviewer is replaced, by a scripted policy (scripted_decision). Three arms:
+  human reviewer is replaced, by a scripted policy (scripted_decision). Four arms:
 
-    A  governance off     No automatic data-quality retry; approve at the first gate.
-    B  auto-retry         Automatic retry at the default cap; approve at the first gate.
-    C  fairness reviewer  Automatic retry; at each gate, reject the model while a
-                          fairness violation remains and reroutes remain, else approve.
+    A  governance off       No automatic data-quality retry; approve at the first gate.
+    B  auto-retry           Automatic retry at the default cap; approve at the first gate.
+    C  fairness reviewer    Automatic retry; at each gate, reject the model while a
+                            fairness violation remains and reroutes remain, else approve.
+    D  mitigation reviewer  As C, but the rejection is reject_and_mitigate: the same
+                            candidates are retrained with reweighing (mitigation.py).
 
 WHAT VARIES ACROSS SEEDS, AND WHAT DOES NOT:
   - The train/test split seed varies (PipelineState["split_seed"]).
@@ -99,7 +101,7 @@ RUN_FIELDS = [
     "fairness_evaluated", "overall_fairness_passed", "attributes_evaluated",
     "n_violations", "min_disparate_impact", "max_parity_difference",
     "max_equal_opportunity_difference", "protected_attributes_evaluated",
-    "protected_attributes_unaudited",
+    "protected_attributes_unaudited", "mitigated_attributes",
     "retries", "reroutes", "eda_findings", "columns_dropped",
     "train_rows", "test_rows", "split_seed_recorded",
     "planner_calls", "planner_cache_hits", "planner_tokens_recorded", "planner_model",
@@ -254,7 +256,7 @@ class Arm:
     label: str
     description: str
     max_retries: int
-    reviewer: str   # "approve_first" | "reject_violations"
+    reviewer: str   # "approve_first" | "reject_violations" | "mitigate_violations"
 
 
 ARMS: dict[str, Arm] = {
@@ -268,7 +270,16 @@ ARMS: dict[str, Arm] = {
              "Automatic retry; reject the model while a fairness violation remains "
              "and reroutes remain, otherwise approve.",
              max_retries=pipeline_graph.MAX_RETRIES, reviewer="reject_violations"),
+    "D": Arm("D", "mitigation reviewer",
+             "Automatic retry; while a fairness violation remains and reroutes remain, "
+             "reject and mitigate (reweighing), otherwise approve.",
+             max_retries=pipeline_graph.MAX_RETRIES, reviewer="mitigate_violations"),
 }
+
+
+# Arms whose reviewer rejects at the gate, and what the rejection does. Each gets its
+# own first-gate vs approved-model table.
+REROUTE_ARMS = {"C": "rerouting to the next model", "D": "mitigation"}
 
 
 def scripted_decision(arm: Arm, payload: dict, reroutes_used: int,
@@ -295,6 +306,12 @@ def scripted_decision(arm: Arm, payload: dict, reroutes_used: int,
         return approve("no fairness violation")
     if reroutes_used >= max_reroutes:
         return approve("violation remains but reroutes are exhausted")
+    if arm.reviewer == "mitigate_violations":
+        return {
+            "decision": "reject_and_mitigate",
+            "human_feedback": "",
+            "reason": "fairness violation with reroutes remaining: mitigate",
+        }
     return {
         "decision": "reject_model_or_fairness",
         "human_feedback": "Fairness violation at the governance gate.",
@@ -424,6 +441,7 @@ def _final_metrics(values: dict, gates: int) -> dict:
                                            if report else None),
         "protected_attributes_unaudited": ";".join(
             str(p.get("attribute")) for p in fairness.get("protected_attributes_unaudited") or []),
+        "mitigated_attributes": ";".join((values.get("mitigation") or {}).get("attributes") or []),
         "retries": values.get("retry_count", 0),
         "reroutes": values.get("rejection_reroute_count", 0),
         "eda_findings": len(values.get("eda_findings") or []),
@@ -658,9 +676,11 @@ def summarise(runs: list[dict], trajectory: list[dict],
                       "automatic data-quality retry never engaged on this dataset.")
         md.append("")
 
-    c_effects = [e for e in effects if e["arm"] == "C"]
-    if c_effects:
-        md.append("### Effect of rerouting (arm C): first gate vs approved model\n")
+    for reroute_arm in REROUTE_ARMS:
+        c_effects = [e for e in effects if e["arm"] == reroute_arm]
+        if not c_effects:
+            continue
+        md.append(f"### Effect of {REROUTE_ARMS[reroute_arm]} (arm {reroute_arm}): first gate vs approved model\n")
         md.append("| Dataset | Runs rerouted | Violated attributes: first → approved | "
                   "Min disparate impact: first → approved | "
                   "Max parity difference: first → approved | AUC: first → approved | "
@@ -696,7 +716,7 @@ def summarise(runs: list[dict], trajectory: list[dict],
                       and e["violations_first"] is not None
                       and e["violations_final"] is not None]
         md.append(
-            f"\nAcross all datasets arm C rerouted {total_rerouted} of {len(c_effects)} "
+            f"\nAcross all datasets arm {reroute_arm} rerouted {total_rerouted} of {len(c_effects)} "
             f"runs. Of the {len(comparable)} rerouted runs with fairness measured at both "
             f"gates, the approved model had fewer violated attributes in "
             f"{sum(1 for e in comparable if e['violations_final'] < e['violations_first'])}, "
@@ -718,20 +738,30 @@ THEMES = {
     "light": {
         "surface": "#fcfcfb", "ink": "#0b0b0b", "ink2": "#52514e", "muted": "#898781",
         "grid": "#e1e0d9", "axis": "#c3c2b7",
-        "series": {"A": "#2a78d6", "B": "#eb6834", "C": "#1baf7a"},
+        "series": {"A": "#2a78d6", "B": "#2a78d6", "C": "#1baf7a", "D": "#eb6834"},
     },
     "dark": {
         "surface": "#1a1a19", "ink": "#ffffff", "ink2": "#c3c2b7", "muted": "#898781",
         "grid": "#2c2c2a", "axis": "#383835",
-        "series": {"A": "#3987e5", "B": "#d95926", "C": "#199e70"},
+        "series": {"A": "#3987e5", "B": "#3987e5", "C": "#199e70", "D": "#d95926"},
     },
 }
-# Shape is a second identity channel: A and B often coincide exactly, and a single
-# shape would let one hide the other.
-MARKERS = {"A": "o", "B": "s", "C": "^"}
-# (run point, arm mean) areas. Drawn A, then B, then C: when A and B coincide
-# exactly, B's smaller square sits inside A's larger circle and both stay visible.
-SIZES = {"A": (95, 270), "B": (40, 120), "C": (60, 175)}
+# Four arms on a scatter, but only three hues: the reference palette validates just
+# its first three slots when every pair must be distinguishable. A and B share blue
+# because they are the same reviewer (approve at the first gate) and usually coincide
+# exactly; shape and fill tell them apart. B is a hollow square, so when it sits on
+# A's filled circle both stay visible.
+MARKERS = {"A": "o", "B": "s", "C": "^", "D": "D"}
+HOLLOW = {"B"}
+# (run point, arm mean) areas. Drawn in arm order, so B's smaller square lands on
+# top of A's larger circle.
+SIZES = {"A": (95, 270), "B": (40, 120), "C": (60, 175), "D": (55, 160)}
+
+
+def _marker_colours(theme: dict, arm_key: str) -> tuple[str, str]:
+    """(face, edge): filled markers get a surface ring, hollow ones a coloured outline."""
+    colour = theme["series"][arm_key]
+    return (theme["surface"], colour) if arm_key in HOLLOW else (colour, theme["surface"])
 
 # Mean labels sit in a column to the right of every point and connect to their mean
 # with a hairline leader. Placing them beside the marker overprinted neighbouring
@@ -889,15 +919,14 @@ def render_charts(runs: list[dict], out_dir: Path, arms: dict[str, Arm] = ARMS,
                     xs = [float(r["auc_roc"]) for r in pts]
                     ys = [float(r["min_disparate_impact"]) for r in pts]
                     run_size, mean_size = SIZES.get(arm_key, (50, 150))
+                    face, edge = _marker_colours(theme, arm_key)
                     ax.scatter(xs, ys, s=run_size, marker=MARKERS[arm_key],
-                               color=theme["series"][arm_key],
-                               edgecolors=theme["surface"], linewidths=1.5,
+                               facecolors=face, edgecolors=edge, linewidths=1.5,
                                zorder=3 + order)
                     means[arm_key] = (statistics.fmean(xs), statistics.fmean(ys))
                     ax.scatter([means[arm_key][0]], [means[arm_key][1]], s=mean_size,
-                               marker=MARKERS[arm_key], color=theme["series"][arm_key],
-                               edgecolors=theme["surface"], linewidths=2,
-                               zorder=10 + order)
+                               marker=MARKERS[arm_key], facecolors=face, edgecolors=edge,
+                               linewidths=2, zorder=10 + order)
 
                 x_span = ax.get_xlim()[1] - ax.get_xlim()[0]
                 groups: list[dict] = []
@@ -938,8 +967,9 @@ def render_charts(runs: list[dict], out_dir: Path, arms: dict[str, Arm] = ARMS,
                      "exclusions are noted under each panel.",
                      ha="left", va="top", fontsize=8.5, color=theme["ink2"])
             handles = [Line2D([0], [0], marker=MARKERS[k], linestyle="",
-                              markersize=8, markerfacecolor=theme["series"][k],
-                              markeredgecolor=theme["surface"],
+                              markersize=8, markerfacecolor=_marker_colours(theme, k)[0],
+                              markeredgecolor=_marker_colours(theme, k)[1],
+                              markeredgewidth=1.5,
                               label=f"{k}  {arms[k].label}") for k in arm_keys]
             fig.legend(handles=handles, loc="upper left", ncol=len(handles),
                        frameon=False, fontsize=9, labelcolor=theme["ink2"],
@@ -1136,7 +1166,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="replay (default) never calls the LLM; record calls it on a cache miss")
     ap.add_argument("--datasets", default=",".join(DATASETS),
                     help=f"comma-separated subset of: {', '.join(DATASETS)}")
-    ap.add_argument("--arms", default=",".join(ARMS), help="comma-separated subset of A,B,C")
+    ap.add_argument("--arms", default=",".join(ARMS), help="comma-separated subset of A,B,C,D")
     ap.add_argument("--seeds", type=int, default=len(DEFAULT_SEEDS),
                     help=f"number of split seeds, taken from {DEFAULT_SEEDS}")
     ap.add_argument("--max-rows", type=int, default=None,

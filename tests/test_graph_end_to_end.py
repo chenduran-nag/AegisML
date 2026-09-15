@@ -94,8 +94,9 @@ def test_pipeline_pauses_at_the_governance_gate(graph, toy_df):
 
     payload = snapshot.tasks[0].interrupts[0].value
     assert set(payload["allowed_decisions"]) == {
-        "approve", "reject_data_quality", "reject_model_or_fairness"
+        "approve", "reject_data_quality", "reject_model_or_fairness", "reject_and_mitigate"
     }
+    assert payload["mitigation"] is None
     assert payload["selected_model_name"] in ("LogisticRegression", "RandomForest")
     assert "fairness_evaluated" in payload
     assert payload["fairness_min_group_size"] == 30
