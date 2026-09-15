@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-15T16:45:08.586895+00:00",
+  "generated_at": "2026-09-15T17:54:18.292561+00:00",
   "mode": "replay",
   "quick": false,
-  "git_commit": "89098182b5f01652d208e6bcb46fa01c0982b966",
+  "git_commit": "b2fd32b27b69e22581bfd5f1397726a92cdf5960",
   "git_dirty": true,
   "python": "3.13.9",
   "platform": "Windows-10-10.0.19045-SP0",
@@ -38,6 +38,11 @@
   },
   "max_human_reroutes": 2,
   "min_group_size": 30,
+  "policy": {
+    "version": "1.0.0",
+    "sha256": "3c05c76e2105de9c2e708b937575a78bbca18008aa1baef6d10572ac20b40be9",
+    "source": "C:\\Users\\chenduran\\Sem7_proj\\policy.yaml"
+  },
   "datasets": {
     "adult": {
       "label": "UCI Adult Income",
@@ -79,5 +84,5 @@
   "planner_cache_hits": 80,
   "runs": 80,
   "errors": 0,
-  "wall_clock_s": 975.9
+  "wall_clock_s": 991.6
 }

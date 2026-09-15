@@ -44,7 +44,8 @@
 | #23 **New:** max-vs-min disparate impact had no minimum group size — a 4-person Adult group set DI to 0.0 | Fixed — groups under 30 rows excluded and listed |
 | #24 **New:** `age` was proposed by the planner on every benchmark and never audited | Fixed — banded <25 / 25-59 / 60+ |
 | #25 **New:** skipped attributes were computed but never shown on the dashboard | Fixed — "Not audited" list with reasons |
-| 3.1 Quantitative governance evaluation: 4 datasets × 4 arms × 5 seeds, replay-verified | **Done**, re-run with the validation gate and protected-only verdict — on test rows 72/80 approved models violate, 8 not evaluated, 0 pass; see `experiments/results/summary.md` |
+| 3.1 Quantitative governance evaluation: 4 datasets × 4 arms × 5 seeds, replay-verified | **Done**, re-run under the governance policy — 60/80 runs approved and all 60 violate on test rows; all 20 German Credit runs blocked (fairness not measurable at the gate); see `experiments/results/summary.md` |
+| #31 **New:** the evaluation's `git_dirty` flag was computed after the harness wrote its own tracked result files, so it was true for every run into `experiments/results/` | Fixed — result files excluded from the check |
 | #26 **New:** a verdict reads "passed" when a protected attribute present in the data could not be audited (German Credit seed 19 passed on `job` alone; age bands too small) | Fixed — verdict is `None` (NOT FULLY EVALUATED) with the gap named; seed 19 now reads that under every arm |
 | 3.2 Reviewer-triggered bias mitigation (reweighing), evaluated as arm D | **Done** — fewer violated attributes in 6/19 rerouted runs (model switching: 2/19) at a far smaller AUC cost; still not compliant on Adult, Bank Marketing or COMPAS |
 | Protected-only fairness verdict; unprotected attributes advisory (user decision) | **Done** |

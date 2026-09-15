@@ -230,18 +230,19 @@ they share a value.
 | Dataset | AUC (test rows) | Violated protected attributes | Min disparate impact | Max parity difference |
 |---|---|---|---|---|
 | UCI Adult (48,842) | 0.926 · 0.877 · 0.923 | 3.0 · 3.0 · 3.0 | 0.018 · 0.034 · 0.073 | 0.246 · 0.250 · 0.202 |
-| German Credit (1,000) ‡ | 0.780 · 0.780 · 0.780 | 1.0 · 1.0 · 1.0 | 0.778 · 0.778 · 0.778 | 0.178 · 0.178 · 0.178 |
+| German Credit (1,000) ‡ | — | — | — | — |
 | Bank Marketing (45,211) | 0.746 · 0.724 · 0.742 | 1.0 · 1.0 · 1.0 | 0.177 · 0.146 · 0.239 | 0.127 · 0.206 · 0.083 |
 | COMPAS (5,278) | 0.724 · 0.666 · 0.709 | 4.0 · 3.6 · 3.2 | 0.184 · 0.364 · 0.416 | 0.619 · 0.391 · 0.231 |
 
-‡ German Credit's fairness columns average the 3 of 5 splits whose test rows could audit a
-protected attribute; see finding 4.
+‡ No German Credit model was approved. On every split the gate could not audit a protected
+attribute, and the governance policy blocks approving a model whose fairness was not
+measured; see finding 4.
 
 **Findings.**
 
-1. **No approved model passed.** On the test rows, 72 of 80 approved models violated on a
-   protected attribute and 8 were NOT EVALUATED (German Credit seeds 19 and 42 under every
-   arm, where no protected attribute could be audited). None passed.
+1. **No approved model passed.** 60 of 80 runs ended with an approved model, and all 60
+   violated on a protected attribute on their test rows. The other 20 — every German Credit
+   run — ended with approval blocked by the governance policy (finding 4).
 2. **Rejecting a model and taking the next best is not a fairness intervention.** Arm C
    rerouted 15 of 20 runs; in all 15 the approved model had the same number of violated
    protected attributes as the first. It cost test AUC on every dataset it touched: −0.049 on
@@ -253,20 +254,20 @@ protected attribute; see finding 4.
    0.42 and max parity difference fell from 0.62 to 0.23; on Adult min DI rose from 0.018 to
    0.073. Every run still violated: two reweighings, capped by two reroutes, cannot close gaps
    this large.
-4. **The gate cannot act on what its validation rows cannot measure.** On German Credit's
-   160-row validation split, no protected attribute could be audited at the gate on any of the
-   5 seeds (the age bands never reached 30 rows, and `job` is advisory). The verdict was NOT
-   EVALUATED, so the scripted reviewers of arms C and D approved without rejecting, and all
-   four arms are identical. On the 200 test rows, age could be audited on 3 seeds, and all 3
-   violated. A reviewer who approves a NOT EVALUATED model approves blind. The previous run's
-   two German Credit passes came from reweighing age, which this gate never saw. A policy that
-   blocks approval of an unevaluated model (Steps 4–5), or a larger validation split for small
-   datasets, would change this.
+4. **The gate cannot act on what its validation rows cannot measure — so the policy refuses
+   to approve.** On German Credit's 160-row validation split, no protected attribute could be
+   audited at the gate on any of the 5 seeds (the age bands never reached 30 rows, and `job`
+   is advisory), so every gate verdict was NOT EVALUATED. Before the approval block, all four
+   arms approved those models anyway, and the untouched test rows then showed age violations
+   on 3 of 5 seeds (results at `d81faa2`): reviewers had approved blind. Under the governance
+   policy's default, approving a model whose fairness was not measured is refused, so all 20
+   German Credit runs end without an approved model. The underlying problem — a validation
+   split too small to audit a small dataset's protected groups — is still open.
 5. **Gate numbers are optimistic, as they should be expected to be.** Models are chosen on the
-   validation rows, so the gate overstates the test result: German Credit 0.805 at the gate
-   against 0.780 on test, COMPAS 0.735 against 0.724. For arms A and B, where ranking rows are
-   the only difference from the previous run, ranking on validation rows changed the selected
-   model in 16 of 40 runs.
+   validation rows, so the gate overstates the test result: COMPAS 0.735 at the gate against
+   0.724 on test (arms A/B), and German Credit 0.805 against 0.780 in the run before the
+   approval block. Compared with `75b96c9`, which ranked models on the test rows, ranking on
+   validation rows changed the selected model in 16 of 40 arm A/B runs.
 6. **The automatic data-quality retry never engaged.** Benchmark data passes the quality
    gate first time, so arms A and B coincide. That loop is exercised only by the synthetic
    tests.
@@ -350,13 +351,16 @@ saved CSVs, in seconds:
 python experiments/run_governance_eval.py --summarise-only
 ```
 
-These results were produced from commit `8909818`. The manifest records `git_dirty: true`
-because intersectional reporting, dashboard fixes and documentation were being written while
-the run was in progress; the running process had already loaded the committed code, and none
-of those changes alter a recorded result. The tables and figure were then rebuilt with
-`--summarise-only` to add the per-panel exclusion notes. Earlier results remain in git history:
-the first run at `363ce53`, the corrected-metrics run at `ab2d12f`, and the first arm-D run
-(test rows at the gate, every audited attribute in the verdict) at `75b96c9`.
+These results were produced from commit `b2fd32b` under `policy.yaml` version 1.0.0 (SHA-256
+`3c05c76e…`, recorded in the manifest). The manifest's `git_dirty: true` is an artifact of the
+harness, not a change to the code: it checked the working tree after writing its own result
+files into the tracked `experiments/results/`, so every manifest produced this way reports
+dirty (fixed for future runs; earlier manifests overstate it too). No tracked code file was
+modified during this run. Compared with the previous results, every run outside German
+Credit is identical except one AUC that differs in the fourth decimal (COMPAS arm C, seed 42:
+0.6670 → 0.6671). Earlier results remain in git history: the first run at `363ce53`, the
+corrected-metrics run at `ab2d12f`, the first arm-D run (test rows at the gate, every audited
+attribute in the verdict) at `75b96c9`, and the run before the approval block at `d81faa2`.
 
 ---
 

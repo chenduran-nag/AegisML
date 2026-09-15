@@ -1046,13 +1046,17 @@ def _git_commit() -> Optional[str]:
 
 def _git_dirty() -> Optional[bool]:
     """
-    True if tracked files differ from HEAD.
+    True if tracked files other than the committed results differ from HEAD.
 
     git_commit alone is misleading when results come from uncommitted code: the
     manifest would name a commit that does not contain the code that produced it.
+    The results directory is excluded: this check runs after the harness has written
+    runs.csv and the trajectory, and counting its own outputs made every run look
+    dirty.
     """
     with contextlib.suppress(Exception):
-        out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+        out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no", "--",
+                              ".", ":(exclude)experiments/results"],
                              cwd=REPO_ROOT, capture_output=True, text=True, timeout=10)
         if out.returncode == 0:
             return bool(out.stdout.strip())

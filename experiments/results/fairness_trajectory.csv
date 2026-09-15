@@ -387,10 +387,10 @@ compas,C,42,1,XGBoost,0.7409,0.6994,False,sex,0.6387,0.1601,0.1609,True,,True,re
 compas,C,42,1,XGBoost,0.7409,0.6994,False,age,0.1789,0.5246,0.1719,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
 compas,C,42,1,XGBoost,0.7409,0.6994,False,race,0.5477,0.227,0.2049,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
 compas,C,42,1,XGBoost,0.7409,0.6994,False,age_cat,0.3166,0.4366,0.397,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
-compas,C,42,2,RandomForest,0.704,0.6462,False,sex,0.695,0.1463,0.1812,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,42,2,RandomForest,0.704,0.6462,False,age,0.3956,0.3492,0.0549,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,42,2,RandomForest,0.704,0.6462,False,race,0.636,0.1919,0.1711,True,,True,approve,violation remains but reroutes are exhausted
-compas,C,42,2,RandomForest,0.704,0.6462,False,age_cat,0.4901,0.2946,0.2342,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,42,2,RandomForest,0.7041,0.6462,False,sex,0.695,0.1463,0.1812,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,42,2,RandomForest,0.7041,0.6462,False,age,0.3956,0.3492,0.0549,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,42,2,RandomForest,0.7041,0.6462,False,race,0.636,0.1919,0.1711,True,,True,approve,violation remains but reroutes are exhausted
+compas,C,42,2,RandomForest,0.7041,0.6462,False,age_cat,0.4901,0.2946,0.2342,True,,True,approve,violation remains but reroutes are exhausted
 compas,C,7,0,LogisticRegression,0.7281,0.6698,False,sex,0.4736,0.255,0.2107,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
 compas,C,7,0,LogisticRegression,0.7281,0.6698,False,age,0.476,0.3865,0.2864,True,60+=25,True,reject_model_or_fairness,fairness violation with reroutes remaining
 compas,C,7,0,LogisticRegression,0.7281,0.6698,False,race,0.585,0.2139,0.2397,True,,True,reject_model_or_fairness,fairness violation with reroutes remaining
