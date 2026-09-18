@@ -194,7 +194,7 @@ with its predecessor. The banner re-verifies the chain.
 ### 1. Clone & Setup Environment
 
 ```bash
-git clone https://github.com/ruhannpn/AegisML.git
+git clone https://github.com/chenduran-nag/AegisML.git
 cd AegisML
 
 # Create virtual environment
@@ -457,8 +457,8 @@ Approving a model writes `artifacts/<run_id>/`:
 
 | File | What it is |
 |---|---|
-| `model_card.md` / `.json` | Model details, intended use, training-data characteristics, held-out metrics, fairness results, SHAP features, the full human decision history, and explicit limitations |
-| `aibom.json` | AI Bill of Materials: dataset SHA-256, model SHA-256, Python and library versions, planner model id and prompt hashes, token usage, audit chain head |
+| `model_card.md` / `.json` | Model details, intended use, training-data characteristics, held-out metrics, fairness results, SHAP features, who approved and under which policy, the full human decision history with the reviewer behind each decision, and explicit limitations |
+| `aibom.json` | AI Bill of Materials: dataset SHA-256, model SHA-256, Python and library versions, planner model id and prompt hashes, token usage, the approvers, the policy version and hash, and the audit chain head |
 | `technical_documentation.md` | Draft documentation laid out under the nine EU AI Act Annex IV headings |
 
 The model card also lists every exploratory finding and how it was used.
