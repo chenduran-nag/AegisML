@@ -416,13 +416,15 @@ saved CSVs, in seconds:
 python experiments/run_governance_eval.py --summarise-only
 ```
 
-These results were produced from commit `9973484` on a clean working tree, under `policy.yaml`
+These results were produced from commit `5b6fd2c` on a clean working tree, under `policy.yaml`
 version 1.1.0 (SHA-256 `cbed6975…`, recorded in the manifest). Dual sign-off applies to them:
 the scripted reviewer signs with two identities, and `runs.csv` records both in `approvers`.
 **Every one of the 60 approvals is an approval of a model with a fairness violation, and every
 one of them now took two reviewers** — the rule slows the decision down; it does not, on this
-evidence, change it. Compared with the run before reviewer identity existed, all 80 runs are
-identical except one AUC in the fourth decimal (COMPAS arm C, seed 42: 0.6671 → 0.6670).
+evidence, change it. Every one of the 80 runs matches the results recorded before reviewer
+identity existed. One value is not bit-stable across re-runs: COMPAS arm C, seed 42 has
+reported both 0.6670 and 0.6671 AUC on identical code, a fourth-decimal difference that comes
+from the training library, not from the governance layer.
 Earlier results remain in git history: the first run at `e28b237`, the corrected-metrics run at
 `332e28b`, the first arm-D run (test rows at the gate, every audited attribute in the verdict)
 at `132e0c2`, the run before the approval block at `e8e9d77`, and the first run under the policy

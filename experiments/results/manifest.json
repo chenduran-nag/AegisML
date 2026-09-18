@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-18T18:18:56.826706+00:00",
+  "generated_at": "2026-09-18T19:03:01.423128+00:00",
   "mode": "replay",
   "quick": false,
-  "git_commit": "c31f06a3b99e4584643dc317e63bca956b7df9c4",
+  "git_commit": "5b6fd2c87fd848814fbf13b4bd3d6391d0e6c781",
   "git_dirty": false,
   "python": "3.13.9",
   "platform": "Windows-10-10.0.19045-SP0",
@@ -84,5 +84,5 @@
   "planner_cache_hits": 80,
   "runs": 80,
   "errors": 0,
-  "wall_clock_s": 1325.8
+  "wall_clock_s": 1272.7
 }
