@@ -205,6 +205,19 @@ def _bullets(items: list[Any] | None, empty: str = "_None recorded._") -> str:
 # ---------------------------------------------------------------------------
 
 
+def _approver_identities(state: dict) -> list[dict]:
+    """One entry per reviewer who approved, in order (see build_model_card)."""
+    approvers: list[dict] = []
+    for record in (state.get("reviewer_decisions") or []):
+        if record.get("decision") != "approve":
+            continue
+        if any(a["reviewer_id"] == record.get("reviewer_id") for a in approvers):
+            continue
+        approvers.append({k: record.get(k) for k in ("reviewer_id", "reviewer_role",
+                                                     "authenticated", "stage", "timestamp")})
+    return approvers
+
+
 def build_model_card(
     state: dict,
     run_id: str,
@@ -249,13 +262,10 @@ def build_model_card(
             })
 
     # Identities that approved, in order, from recorded state. One entry is a single
-    # sign-off; two are a dual sign-off by different reviewers (invariant 18).
-    approvers = [
-        {k: record.get(k) for k in ("reviewer_id", "reviewer_role", "authenticated",
-                                    "stage", "timestamp")}
-        for record in (state.get("reviewer_decisions") or [])
-        if record.get("decision") == "approve"
-    ]
+    # sign-off; two are a dual sign-off by different reviewers (invariant 18). One entry
+    # per reviewer: a refused self-approval must not read as two approvers. Every
+    # decision, refused ones included, stays in the history below.
+    approvers = _approver_identities(state)
     unverified_approvers = [a for a in approvers if not a.get("authenticated")]
 
     # Limitations are stated unconditionally where they are properties of the
@@ -699,12 +709,7 @@ def build_aibom(state: dict, run_id: str, chain: Optional[dict] = None) -> dict:
             # Every identity that approved, from recorded state. This previously read a
             # `reviewer_id` field that no node ever wrote, so it always said "not
             # recorded" — a plausible blank of exactly the kind invariant 12 forbids.
-            "approvers": [
-                {k: record.get(k) for k in ("reviewer_id", "reviewer_role",
-                                            "authenticated", "stage", "timestamp")}
-                for record in (state.get("reviewer_decisions") or [])
-                if record.get("decision") == "approve"
-            ] or NOT_RECORDED,
+            "approvers": _approver_identities(state) or NOT_RECORDED,
             "final_decision": state.get("human_decision", NOT_RECORDED),
             "policy_version": state.get("policy_version") or NOT_RECORDED,
             "policy_sha256": state.get("policy_sha256") or NOT_RECORDED,

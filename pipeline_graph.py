@@ -231,13 +231,23 @@ def _signoff_shortfall(state: PipelineState) -> str | None:
 
 
 def _approvers(state: PipelineState) -> list[dict]:
-    """The identities that approved this run, in order. Identity only, no feedback."""
-    return [
-        {k: record.get(k) for k in
-         ("reviewer_id", "reviewer_role", "authenticated", "stage", "timestamp")}
-        for record in (state.get("reviewer_decisions") or [])
-        if record.get("decision") == "approve"
-    ]
+    """
+    The identities that approved this run, in order. Identity only, no feedback.
+
+    One entry per reviewer, not per approve decision: a refused self-approval would
+    otherwise make the record read "approved by a.kumar and a.kumar". Every attempt is
+    still in `reviewer_decisions` and in the audit trail.
+    """
+    approvers: list[dict] = []
+    for record in (state.get("reviewer_decisions") or []):
+        if record.get("decision") != "approve":
+            continue
+        if any(a["reviewer_id"] == record.get("reviewer_id") for a in approvers):
+            continue
+        approvers.append({k: record.get(k) for k in
+                          ("reviewer_id", "reviewer_role", "authenticated", "stage",
+                           "timestamp")})
+    return approvers
 
 # Directory approved models are serialised into by audit_log_node.
 SAVED_MODELS_DIR = "saved_models"
@@ -1064,6 +1074,9 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
         "model_save_error": save_error,
         "artifacts_manifest": artifacts,
         "final_evaluation": final_evaluation,
+        # The sign-off is complete: a finished run must not report itself as waiting for
+        # one. `first_approval` stays, as the record of who signed first.
+        "awaiting_second_approval": False,
     }
 
 

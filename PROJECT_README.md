@@ -417,7 +417,7 @@ into the gitignored `experiments/results_quick/`, with `--cache-dir` pointing at
 ├── audit_log.py                 Hash-chained audit log and verification
 ├── compliance_artifacts.py      Model card, AIBOM, Annex IV draft, artifact verification
 ├── static/index.html            Dashboard
-├── tests/                       Offline pytest suite (278 tests)
+├── tests/                       Offline pytest suite (279 tests)
 ├── .github/workflows/tests.yml  Runs pytest on every push
 ├── experiments/
 │   ├── run_governance_eval.py   Evaluation harness
@@ -442,7 +442,7 @@ Created at runtime and gitignored: `.env`, `reviewers.yaml`, `pipeline_state.db`
 
 ## 7. Tests
 
-`pytest` runs **278 offline tests**: synthetic fixtures, a stubbed planner, no API key, no network.
+`pytest` runs **279 offline tests**: synthetic fixtures, a stubbed planner, no API key, no network.
 GitHub Actions runs them on every push.
 
 | File | Tests | Covers |
@@ -461,7 +461,7 @@ GitHub Actions runs them on every push.
 | `test_intersectional.py` | 6 | Combined subgroups: hidden disparities, small combinations, never in the verdict |
 | `test_feature_names.py` | 5 | XGBoost-safe one-hot names |
 | `test_fairness_honesty.py` | 3 | Unmeasured fairness never reported as passed |
-| `test_dual_signoff.py` | 12 | One approval is not an approval, self sign-off refused, both approvers in the artifacts, the policy switches |
+| `test_dual_signoff.py` | 13 | One approval is not an approval, self sign-off refused, both approvers in the artifacts, the policy switches |
 | `test_completed_run.py` | 2 | A finished run keeps the payload its reviewer decided on |
 
 ---
@@ -519,7 +519,7 @@ flowchart"). The original repository has had **no new commits since**. All work 
 
 **Totals through `8f762be`:** 18 commits, 70 files changed, **+13,764 / −750 lines**; tests went from 0
 automated (8 manual scripts needing a live API key and network) to **251 offline tests**. Reviewer
-identity and dual sign-off add one further commit and take the suite to **278 tests**.
+identity and dual sign-off add two further commits and take the suite to **279 tests**.
 
 ### 10.1 Commits
 
@@ -601,7 +601,7 @@ identity and dual sign-off add one further commit and take the suite to **278 te
   reviewers to approve a violating model, both recorded in the audit trail and the paperwork
 - Training-failure and approval-blocked endings
 - Quantitative governance evaluation: 4 datasets × 4 arms × 5 seeds, committed results, replayable without a key
-- 278 offline tests and a GitHub Actions workflow
+- 279 offline tests and a GitHub Actions workflow
 - Dashboard: black / white / silver restyle, deep links to runs, terminated and approved banners,
   artifacts panel, EDA insights, fairness table with protected and advisory labels, combined-subgroup
   table, mitigation card, disabled Approve with the policy's reason, reviewer identity fields and the

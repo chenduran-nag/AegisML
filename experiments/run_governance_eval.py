@@ -103,6 +103,7 @@ RUN_FIELDS = [
     "n_violations", "n_advisory_violations", "min_disparate_impact", "max_parity_difference",
     "max_equal_opportunity_difference", "protected_attributes_evaluated",
     "protected_attributes_unaudited", "mitigated_attributes",
+    "approvers", "n_signoffs",
     "retries", "reroutes", "eda_findings", "columns_dropped",
     "train_rows", "validation_rows", "test_rows", "split_seed_recorded",
     "planner_calls", "planner_cache_hits", "planner_tokens_recorded", "planner_model",

@@ -114,6 +114,27 @@ def test_the_first_approver_cannot_supply_the_second_signoff(graph, toy_df):
     assert len([e for e in trail if e["event_type"] == "human_decision"]) == 2
 
 
+def test_a_refused_self_approval_does_not_count_as_a_second_approver(graph, toy_df):
+    config = _run_to_gate(graph, toy_df, "t-signoff-dedupe")
+    decide(graph.g, config, "approve", reviewer=REVIEWER_A)
+    decide(graph.g, config, "approve", reviewer=REVIEWER_A)   # refused
+    decide(graph.g, config, "approve", reviewer=REVIEWER_B)
+
+    values = graph.g.get_state(config).values
+    assert values["model_saved_path"]
+    assert len([d for d in values["reviewer_decisions"] if d["decision"] == "approve"]) == 3,         "every attempt stays in the history"
+
+    final = [e for e in get_audit_trail("t-signoff-dedupe", db_path=graph.audit_db)
+             if e["event_type"] == "final_outcome"][-1]
+    assert [a["reviewer_id"] for a in final["details"]["approvers"]] ==         ["test.first", "test.second"], "one entry per reviewer, not per approval"
+
+    with open(os.path.join(graph.artifacts_dir, "t-signoff-dedupe", "model_card.json"),
+              encoding="utf-8") as fh:
+        card = json.load(fh)
+    assert [a["reviewer_id"] for a in card["human_governance"]["approvers"]] ==         ["test.first", "test.second"]
+    assert len(card["human_governance"]["decision_history"]) == 3
+
+
 def test_an_approval_with_no_reviewer_id_is_not_a_signoff(graph, toy_df):
     config = _run_to_gate(graph, toy_df, "t-signoff-anon")
     decide(graph.g, config, "approve", reviewer=ANON)
@@ -144,8 +165,9 @@ def test_a_second_different_reviewer_completes_the_approval(graph, toy_df):
     assert snapshot.next == (), "the run should be finished"
     values = snapshot.values
     assert values["model_saved_path"] and os.path.exists(values["model_saved_path"])
-    assert values["awaiting_second_approval"] is True and values["first_approval"], \
-        "the completed run still records that it took two"
+    assert values["awaiting_second_approval"] is False, "nothing is being waited for now"
+    assert values["first_approval"]["reviewer_id"] == "test.first", \
+        "the completed run still records who signed first"
 
     approvals = [d for d in values["reviewer_decisions"] if d["decision"] == "approve"]
     assert [d["reviewer_id"] for d in approvals] == ["test.first", "test.second"]

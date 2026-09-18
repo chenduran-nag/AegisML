@@ -255,7 +255,7 @@ http://localhost:8000
 ├── reviewers.example.yaml      # Template roster (the real one, reviewers.yaml, is gitignored)
 ├── static/
 │   └── index.html              # Dashboard (vanilla JS + Chart.js)
-├── tests/                      # Offline pytest suite (278 tests)
+├── tests/                      # Offline pytest suite (279 tests)
 ├── experiments/
 │   ├── run_governance_eval.py  # Governance evaluation harness (record / replay / --summarise-only)
 │   ├── planner_cache/          # Recorded planner responses, so results reproduce without a key
@@ -537,7 +537,7 @@ decision history and the AIBOM.
 pytest
 ```
 
-The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. **278 tests**, and a GitHub Actions workflow runs them on every push.
+The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. **279 tests**, and a GitHub Actions workflow runs them on every push.
 
 | File | Tests | Covers |
 |---|---:|---|
@@ -555,7 +555,7 @@ The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, n
 | `test_intersectional.py` | 6 | Combined subgroups: hidden disparities, small combinations, never in the verdict |
 | `test_feature_names.py` | 5 | XGBoost-safe one-hot column names |
 | `test_fairness_honesty.py` | 3 | Unmeasured fairness never reported as passed |
-| `test_dual_signoff.py` | 12 | One approval is not an approval, self sign-off refused, two reviewers in the artifacts, the policy switches |
+| `test_dual_signoff.py` | 13 | One approval is not an approval, self sign-off refused, two reviewers in the artifacts, the policy switches |
 | `test_completed_run.py` | 2 | A finished run keeps the payload its reviewer decided on |
 
 The `test_*.py` scripts in the repository root are the original manual integration walkthroughs — they download the UCI Adult dataset and call the live Groq API, so they are run by hand and are excluded from `pytest` collection.
