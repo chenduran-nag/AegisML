@@ -23,7 +23,24 @@ __pycache__/
 .~*.pptx
 saved_models/
 
+# Generated compliance artifacts (model cards, AIBOM, Annex IV drafts)
+artifacts/
+
 # IDE & System files
 .DS_Store
 .vscode/
 .idea/
+
+# Local test fixtures (downloaded, not part of the repo)
+adult_income.csv
+static/adult_*.csv
+
+# Evaluation: downloaded OpenML datasets, and throwaway --quick smoke-test output.
+# experiments/results/ and experiments/planner_cache/ ARE committed: together they
+# reproduce the published numbers without a Groq key.
+experiments/.data_cache/
+experiments/results_quick/
+
+# Reviewer roster: bearer tokens for governance decisions. reviewers.example.yaml
+# IS committed; the real roster never is.
+reviewers.yaml

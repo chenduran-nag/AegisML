@@ -95,6 +95,36 @@ class PipelineState(TypedDict, total=False):
     cleaned_df_bytes : Optional[bytes]
         The cleaned DataFrame from data_agent_node, pickled.
         Deserialise with bytes_to_df(). Used by training_node.
+    dataset_sha256 : Optional[str]
+        SHA-256 of the raw uploaded file's bytes, computed by the server before
+        parsing. Hashed from the upload rather than from df_bytes because pickle
+        bytes are not stable across pandas/Python versions, so a pickle digest
+        would change without the data changing. Provenance anchor for the AIBOM.
+    planner_meta : Optional[dict]
+        Provenance of the planner LLM call: resolved model id, SHA-256 of the exact
+        prompts sent, and token usage. Kept separate from `plan` so that metadata
+        about the call can never be confused with content from the call.
+    artifacts_manifest : Optional[dict]
+        Result of compliance_artifacts.generate_artifacts(): output directory plus
+        a per-file path/digest map. Set only on the approve path.
+    split_seed : Optional[int]
+        Seed for the train/test split drawn by the Data Agent. None means the
+        default (data_agent.SPLIT_RANDOM_STATE). Set per run by the governance
+        evaluation to repeat a run over several partitions.
+    eda_findings : Optional[list]
+        Structured findings from eda_insights.derive_eda_findings(), each carrying a
+        `route` ("data_agent", "planner" or "reviewer") that decides which stage may
+        act on it. Set once by data_analysis_node.
+    eda_report : Optional[dict]
+        Exploratory profiling report from analyze_raw_dataset(), computed by the
+        server at upload time. Stored in state (not a module-level cache) so it
+        survives a process restart alongside the rest of the run.
+    split_index : Optional[dict]
+        {"train": [...], "test": [...]} — index labels of the train/test split
+        drawn by run_data_agent() BEFORE any preprocessing parameter was fitted.
+        Held here rather than inside data_agent_result so these long lists never
+        reach the audit log. training_node reuses this split verbatim, and
+        fairness_node evaluates on the "test" half.
     last_failure_reason : Optional[dict]
         Populated with quality_report when quality_check_passed = False.
         Passed as failure_context to plan_pipeline() on the next retry.
@@ -125,6 +155,49 @@ class PipelineState(TypedDict, total=False):
     unresolved_human_rejection : bool
         True when rejection_reroute_count >= MAX_HUMAN_REROUTES and human rejects again.
         Prevents infinite human-rejection loops.
+    unresolved_training_failure : bool
+        True when training produced no model — every remaining candidate failed to
+        fit. The run ends without reaching the approval gate.
+    model_saved_path : Optional[str]
+        Filesystem path the approved model was serialised to by audit_log_node,
+        or None if it was never approved or the write failed. This is the real
+        path on disk — never construct a display path from other fields.
+    model_save_error : Optional[str]
+        Reason the serialisation failed, when model_saved_path is None.
+    mitigation : Optional[dict]
+        Set by mitigation_node after a "reject_and_mitigate" decision:
+        {method, attributes, applications: [{attribute, status, reason, cells,
+        before}]}. Cells are per-(group, label) weights, never per-row data. While
+        attributes is non-empty, training_node trains with reweighing weights.
+    declared_protected_attributes : Optional[list[str]]
+        Columns the reviewer declared protected at run start. They are audited, count
+        toward the fairness verdict, and feed EDA proxy detection, in addition to the
+        columns detected by name.
+    reviewer_decisions : Optional[list[dict]]
+        Every governance decision this run received, in order, each with the identity
+        it was submitted under: {timestamp, decision, feedback, reviewer_id,
+        reviewer_role, authenticated, stage}. `authenticated` is False when no reviewer
+        roster was configured, so the identity is the caller's word (see reviewers.py).
+    current_reviewer : Optional[dict]
+        The identity attached to the most recent decision. Read by the router, which
+        must compare it with `first_approval` without trusting either to exist.
+    first_approval : Optional[dict]
+        Set when a model with a fairness violation received its first approval and the
+        run needs a second, different reviewer (policy
+        `require_dual_signoff_for_violating_approval`). Cleared on any reroute, since
+        the next gate reviews a different model.
+    awaiting_second_approval : bool
+        True while the gate is re-opened for that second sign-off. The run is NOT
+        approved in this state and nothing has been written to disk.
+    signoff_error : Optional[str]
+        Why the last approval attempt did not count as the second sign-off (no
+        reviewer id, or the same reviewer twice). Shown at the re-opened gate and
+        logged; cleared as soon as any decision is submitted.
+    final_evaluation : Optional[dict]
+        Written by audit_log_node on approval only: the approved model scored once on
+        the untouched test rows ({split, rows, metrics, fairness}). Everything before
+        approval — leaderboard, fairness audit, reviewer decisions — uses the
+        validation rows in split_index["validation"].
     """
 
     df_bytes: bytes
@@ -133,6 +206,13 @@ class PipelineState(TypedDict, total=False):
     plan: Optional[dict]
     data_agent_result: Optional[dict]
     cleaned_df_bytes: Optional[bytes]
+    split_index: Optional[dict]
+    eda_report: Optional[dict]
+    eda_findings: Optional[list]
+    split_seed: Optional[int]
+    dataset_sha256: Optional[str]
+    planner_meta: Optional[dict]
+    artifacts_manifest: Optional[dict]
     last_failure_reason: Optional[dict]
     retry_count: int
     unresolved_quality_issue: bool
@@ -140,8 +220,26 @@ class PipelineState(TypedDict, total=False):
     selected_model_bytes: Optional[bytes]
     fairness_result: Optional[dict]
     human_decision: Optional[str]
+    reviewer_decisions: Optional[list[dict]]
+    current_reviewer: Optional[dict]
+    first_approval: Optional[dict]
+    awaiting_second_approval: bool
+    signoff_error: Optional[str]
     rejection_reroute_count: int
     unresolved_human_rejection: bool
+    unresolved_training_failure: bool
     business_objective: Optional[str]
     rejected_models: Optional[list[str]]
     human_feedback: Optional[str]
+    model_saved_path: Optional[str]
+    model_save_error: Optional[str]
+    mitigation: Optional[dict]
+    declared_protected_attributes: Optional[list[str]]
+    final_evaluation: Optional[dict]
+    last_review_payload: Optional[dict]
+    # Governance policy (policy.py): the validated policy, its version and SHA-256.
+    policy: Optional[dict]
+    policy_version: Optional[str]
+    policy_sha256: Optional[str]
+    # True when an approve decision was refused by policy and the run ended.
+    unresolved_approval_blocked: bool

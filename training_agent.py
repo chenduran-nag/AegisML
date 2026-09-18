@@ -16,7 +16,10 @@ DESIGN PRINCIPLES:
     continue training unaffected.
 
 PIPELINE (in order):
-  1. Train/test split: 80/20, stratified for classification, fixed seed
+  1. Train/test split: reuses the split drawn by the Data Agent (passed in as
+     train_index / test_index) so that models are evaluated on rows that had no
+     influence on any fitted preprocessing parameter. Falls back to an internal
+     80/20 stratified split only when called standalone.
   2. Train each recommended model on X_train / y_train
   3. Evaluate each model on X_test / y_test
   4. Build leaderboard sorted by primary metric
@@ -27,11 +30,10 @@ PIPELINE (in order):
      Sample up to SHAP_SAMPLE_SIZE rows from the test set for speed.
   7. Return results dict
 
-TODO (graph wiring, Step 4): When Training Agent is wired into pipeline_graph.py,
-the fitted selected_model object must be serialised for LangGraph state. Options:
-  A. joblib.dump() -> bytes -> store in PipelineState["trained_model_bytes"]
-  B. in-memory cache keyed by thread_id (avoids pickle overhead for large models)
-Decide at wiring time -- do not over-engineer here.
+RESOLVED (graph wiring, Step 4): the fitted model is returned under the private
+key "_fitted_model"; pipeline_graph.training_node serialises it with
+graph_state.model_to_bytes() (joblib) into PipelineState["selected_model_bytes"]
+and strips the key before storing the rest of the result.
 """
 
 from __future__ import annotations
@@ -89,11 +91,11 @@ PRIMARY_METRIC_REGRESSION = "rmse"          # lower is better  -> sort ascending
 
 _REGISTRY: dict[str, tuple[Any, Any]] = {
     "logisticregression": (
-        LogisticRegression(max_iter=1000, random_state=RANDOM_STATE, n_jobs=-1),
+        LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),  # n_jobs has no effect here; sklearn 1.8+ warns
         None,
     ),
     "logistic": (
-        LogisticRegression(max_iter=1000, random_state=RANDOM_STATE, n_jobs=-1),
+        LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),  # n_jobs has no effect here; sklearn 1.8+ warns
         None,
     ),
     "randomforest": (
@@ -202,6 +204,28 @@ def _regression_metrics(model: Any, X_test: np.ndarray,
     }
 
 
+def evaluate_model(model: Any, cleaned_df: pd.DataFrame, target_column: str,
+                   task_type: str, index: list) -> dict:
+    """
+    Score an already-fitted model on the given rows exactly as run_training_agent
+    scores its evaluation rows: the same target encoding and bool-to-int conversion.
+
+    Used once, after approval, on the untouched test rows (pipeline_graph.audit_log_node).
+    """
+    X = cleaned_df.drop(columns=[target_column])
+    y = cleaned_df[target_column]
+    if task_type == "classification":
+        y = pd.Series(LabelEncoder().fit_transform(y), index=y.index)
+    bool_cols = [c for c in X.columns if pd.api.types.is_bool_dtype(X[c])]
+    if bool_cols:
+        X = X.copy()
+        X[bool_cols] = X[bool_cols].astype(int)
+    rows = pd.Index(index)
+    if task_type == "classification":
+        return _classification_metrics(model, X.loc[rows], y.loc[rows])
+    return _regression_metrics(model, X.loc[rows], y.loc[rows])
+
+
 # ---------------------------------------------------------------------------
 # SHAP explainability summary
 # ---------------------------------------------------------------------------
@@ -295,9 +319,17 @@ def run_training_agent(
     target_column: str,
     task_type: str,
     recommended_models: list[str],
+    train_index: list | None = None,
+    test_index: list | None = None,
+    sample_weight: pd.Series | None = None,
+    eval_label: str = "test",
 ) -> dict:
     """
     Train, evaluate, and rank models recommended by the Planner Agent.
+
+    sample_weight, when given, is a Series of per-row training weights indexed by
+    train-row labels (reweighing mitigation, see mitigation.py). Every registry model
+    accepts it in fit(). Evaluation metrics stay unweighted.
 
     Parameters
     ----------
@@ -309,6 +341,13 @@ def run_training_agent(
     task_type : {"classification", "regression"}
     recommended_models : list[str]
         Names from plan["recommended_models"].
+    train_index, test_index : list, optional
+        Index labels of the split drawn by run_data_agent(). When supplied, this
+        exact split is reused, guaranteeing that the rows used to fit imputation
+        / encoding / scaling parameters are precisely the rows the model trains
+        on. When omitted, an internal split is drawn and a warning is recorded in
+        actions_taken, because preprocessing statistics may then have been fitted
+        over rows that end up in the test set.
 
     Returns
     -------
@@ -346,23 +385,61 @@ def run_training_agent(
         X = X.copy()
         X[bool_cols] = X[bool_cols].astype(int)
 
-    stratify_param = y if task_type == "classification" else None
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
-        test_size=TEST_SIZE,
-        random_state=RANDOM_STATE,
-        stratify=stratify_param,
-    )
-    actions.append(
-        f"Train/test split: {len(X_train):,} train / {len(X_test):,} test rows "
-        f"(stratified={task_type == 'classification'})"
-    )
+    if train_index is not None and test_index is not None:
+        train_idx = pd.Index(train_index)
+        test_idx = pd.Index(test_index)
+
+        unknown = len(train_idx.difference(X.index)) + len(test_idx.difference(X.index))
+        if unknown:
+            raise ValueError(
+                f"Training Agent: {unknown} index label(s) supplied in "
+                f"train_index/test_index are absent from cleaned_df. The Data "
+                f"Agent's split and the cleaned frame are out of sync."
+            )
+
+        X_train, X_test = X.loc[train_idx], X.loc[test_idx]
+        y_train, y_test = y.loc[train_idx], y.loc[test_idx]
+        actions.append(
+            f"Train/{eval_label} split: reused the Data Agent's split "
+            f"({len(X_train):,} train / {len(X_test):,} {eval_label} rows; the leaderboard "
+            f"ranks models on the {eval_label} rows). Imputation, "
+            f"encoding and scaling parameters were fitted on these train rows only."
+        )
+    else:
+        stratify_param = y if task_type == "classification" else None
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y,
+            test_size=TEST_SIZE,
+            random_state=RANDOM_STATE,
+            stratify=stratify_param,
+        )
+        actions.append(
+            f"WARNING: no split supplied by the Data Agent — drew an internal "
+            f"{len(X_train):,} train / {len(X_test):,} test split "
+            f"(stratified={task_type == 'classification'}). Preprocessing "
+            f"statistics may have been fitted over held-out rows; treat these "
+            f"metrics as optimistic."
+        )
 
     # ------------------------------------------------------------------
     # Steps 2–3 — Train and evaluate each recommended model
     # ------------------------------------------------------------------
     leaderboard: list[dict] = []
     trained_models: dict[str, Any] = {}
+
+    fit_kwargs: dict[str, Any] = {}
+    if sample_weight is not None:
+        missing = len(X_train.index.difference(sample_weight.index))
+        if missing:
+            raise ValueError(
+                f"Training Agent: sample_weight has no weight for {missing} train row(s)."
+            )
+        weights = sample_weight.loc[X_train.index]
+        fit_kwargs["sample_weight"] = weights.to_numpy()
+        actions.append(
+            f"Training with bias-mitigation sample weights on {len(weights):,} train rows "
+            f"(min {weights.min():.4f}, max {weights.max():.4f}); evaluation is unweighted"
+        )
 
     for model_name in recommended_models:
         model, resolved = _resolve_model(model_name, task_type)
@@ -378,7 +455,7 @@ def run_training_agent(
             continue
 
         try:
-            model.fit(X_train, y_train)
+            model.fit(X_train, y_train, **fit_kwargs)
             metrics = (
                 _classification_metrics(model, X_test, y_test)
                 if task_type == "classification"

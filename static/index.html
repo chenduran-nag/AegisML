@@ -3,261 +3,314 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AegisML — Enterprise AI Governance Platform</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <title>AegisML</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
+    /* Black, white and silver. Status is never carried by hue: a pass is a quiet
+       outline, a failure is inverted (black on white), and an uncertain state is
+       dashed. Every status also has a text label. */
     :root {
-      --bg-dark: #090d16;
-      --card-bg: rgba(17, 24, 39, 0.75);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --primary-violet: #7c3aed;
-      --primary-indigo: #6366f1;
-      --primary-gradient: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
-      --accent-green: #10b981;
-      --accent-red: #ef4444;
-      --accent-amber: #f59e0b;
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --text-dark: #6b7280;
+      --bg: #0b0b0b;
+      --surface: #131313;
+      --surface-2: #1b1b1b;
+      --line: #262626;
+      --line-strong: #3a3a3a;
+      --text: #ededed;
+      --white: #f5f5f5;
+      --silver: #b8b8b8;
+      --silver-dim: #8a8a8a;
+      --silver-faint: #5e5e5e;
+      --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+      /* Older names, still used by inline styles written from the script. */
+      --bg-dark: var(--bg);
+      --card-bg: var(--surface);
+      --card-border: var(--line);
+      --text-main: var(--text);
+      --text-muted: var(--silver-dim);
+      --text-dark: var(--silver-faint);
+      --accent-amber: var(--silver-dim);
+      --accent-red: var(--white);
+      --accent-green: var(--silver);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      line-height: 1.5;
+      font-family: var(--font-sans);
+      font-size: 15px;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
       min-height: 100vh;
     }
+    ::selection { background: var(--silver); color: var(--bg); }
+    a { color: var(--white); }
 
-    /* Navbar Header */
+    /* Header */
     header {
-      background: rgba(11, 15, 25, 0.95);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--card-border);
-      padding: 14px 32px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+      padding: 0 28px;
+      height: 54px;
       position: sticky;
       top: 0;
       z-index: 100;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 24px;
     }
-    .logo-area { display: flex; align-items: center; gap: 12px; }
-    .logo-badge {
-      width: 32px; height: 32px;
-      background: var(--primary-gradient);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 14px; color: #ffffff;
-      box-shadow: 0 0 12px rgba(124, 58, 237, 0.4);
-    }
-    .logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.3px; }
-    .logo-tag { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+    .logo-area { display: flex; align-items: center; }
+    .logo-text { font-size: 1rem; font-weight: 600; letter-spacing: 0.02em; color: var(--white); }
 
-    /* Page Navigation Tabs */
-    .nav-tabs { display: flex; gap: 8px; }
+    .nav-tabs { display: flex; gap: 2px; align-self: stretch; }
     .nav-btn {
-      padding: 8px 18px; font-weight: 600; font-size: 0.82rem; color: var(--text-muted);
-      border: 1px solid var(--card-border); border-radius: 20px; background: rgba(0, 0, 0, 0.3);
-      cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
-    }
-    .nav-btn:hover { color: var(--text-main); border-color: rgba(255, 255, 255, 0.2); }
-    .nav-btn.active-nav {
-      background: rgba(124, 58, 237, 0.2); border-color: var(--primary-violet); color: #c4b5fd;
-      box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
-    }
-
-    /* Page Views */
-    .page-view { display: none; }
-    .page-view.active-page { display: grid; grid-template-columns: 440px 1fr; gap: 24px; max-width: 1600px; margin: 24px auto; padding: 0 24px; }
-    
-    .page-view-full { display: none; }
-    .page-view-full.active-page { display: block; max-width: 1600px; margin: 24px auto; padding: 0 24px; }
-
-    /* Glassmorphism Card */
-    .glass-card {
-      background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    }
-    .card-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; letter-spacing: -0.2px; }
-
-    /* Form Controls */
-    .form-group { margin-bottom: 16px; }
-    label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
-    input[type="text"], select, textarea {
-      width: 100%;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 10px 14px;
-      color: var(--text-main);
-      font-family: inherit;
-      font-size: 0.88rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--primary-indigo); }
-
-    /* Upload Box */
-    .upload-zone {
-      border: 2px dashed rgba(124, 58, 237, 0.35);
-      border-radius: 12px;
-      padding: 24px;
-      text-align: center;
-      background: rgba(124, 58, 237, 0.03);
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    .upload-zone:hover { border-color: var(--primary-violet); background: rgba(124, 58, 237, 0.08); }
-
-    /* Radio Group */
-    .radio-group { display: flex; gap: 10px; }
-    .radio-option {
-      flex: 1; padding: 10px 14px; border-radius: 8px;
-      background: rgba(0, 0, 0, 0.35); border: 1px solid var(--card-border);
-      text-align: center; cursor: pointer; font-size: 0.85rem; font-weight: 600;
-      transition: all 0.2s;
-    }
-    .radio-option.selected {
-      background: rgba(99, 102, 241, 0.2); border-color: var(--primary-indigo); color: #a5b4fc;
-    }
-
-    /* Buttons */
-    .btn-primary {
-      width: 100%;
-      background: var(--primary-gradient);
+      padding: 0 14px;
+      font: inherit;
+      font-size: 0.86rem;
+      font-weight: 500;
+      color: var(--silver-dim);
+      background: none;
       border: none;
-      color: white;
-      padding: 13px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.9rem;
+      border-bottom: 2px solid transparent;
       cursor: pointer;
-      box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
-      transition: transform 0.1s, box-shadow 0.2s;
     }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(124, 58, 237, 0.6); }
+    .nav-btn:hover { color: var(--text); }
+    .nav-btn.active-nav { color: var(--white); border-bottom-color: var(--white); }
 
-    /* Live DAG Diagram Grid */
-    .dag-flow-container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 16px 8px;
-      overflow-x: auto;
+    /* Page layout */
+    .page-view { display: none; }
+    .page-view.active-page {
+      display: grid; grid-template-columns: 420px 1fr; gap: 20px; align-items: start;
+      max-width: 1480px; margin: 24px auto; padding: 0 24px;
     }
-    .dag-node-box {
-      flex: 1;
-      min-width: 120px;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 14px 10px;
-      text-align: center;
-      transition: all 0.3s ease;
-    }
-    .dag-node-box .node-title { font-size: 0.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px; }
-    .dag-node-box .node-status-pill {
-      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
-      padding: 3px 8px; border-radius: 10px; display: inline-block;
-    }
+    .page-view-full { display: none; }
+    .page-view-full.active-page { display: block; max-width: 1480px; margin: 24px auto; padding: 0 24px; }
 
-    /* Node States */
-    .dag-node-box.pending { border-color: rgba(255, 255, 255, 0.08); opacity: 0.65; }
-    .dag-node-box.pending .node-status-pill { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
-
-    .dag-node-box.running {
-      border-color: var(--primary-violet);
-      box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
-      animation: nodePulse 1.5s infinite alternate;
-    }
-    .dag-node-box.running .node-status-pill { background: rgba(124, 58, 237, 0.3); color: #c4b5fd; }
-
-    .dag-node-box.completed {
-      border-color: rgba(16, 185, 129, 0.4);
-      background: rgba(16, 185, 129, 0.05);
-    }
-    .dag-node-box.completed .node-status-pill { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-
-    .dag-node-box.awaiting {
-      border-color: rgba(245, 158, 11, 0.5);
-      background: rgba(245, 158, 11, 0.08);
-      box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
-    }
-    .dag-node-box.awaiting .node-status-pill { background: rgba(245, 158, 11, 0.3); color: #fbbf24; }
-
-    @keyframes nodePulse {
-      0% { box-shadow: 0 0 5px rgba(124, 58, 237, 0.3); }
-      100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.7); }
-    }
-
-    .dag-connector { font-size: 14px; color: var(--text-dark); flex-shrink: 0; }
-
-    /* Winner KPI Block */
-    .kpi-winner {
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.03) 100%);
-      border: 1px solid rgba(16, 185, 129, 0.25);
-      border-radius: 12px;
-      padding: 20px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    /* Panels */
+    .glass-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      padding: 20px 22px;
       margin-bottom: 20px;
     }
-    .kpi-val { font-size: 1.8rem; font-weight: 800; color: #34d399; }
-    .kpi-label { font-size: 0.75rem; text-transform: uppercase; color: #a7f3d0; font-weight: 600; letter-spacing: 0.5px; }
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--silver);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .muted { color: var(--silver-dim); }
+    .small { font-size: 0.82rem; }
+
+    /* Forms */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--silver); margin-bottom: 6px; }
+    input[type="text"], input[type="password"], select, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--line-strong);
+      border-radius: 3px;
+      padding: 9px 12px;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.88rem;
+      outline: none;
+    }
+    input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:focus { border-color: var(--silver); }
+    input::placeholder, textarea::placeholder { color: var(--silver-faint); }
+
+    .upload-zone { border: 1px dashed var(--line-strong); border-radius: 3px; padding: 18px 16px; cursor: pointer; }
+    .upload-zone:hover { border-color: var(--silver); }
+
+    .radio-group { display: flex; gap: 8px; }
+    .radio-option {
+      flex: 1;
+      padding: 9px 12px;
+      border-radius: 3px;
+      background: var(--bg);
+      border: 1px solid var(--line-strong);
+      cursor: pointer;
+      font-size: 0.86rem;
+      color: var(--silver);
+    }
+    .radio-option:hover { border-color: var(--silver-dim); color: var(--text); }
+    .radio-option.selected { border-color: var(--white); color: var(--white); box-shadow: inset 3px 0 0 var(--white); }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--white);
+      color: var(--bg);
+      border: 1px solid var(--white);
+      padding: 10px 16px;
+      border-radius: 3px;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: var(--silver); border-color: var(--silver); }
+    .btn-inline { width: auto; padding: 10px 24px; }
+    .btn-primary:focus-visible, .nav-btn:focus-visible, .tab-btn:focus-visible, .radio-option:focus-visible {
+      outline: 2px solid var(--white); outline-offset: 2px;
+    }
+
+    /* Pipeline diagram */
+    .dag-flow-container { display: flex; align-items: center; overflow-x: auto; padding: 2px 0; }
+    .dag-node-box {
+      flex: 1;
+      min-width: 118px;
+      background: var(--bg);
+      border: 1px solid var(--line-strong);
+      border-radius: 3px;
+      padding: 11px 10px;
+    }
+    .dag-node-box .node-title { font-size: 0.82rem; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+    .dag-node-box .node-status-pill { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.04em; color: var(--silver-dim); }
+    .dag-connector { flex: 0 0 16px; height: 1px; background: var(--line-strong); }
+    .dag-node-box.pending .node-title { color: var(--silver-dim); }
+    .dag-node-box.pending .node-status-pill { color: var(--silver-faint); }
+    .dag-node-box.running { border-color: var(--white); }
+    .dag-node-box.running .node-status-pill { color: var(--white); }
+    .dag-node-box.completed { border-color: var(--silver-dim); }
+    .dag-node-box.completed .node-status-pill { color: var(--silver); }
+    .dag-node-box.awaiting { border: 1px dashed var(--white); }
+    .dag-node-box.awaiting .node-status-pill { color: var(--white); }
+
+    .steps { padding-left: 20px; display: grid; gap: 10px; font-size: 0.9rem; color: var(--silver); margin-bottom: 14px; }
+    .steps strong { color: var(--text); font-weight: 600; }
+
+    /* Figures */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--surface);
+      margin-bottom: 20px;
+    }
+    .stat { padding: 12px 18px; border-left: 1px solid var(--line); }
+    .stat:first-child { border-left: none; }
+    .stat-label { font-size: 0.74rem; color: var(--silver-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-value { font-size: 1.45rem; font-weight: 600; color: var(--white); font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+    .kpi-winner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      padding: 14px 22px;
+      margin-bottom: 20px;
+    }
+    .kpi-val { font-size: 1.45rem; font-weight: 600; color: var(--white); font-variant-numeric: tabular-nums; }
+    .kpi-label { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--silver-dim); }
+
+    /* Run outcome */
+    .status-panel { border-left: 3px solid var(--silver); }
+    .status-panel--refused { border: 1px solid var(--white); border-left-width: 3px; }
+    .status-panel__head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 6px; }
+    .status-panel__title { font-size: 1.05rem; font-weight: 600; color: var(--white); }
+    .decision-panel { border-color: var(--silver-dim); }
+    .identity-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .identity-row > * { flex: 1 1 160px; }
+    /* Sign-off notices: state by form, not hue — a dashed rule, like every other
+       "read this before you click" note on the page. */
+    .signoff-note {
+      font-size: 0.8rem; color: var(--silver); padding: 10px 12px; margin-bottom: 14px;
+      border: 1px dashed var(--silver-dim); border-radius: 3px;
+    }
+    .signoff-note strong { color: var(--text); }
 
     /* Tabs */
-    .tabs-header { display: flex; gap: 8px; border-bottom: 1px solid var(--card-border); margin-bottom: 20px; }
+    .tabs-header { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 18px; overflow-x: auto; }
     .tab-btn {
-      padding: 10px 18px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted);
-      border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;
-      transition: all 0.2s;
+      padding: 9px 14px;
+      font: inherit;
+      font-size: 0.86rem;
+      font-weight: 500;
+      color: var(--silver-dim);
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
     }
-    .tab-btn.active { color: var(--text-main); border-bottom-color: var(--primary-violet); }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--white); border-bottom-color: var(--white); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
     /* Tables */
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
-    th { text-align: left; padding: 10px 14px; background: rgba(0, 0, 0, 0.4); color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--card-border); }
-    td { padding: 12px 14px; border-bottom: 1px solid var(--card-border); }
-    tr:hover { background: rgba(255, 255, 255, 0.02); }
-
-    /* Badges & Tags */
-    .badge { padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
-    .badge-pass { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-    .badge-fail { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-    .badge-winner { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-
-    /* Code & Details */
-    code, pre { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; background: rgba(0, 0, 0, 0.4); padding: 2px 6px; border-radius: 4px; }
-    pre { padding: 14px; overflow-x: auto; color: #a5b4fc; }
-
-    /* Audit Log List */
-    .audit-list { display: flex; flex-direction: column; gap: 10px; max-height: 600px; overflow-y: auto; }
-    .audit-item { background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); border-radius: 8px; padding: 14px 18px; font-size: 0.85rem; }
-    .audit-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
-    .audit-time { color: var(--text-dark); font-size: 0.75rem; }
-
-    /* Spinner Overlay */
-    .overlay {
-      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(9, 13, 22, 0.85); backdrop-filter: blur(8px);
-      z-index: 200; justify-content: center; align-items: center; flex-direction: column;
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      color: var(--silver-dim);
+      font-weight: 500;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--line-strong);
     }
-    .spinner { width: 44px; height: 44px; border: 4px solid rgba(124, 58, 237, 0.2); border-top-color: var(--primary-violet); border-radius: 50%; animation: spin 1s infinite linear; margin-bottom: 16px; }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
+    tbody tr:hover { background: var(--surface-2); }
+
+    /* Status labels */
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 2px;
+      border: 1px solid var(--line-strong);
+      font-weight: 600;
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      color: var(--silver);
+      white-space: nowrap;
+    }
+    .badge-pass { color: var(--text); border-color: var(--silver-dim); }
+    .badge-fail { background: var(--white); border-color: var(--white); color: var(--bg); }
+    .badge-winner { color: var(--white); border-color: var(--white); }
+
+    code, pre {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      padding: 1px 5px;
+      border-radius: 2px;
+      color: var(--silver);
+    }
+    pre { padding: 14px; overflow-x: auto; }
+    ul { color: var(--text); }
+    li + li { margin-top: 3px; }
+
+    /* Audit log */
+    .audit-list { display: flex; flex-direction: column; max-height: 640px; overflow-y: auto; border-top: 1px solid var(--line); }
+    .audit-item { border-bottom: 1px solid var(--line); padding: 12px 4px; font-size: 0.85rem; }
+    .audit-header { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+    .audit-time { color: var(--silver-faint); font-size: 0.75rem; font-family: var(--font-mono); }
+
+    /* Loading */
+    .overlay {
+      display: none; position: fixed; inset: 0; background: rgba(8, 8, 8, 0.94);
+      z-index: 200; justify-content: center; align-items: center; flex-direction: column; gap: 4px;
+    }
+    .overlay-title { font-size: 1rem; font-weight: 600; color: var(--white); }
+    .spinner {
+      width: 26px; height: 26px; border: 2px solid var(--line-strong); border-top-color: var(--white);
+      border-radius: 50%; animation: spin 0.9s linear infinite; margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
   </style>
 </head>
 <body>
@@ -265,18 +318,17 @@
   <!-- Top Navbar -->
   <header>
     <div class="logo-area">
-      <div class="logo-badge">AG</div>
       <div>
-        <div class="logo-text">AegisML <span class="logo-tag">Governance Engine</span></div>
+        <div class="logo-text">AegisML</div>
       </div>
     </div>
 
     <!-- Page Navigation Tabs -->
     <div class="nav-tabs">
-      <button class="nav-btn active-nav" id="btn-nav-home" onclick="showPage('page-home', this)">1. Pipeline Setup & Topology</button>
-      <button class="nav-btn" id="btn-nav-eda" onclick="showPage('page-eda', this)">2. Data Analysis & Profiling</button>
-      <button class="nav-btn" id="btn-nav-results" onclick="showPage('page-results', this)">3. Governance Results & Review</button>
-      <button class="nav-btn" id="btn-nav-audit" onclick="showPage('page-audit', this)">4. Audit Trail</button>
+      <button class="nav-btn active-nav" id="btn-nav-home" onclick="showPage('page-home', this)">Setup</button>
+      <button class="nav-btn" id="btn-nav-eda" onclick="showPage('page-eda', this)">Data profile</button>
+      <button class="nav-btn" id="btn-nav-results" onclick="showPage('page-results', this)">Review</button>
+      <button class="nav-btn" id="btn-nav-audit" onclick="showPage('page-audit', this)">Audit log</button>
     </div>
 
     <div style="font-size: 0.8rem; color: var(--text-muted);">Run ID: <code id="run-id-display">None</code></div>
@@ -288,26 +340,35 @@
     <!-- Left Column: Pipeline Setup & Configuration -->
     <div>
       <div class="glass-card">
-        <div class="card-title">1. Dataset & Pipeline Setup</div>
+        <div class="card-title">New run</div>
         
         <div class="form-group">
-          <label>Upload CSV Dataset</label>
+          <label>Dataset</label>
           <div class="upload-zone" onclick="document.getElementById('csv-file').click()">
-            <div id="file-label" style="font-size: 0.9rem; font-weight: 600;">Click to select CSV file</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Supports any tabular CSV dataset</div>
+            <div id="file-label" style="font-size: 0.9rem; font-weight: 600;">Choose a CSV file</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">One header row, one column per feature</div>
           </div>
           <input type="file" id="csv-file" accept=".csv" style="display: none;" onchange="handleFileSelect(event)">
         </div>
 
         <div class="form-group">
-          <label>Target / Label Column Name</label>
+          <label>Target column</label>
           <select id="target-col">
             <option value="">Upload CSV to populate column options...</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label>ML Task Type</label>
+          <label>Extra protected attributes (optional)</label>
+          <input type="text" id="protected-attrs" placeholder="e.g. marital-status, personal_status">
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">
+            Columns named like sex, gender, race, age, religion, nationality or disability are detected automatically.
+            The fairness verdict covers protected attributes only; name any other column it must cover.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Task</label>
           <div class="radio-group">
             <div class="radio-option selected" id="task-clf" onclick="setTaskType('classification')">Classification</div>
             <div class="radio-option" id="task-reg" onclick="setTaskType('regression')">Regression</div>
@@ -315,11 +376,11 @@
         </div>
 
         <div class="form-group">
-          <label>Business Objective & Governance Constraints (Optional)</label>
-          <textarea id="biz-obj" rows="3" placeholder="e.g. Optimize for high precision, ensure strict algorithmic fairness across gender/race..."></textarea>
+          <label>Objective (optional, given to the planner)</label>
+          <textarea id="biz-obj" rows="3" placeholder="e.g. Favour recall on the positive class"></textarea>
         </div>
 
-        <button class="btn-primary" onclick="runPipeline()">Run Governed Pipeline</button>
+        <button class="btn-primary" onclick="runPipeline()">Run pipeline</button>
       </div>
     </div>
 
@@ -329,8 +390,7 @@
       <!-- Live Pipeline DAG Flow Diagram Card -->
       <div class="glass-card" style="margin-bottom: 24px;">
         <div class="card-title" style="margin-bottom: 8px;">
-          <span>Live Pipeline DAG Topology</span>
-          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; margin-left: auto;">Real-time Multi-Agent Execution Map</span>
+          <span>Pipeline</span>
         </div>
         <div class="dag-flow-container">
           <div class="dag-node-box pending" id="node-planner">
@@ -338,28 +398,28 @@
             <div class="node-status-pill" id="pill-planner">PENDING</div>
           </div>
 
-          <div class="dag-connector">➔</div>
+          <div class="dag-connector" aria-hidden="true"></div>
 
           <div class="dag-node-box pending" id="node-data">
             <div class="node-title">Data Agent</div>
             <div class="node-status-pill" id="pill-data">PENDING</div>
           </div>
 
-          <div class="dag-connector">➔</div>
+          <div class="dag-connector" aria-hidden="true"></div>
 
           <div class="dag-node-box pending" id="node-training">
             <div class="node-title">Training Agent</div>
             <div class="node-status-pill" id="pill-training">PENDING</div>
           </div>
 
-          <div class="dag-connector">➔</div>
+          <div class="dag-connector" aria-hidden="true"></div>
 
           <div class="dag-node-box pending" id="node-fairness">
             <div class="node-title">Fairness Agent</div>
             <div class="node-status-pill" id="pill-fairness">PENDING</div>
           </div>
 
-          <div class="dag-connector">➔</div>
+          <div class="dag-connector" aria-hidden="true"></div>
 
           <div class="dag-node-box pending" id="node-gate">
             <div class="node-title">Governance Gate</div>
@@ -369,12 +429,16 @@
       </div>
 
       <!-- Overview Welcome Banner -->
-      <div class="glass-card" style="text-align: center; padding: 48px 24px;" id="home-welcome">
-        <div style="font-size: 1.15rem; font-weight: 700; margin-bottom: 8px;">Multi-Agent Data Science Governance System</div>
-        <div style="font-size: 0.85rem; color: var(--text-muted); max-width: 620px; margin: 0 auto 24px auto; line-height: 1.6;">
-          Upload a dataset and launch execution. Once the multi-agent graph runs, inspect exploratory data profiling under 
-          <strong style="color: #60a5fa;">2. Data Analysis & Profiling</strong> and governance proposals under <strong style="color: #c4b5fd;">3. Governance Results & Review</strong>.
-        </div>
+      <div class="glass-card" id="home-welcome">
+        <div class="card-title">What a run does</div>
+        <ol class="steps">
+          <li><strong>Profile.</strong> Every column is summarised. Identifier and constant columns are dropped, distribution issues go to the planner, and suspected leakage or proxy variables are held for you.</li>
+          <li><strong>Plan.</strong> The LLM sees aggregate statistics only and proposes preprocessing and models. It never touches the data.</li>
+          <li><strong>Clean and split.</strong> Train, validation and test rows are separated before anything is fitted.</li>
+          <li><strong>Train and audit.</strong> Models are ranked on the validation rows, and fairness is measured on protected attributes.</li>
+          <li><strong>Decide.</strong> The run stops for your review. Approving saves the model, scores it once on the untouched test rows and writes its model card.</li>
+        </ol>
+        <p class="muted small">Every step is written to a hash-chained audit log, under the rules in <code>policy.yaml</code>.</p>
       </div>
 
     </div>
@@ -384,23 +448,26 @@
   <!-- PAGE 2: DATA ANALYSIS & PROFILING PAGE -->
   <div class="page-view-full" id="page-eda">
     
-    <!-- EDA Summary KPI Banner -->
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
-      <div style="background: rgba(0,0,0,0.35); padding: 18px; border-radius: 12px; text-align: center; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Total Rows</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #a5b4fc;" id="eda-total-rows">—</div>
-      </div>
-      <div style="background: rgba(0,0,0,0.35); padding: 18px; border-radius: 12px; text-align: center; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Total Columns</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #60a5fa;" id="eda-total-cols">—</div>
-      </div>
-      <div style="background: rgba(0,0,0,0.35); padding: 18px; border-radius: 12px; text-align: center; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Overall Missing Cells</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #34d399;" id="eda-missing-pct">—</div>
-      </div>
-      <div style="background: rgba(0,0,0,0.35); padding: 18px; border-radius: 12px; text-align: center; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Columns with Outliers</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #fbbf24;" id="eda-outliers-cnt">—</div>
+    <!-- Dataset figures -->
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Rows</div><div class="stat-value" id="eda-total-rows">—</div></div>
+      <div class="stat"><div class="stat-label">Columns</div><div class="stat-value" id="eda-total-cols">—</div></div>
+      <div class="stat"><div class="stat-label">Missing cells</div><div class="stat-value" id="eda-missing-pct">—</div></div>
+      <div class="stat"><div class="stat-label">Columns with outliers</div><div class="stat-value" id="eda-outliers-cnt">—</div></div>
+    </div>
+
+    <!-- EDA Findings: what the analysis found and who acts on it -->
+    <div class="glass-card" style="margin-bottom: 24px;">
+      <div class="card-title">Findings &amp; How They Are Used</div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+        Each finding is routed to the stage allowed to act on it.
+        <strong>Auto-applied by Data Agent:</strong> structural issues such as identifier or constant columns.
+        <strong>Sent to Planner:</strong> judgement-light issues the plan must address by name.
+        <strong>Held for reviewer:</strong> suspected target leakage and proxy variables, which are never sent to the LLM
+        or acted on automatically.
+      </p>
+      <div id="eda-findings-list">
+        <div style="font-size: 0.85rem; color: var(--text-muted);">Run the pipeline to derive findings.</div>
       </div>
     </div>
 
@@ -430,7 +497,7 @@
 
     <!-- Data Profiling Table Card -->
     <div class="glass-card">
-      <div class="card-title">Exploratory Column Statistics & Profiling</div>
+      <div class="card-title">Column profile</div>
       <table>
         <thead>
           <tr>
@@ -482,24 +549,38 @@
   <!-- PAGE 3: GOVERNANCE RESULTS & REVIEW PAGE -->
   <div class="page-view-full" id="page-results">
     
-    <!-- Approved Model Saved Success Banner -->
-    <div class="glass-card" id="approved-banner" style="display: none; border-color: rgba(16, 185, 129, 0.5); background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.04) 100%); margin-bottom: 20px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <div style="font-size: 1.15rem; font-weight: 800; color: #34d399; margin-bottom: 4px;">
-            ✅ Model Formally Approved & Saved to Disk!
-          </div>
-          <div style="font-size: 0.88rem; color: var(--text-main);">
-            The winning algorithm (<strong id="approved-model-title" style="color: #60a5fa;">—</strong>) has been serialized and saved as a production-ready model artifact.
-          </div>
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px;">
-            Saved Artifact Path: <code id="approved-model-path" style="color: #a7f3d0;">saved_models/...</code> | Event logged to SQLite audit store (<code style="color: #c4b5fd;">audit_log.db</code>).
-          </div>
-        </div>
-        <div style="text-align: right;">
-          <span class="badge badge-pass" style="font-size: 0.85rem; padding: 8px 16px;">STATUS: DEPLOYED</span>
-        </div>
+    <!-- Run ended without approval (retry cap, rejection cap, training failure, policy block) -->
+    <div class="glass-card status-panel status-panel--refused" id="terminated-banner" style="display: none;">
+      <div class="status-panel__head">
+        <div class="status-panel__title">Run ended without approval</div>
+        <span class="badge badge-fail">NOT APPROVED</span>
       </div>
+      <div id="terminated-reason">—</div>
+      <div class="muted small" style="margin-top: 6px;">No model was saved and no compliance artifacts were written.</div>
+    </div>
+
+    <!-- Approved -->
+    <div class="glass-card status-panel" id="approved-banner" style="display: none;">
+      <div class="status-panel__head">
+        <div class="status-panel__title">Approved: <span id="approved-model-title">—</span></div>
+        <span class="badge badge-pass">APPROVED</span>
+      </div>
+      <div class="small">Saved to <code id="approved-model-path">—</code>. The decision is recorded in <code>audit_log.db</code>.</div>
+      <div class="small" id="approved-signoff" style="margin-top: 6px; color: var(--silver-dim);"></div>
+    </div>
+
+    <!-- Compliance Artifacts -->
+    <div class="glass-card" id="artifacts-card" style="display: none; margin-bottom: 20px;">
+      <div class="card-title">Compliance Artifacts</div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+        Generated from recorded pipeline state on approval. Each file's SHA-256 is
+        written into the hash-chained audit log, so an edit after the fact is
+        detectable. The Annex IV pack is a <strong>draft</strong> input to technical
+        documentation, not a conformity assessment.
+      </p>
+      <div id="artifacts-integrity" style="margin-bottom: 14px;"></div>
+      <div id="artifacts-list" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+      <pre id="artifact-viewer" style="display: none; margin-top: 16px; max-height: 520px; overflow: auto; background: rgba(0,0,0,0.35); border: 1px solid var(--card-border); border-radius: 3px; padding: 16px; font-size: 0.78rem; line-height: 1.5; white-space: pre-wrap; color: var(--text-main);"></pre>
     </div>
 
     <!-- Selected Model Winner KPI Block -->
@@ -510,19 +591,20 @@
       </div>
       <div style="text-align: right;">
         <div class="kpi-label" id="primary-metric-label">Primary Metric</div>
-        <div class="kpi-val" style="color: #60a5fa;" id="primary-metric-val">—</div>
+        <div class="kpi-val" style="color: #ededed;" id="primary-metric-val">—</div>
       </div>
     </div>
 
     <!-- Governance Multi-Agent Output Tabs -->
     <div class="glass-card">
-      <div class="card-title">Multi-Agent Evaluation Results</div>
+      <div class="card-title">Run results</div>
       
       <div class="tabs-header">
         <button class="tab-btn active" onclick="switchTab(event, 'tab-planner')">Planner Proposal</button>
         <button class="tab-btn" onclick="switchTab(event, 'tab-data')">Data Cleaning Report</button>
         <button class="tab-btn" onclick="switchTab(event, 'tab-leaderboard')">Model Leaderboard</button>
         <button class="tab-btn" onclick="switchTab(event, 'tab-fairness')">Fairness Assessment</button>
+        <button class="tab-btn" onclick="switchTab(event, 'tab-eda-insights')">EDA Insights <span id="eda-insights-count" style="color: #b8b8b8;"></span></button>
       </div>
 
       <!-- Tab 1: Planner -->
@@ -548,21 +630,12 @@
 
       <!-- Tab 2: Data Agent -->
       <div class="tab-content" id="tab-data">
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
-          <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 10px; text-align: center; border: 1px solid var(--card-border);">
-            <div style="font-size: 0.8rem; color: var(--text-muted);">Missing % After Cleaning</div>
-            <div style="font-size: 1.5rem; font-weight: 800; color: #34d399;" id="data-missing">0%</div>
-          </div>
-          <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 10px; text-align: center; border: 1px solid var(--card-border);">
-            <div style="font-size: 0.8rem; color: var(--text-muted);">Rows Dropped</div>
-            <div style="font-size: 1.5rem; font-weight: 800; color: #60a5fa;" id="data-rows-dropped">0</div>
-          </div>
-          <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 10px; text-align: center; border: 1px solid var(--card-border);">
-            <div style="font-size: 0.8rem; color: var(--text-muted);">Columns Dropped</div>
-            <div style="font-size: 1.5rem; font-weight: 800; color: #a78bfa;" id="data-cols-dropped">0</div>
-          </div>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-label">Missing after cleaning</div><div class="stat-value" id="data-missing">0%</div></div>
+          <div class="stat"><div class="stat-label">Rows dropped</div><div class="stat-value" id="data-rows-dropped">0</div></div>
+          <div class="stat"><div class="stat-label">Columns dropped</div><div class="stat-value" id="data-cols-dropped">0</div></div>
         </div>
-        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 8px;">Executed Preprocessing Actions:</div>
+        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 8px;">Preprocessing actions</div>
         <ul id="data-actions" style="padding-left: 20px; font-size: 0.85rem;"></ul>
       </div>
 
@@ -596,49 +669,84 @@
               <th>Status</th>
               <th>Disparate Impact (≥0.80)</th>
               <th>Demographic Parity Diff (≤0.10)</th>
-              <th>Group Rate Gap</th>
+              <th>Equal Opportunity Diff</th>
+              <th>Groups Compared</th>
             </tr>
           </thead>
           <tbody id="fairness-tbody">
-            <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No sensitive attribute violations evaluated</td></tr>
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No attribute has been audited yet</td></tr>
           </tbody>
         </table>
         <div style="margin-top: 14px; font-size: 0.8rem; color: var(--text-muted);" id="fairness-skipped"></div>
+        <div id="fairness-intersectional"></div>
+        <div id="fairness-mitigation"></div>
+        <div id="fairness-proxy-warnings"></div>
+      </div>
+
+      <!-- Tab 5: EDA Insights -->
+      <div class="tab-content" id="tab-eda-insights">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+          Every finding from exploratory analysis, with what each stage actually did with it.
+          "Mentioned" is a textual check that the plan names the column; it is not proof the
+          concern was resolved.
+        </p>
+        <div id="eda-insights-list"></div>
       </div>
 
     </div>
 
     <!-- GOVERNANCE DECISION CARD (POSITIONED LOGICALLY AFTER RESULTS & LEADERBOARD) -->
-    <div class="glass-card" id="decision-card" style="display: none; border-color: rgba(245, 158, 11, 0.4);">
-      <div class="card-title" style="color: #fbbf24;">Submit Governance Decision</div>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
-        Pipeline execution is paused at the Governance Gate. Based on the evaluation results above, select a governance action:
+    <div class="glass-card decision-panel" id="decision-card" style="display: none;">
+      <div class="card-title">Your decision</div>
+      <p class="muted small" style="margin-bottom: 14px;">
+        The run is paused. Nothing is saved until you approve.
       </p>
+
+      <div class="signoff-note" id="signoff-note" style="display: none;"></div>
+
+      <div class="form-group">
+        <label>Who is deciding</label>
+        <div class="identity-row">
+          <input type="text" id="reviewer-id" placeholder="reviewer id, e.g. a.kumar" autocomplete="off">
+          <select id="reviewer-role">
+            <option value="">role (optional)</option>
+          </select>
+          <input type="password" id="reviewer-token" placeholder="reviewer token" autocomplete="off" style="display: none;">
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;" id="reviewer-identity-note"></div>
+      </div>
 
       <div class="form-group">
         <div class="radio-group" style="flex-direction: column;">
           <div class="radio-option selected" id="opt-approve" onclick="setDecision('approve')">
-            Approve — Deploy model to production
+            Approve — save the model and write its model card
           </div>
           
           <div class="radio-option" id="opt-reject-data" onclick="setDecision('reject_data_quality')">
-            Reject — Data quality concerns (Reroute to Planner)
+            Reject: data quality — back to the planner, with your notes
           </div>
-          <div id="feedback-container" style="display: none; margin-top: 6px; padding: 12px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--card-border); border-radius: 8px;">
-            <label style="font-size: 0.8rem; color: #c4b5fd;">Directives for Planner LLM (Optional):</label>
+          <div id="feedback-container" style="display: none; margin-top: 6px; padding: 12px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--card-border); border-radius: 3px;">
+            <label style="font-size: 0.8rem; color: #b8b8b8;">Notes for the planner (optional)</label>
             <textarea id="human-feedback" rows="2" placeholder="e.g. Impute missing values using median, drop column X, handle extreme class imbalance with SMOTE..."></textarea>
           </div>
 
           <div class="radio-option" id="opt-reject-model" onclick="setDecision('reject_model_or_fairness')">
-            Reject — Model choice / fairness concerns (Reroute to Training)
+            Reject: model — retrain without this model
           </div>
-          <div id="model-reroute-note" style="display: none; font-size: 0.78rem; color: var(--text-muted); padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-left: 2px solid var(--accent-amber); border-radius: 4px; margin-top: 6px;">
+          <div id="model-reroute-note" style="display: none; font-size: 0.78rem; color: var(--text-muted); padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-left: 2px dashed var(--silver-dim); border-radius: 3px; margin-top: 6px;">
             Note: The currently selected top model will be excluded, and the Training Agent will evaluate and select the next best candidate.
+          </div>
+
+          <div class="radio-option" id="opt-mitigate" onclick="setDecision('reject_and_mitigate')">
+            Reject: mitigate bias — retrain with reweighing
+          </div>
+          <div id="mitigate-note" style="display: none; font-size: 0.78rem; color: var(--text-muted); padding: 8px 12px; background: rgba(0, 0, 0, 0.2); border-left: 2px dashed var(--silver-dim); border-radius: 3px; margin-top: 6px;">
+            Note: The protected attribute with the lowest disparate impact among the violations is chosen (otherwise the worst violated attribute). Training rows are reweighted so the label is independent of that group, the same candidate models are retrained, and the next gate shows before and after. Counts as one reroute.
           </div>
         </div>
       </div>
 
-      <button class="btn-primary" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: auto; padding: 12px 32px;" onclick="submitDecision()">Submit Governance Decision</button>
+      <button class="btn-primary btn-inline" onclick="submitDecision()">Submit decision</button>
     </div>
 
   </div>
@@ -646,12 +754,15 @@
   <!-- PAGE 4: AUDIT TRAIL PAGE -->
   <div class="page-view-full" id="page-audit">
     <div class="glass-card">
-      <div class="card-title">Immutable Governance Audit Log</div>
+      <div class="card-title">Audit log</div>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
-        Chronological execution log persisted into SQLite audit database (`audit_log.db`).
+        Every event for this run, oldest first, from <code>audit_log.db</code>.
+        Each entry is SHA-256 hashed together with its predecessor, so any edit,
+        deletion or reordering breaks the chain and is reported below.
       </p>
+      <div id="audit-chain-badge" style="margin-bottom: 16px;"></div>
       <div class="audit-list" id="audit-trail-list">
-        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 40px;">No audit logs registered for this run yet</div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 40px;">No run selected yet.</div>
       </div>
     </div>
   </div>
@@ -659,8 +770,8 @@
   <!-- Loading Overlay -->
   <div class="overlay" id="loading-overlay">
     <div class="spinner"></div>
-    <div style="font-size: 1.05rem; font-weight: 700; color: #c4b5fd;">Executing Multi-Agent Governance Pipeline...</div>
-    <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">Planner → Data Agent → Training Agent → Fairness Agent</div>
+    <div class="overlay-title">Running the pipeline</div>
+    <div class="muted small">Profile, plan, clean, train, audit. Usually one to two minutes.</div>
   </div>
 
   <script>
@@ -755,16 +866,54 @@
       document.getElementById('task-reg').classList.toggle('selected', type === 'regression');
     }
 
+    let approvalBlockedReason = null;
+
+    // How this server treats identities. Asked once, at load: the dashboard must not
+    // guess whether a token is required.
+    let reviewerMode = { roster_configured: false, roles: [], token_header: 'X-Reviewer-Token' };
+
+    async function loadReviewerMode() {
+      try {
+        const res = await fetch('/api/reviewers');
+        if (res.ok) reviewerMode = await res.json();
+      } catch (err) { /* keep the defaults; the resume call will say what is missing */ }
+
+      const roleSelect = document.getElementById('reviewer-role');
+      (reviewerMode.roles || []).forEach(role => {
+        const option = document.createElement('option');
+        option.value = role;
+        option.textContent = role.replace(/_/g, ' ');
+        roleSelect.appendChild(option);
+      });
+      const tokenInput = document.getElementById('reviewer-token');
+      const note = document.getElementById('reviewer-identity-note');
+      if (reviewerMode.roster_configured) {
+        tokenInput.style.display = '';
+        note.innerText = 'This server has a reviewer roster (version '
+          + (reviewerMode.roster_version || '?')
+          + '). Your token identifies you; the id and role are checked against it. '
+          + 'The token is sent with this decision and is not stored by the page.';
+      } else {
+        note.innerText = 'No reviewer roster is configured, so your identity is recorded '
+          + 'as UNVERIFIED — it is whatever you type here. Add reviewers.yaml '
+          + '(see reviewers.example.yaml) to authenticate decisions with tokens.';
+      }
+    }
+
     function setDecision(dec) {
+      if (dec === 'approve' && approvalBlockedReason) return;
       selectedDecision = dec;
       document.getElementById('opt-approve').classList.toggle('selected', dec === 'approve');
       document.getElementById('opt-reject-data').classList.toggle('selected', dec === 'reject_data_quality');
       document.getElementById('opt-reject-model').classList.toggle('selected', dec === 'reject_model_or_fairness');
+      document.getElementById('opt-mitigate').classList.toggle('selected', dec === 'reject_and_mitigate');
 
       const fbBox = document.getElementById('feedback-container');
       const noteBox = document.getElementById('model-reroute-note');
+      const mitigateBox = document.getElementById('mitigate-note');
       if (fbBox) fbBox.style.display = (dec === 'reject_data_quality') ? 'block' : 'none';
       if (noteBox) noteBox.style.display = (dec === 'reject_model_or_fairness') ? 'block' : 'none';
+      if (mitigateBox) mitigateBox.style.display = (dec === 'reject_and_mitigate') ? 'block' : 'none';
     }
 
     function switchTab(evt, tabId) {
@@ -787,6 +936,8 @@
       formData.append('target_column', targetCol);
       formData.append('task_type', selectedTaskType);
       if (bizObj) formData.append('business_objective', bizObj);
+      const protectedAttrs = (document.getElementById('protected-attrs')?.value || '').trim();
+      if (protectedAttrs) formData.append('protected_attributes', protectedAttrs);
 
       document.getElementById('loading-overlay').style.display = 'flex';
 
@@ -805,19 +956,36 @@
 
     async function submitDecision() {
       if (!currentThreadId) return;
+      if (!selectedDecision) { alert('Select a governance decision first.'); return; }
       document.getElementById('loading-overlay').style.display = 'flex';
 
       const fbInput = document.getElementById('human-feedback');
       const feedbackText = (selectedDecision === 'reject_data_quality' && fbInput) ? fbInput.value.trim() : "";
 
+      const reviewerId = (document.getElementById('reviewer-id')?.value || '').trim();
+      const reviewerRole = (document.getElementById('reviewer-role')?.value || '').trim();
+      const reviewerToken = (document.getElementById('reviewer-token')?.value || '').trim();
+      if (!reviewerId && !reviewerMode.roster_configured) {
+        document.getElementById('loading-overlay').style.display = 'none';
+        alert('Enter your reviewer id: a governance decision has to name who made it.');
+        return;
+      }
+
+      // The token goes in a header, never in the body or the URL, and is held only in
+      // this form field — nothing persists it.
+      const headers = { 'Content-Type': 'application/json' };
+      if (reviewerToken) headers[reviewerMode.token_header || 'X-Reviewer-Token'] = reviewerToken;
+
       try {
         const res = await fetch('/api/pipeline/resume', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify({
             thread_id: currentThreadId,
             decision: selectedDecision,
-            human_feedback: feedbackText
+            human_feedback: feedbackText,
+            reviewer_id: reviewerId || null,
+            reviewer_role: reviewerRole || null
           })
         });
         const data = await res.json();
@@ -831,9 +999,44 @@
       }
     }
 
+    function renderSignoffState(payload) {
+      const note = document.getElementById('signoff-note');
+      const lines = [];
+
+      if (payload.signoff_error) {
+        lines.push('<strong>That approval was not accepted as a sign-off.</strong> '
+          + escHtml(payload.signoff_error) + '.');
+      }
+      if (payload.awaiting_second_approval) {
+        const first = payload.first_approval || {};
+        lines.push('<strong>Awaiting a second sign-off.</strong> '
+          + escHtml(first.reviewer_id || 'a reviewer')
+          + (first.reviewer_role ? ' (' + escHtml(first.reviewer_role) + ')' : '')
+          + ' approved this model at ' + escHtml(first.timestamp || 'an unrecorded time')
+          + (first.authenticated ? '' : ', with an UNVERIFIED identity')
+          + '. The run is not approved and nothing has been written. A different '
+          + 'reviewer must approve, or reject.');
+      } else if (payload.dual_signoff_required_reason) {
+        lines.push('<strong>Approving takes two reviewers.</strong> '
+          + escHtml(payload.dual_signoff_required_reason)
+          + '. Your approval will be recorded and the gate will re-open for the second.');
+      }
+
+      const decisions = payload.reviewer_decisions || [];
+      if (decisions.length) {
+        lines.push('Decisions so far: ' + decisions.map(d =>
+          escHtml(d.reviewer_id || 'unidentified') + ' &rarr; ' + escHtml(d.decision)
+        ).join(', ') + '.');
+      }
+
+      note.innerHTML = lines.join('<br><br>');
+      note.style.display = lines.length ? 'block' : 'none';
+    }
+
     function updateDAGTopologyNodes(data) {
       const isPaused = data.status === 'paused';
-      const payload = data.review_payload || {};
+      // A finished run has no live payload; its stages ran, so read the kept one.
+      const payload = data.review_payload || data.last_review_payload || {};
 
       const nPlanner = document.getElementById('node-planner');
       const pPlanner = document.getElementById('pill-planner');
@@ -890,8 +1093,8 @@
           datasets: [{
             label: 'Sample Count',
             data: charts.target_values || [],
-            backgroundColor: 'rgba(124, 58, 237, 0.65)',
-            borderColor: '#7c3aed',
+            backgroundColor: '#b8b8b8',
+            borderColor: '#b8b8b8',
             borderWidth: 1,
             borderRadius: 6
           }]
@@ -901,8 +1104,8 @@
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
-            y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            x: { ticks: { color: '#8a8a8a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#8a8a8a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
           }
         }
       });
@@ -917,8 +1120,8 @@
           datasets: [{
             label: 'Pearson r',
             data: charts.correlation_values || [],
-            backgroundColor: 'rgba(99, 102, 241, 0.65)',
-            borderColor: '#6366f1',
+            backgroundColor: '#8a8a8a',
+            borderColor: '#8a8a8a',
             borderWidth: 1,
             borderRadius: 6
           }]
@@ -929,8 +1132,8 @@
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
-            y: { ticks: { color: '#9ca3af', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            x: { ticks: { color: '#8a8a8a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#8a8a8a', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
           }
         }
       });
@@ -944,8 +1147,8 @@
           labels: ['Clean Cells', 'Missing Cells'],
           datasets: [{
             data: charts.missingness || [100, 0],
-            backgroundColor: ['rgba(16, 185, 129, 0.7)', 'rgba(239, 68, 68, 0.7)'],
-            borderColor: ['#10b981', '#ef4444'],
+            backgroundColor: ['#d4d4d4', '#3a3a3a'],
+            borderColor: ['#131313', '#131313'],
             borderWidth: 1
           }]
         },
@@ -953,10 +1156,68 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { labels: { color: '#9ca3af', font: { size: 11 } } }
+            legend: { labels: { color: '#8a8a8a', font: { size: 11 } } }
           }
         }
       });
+    }
+
+    function escHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
+
+    const EDA_ROUTE_LABEL = {
+      data_agent: 'Auto-applied by Data Agent',
+      planner: 'Sent to Planner',
+      reviewer: 'Held for reviewer',
+    };
+    const EDA_SEVERITY_COLOR = { high: '#f5f5f5', medium: '#b8b8b8', info: '#b8b8b8' };
+    const EDA_STATUS_STYLE = {
+      applied:       ['#ededed', 'rgba(255, 255, 255, 0.08)'],
+      mentioned:     ['#b8b8b8', 'rgba(255, 255, 255, 0.08)'],
+      sent:          ['#b8b8b8', 'rgba(255, 255, 255, 0.08)'],
+      flagged:       ['#b8b8b8', 'rgba(255, 255, 255, 0.08)'],
+      attached:      ['#b8b8b8', 'rgba(255, 255, 255, 0.08)'],
+      not_reflected: ['#f5f5f5', 'rgba(255, 255, 255, 0.14)'],
+      not_applied:   ['#8a8a8a', 'rgba(255, 255, 255, 0.08)'],
+      pending:       ['#8a8a8a', 'rgba(255, 255, 255, 0.08)'],
+    };
+
+    // Column names and evidence come from the uploaded CSV, so every value is
+    // escaped before it reaches innerHTML.
+    function renderEDAFindings(findings, targetId, withOutcomes) {
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      if (!findings || !findings.length) {
+        el.innerHTML = '<div style="font-size: 0.85rem; color: var(--text-muted); padding: 8px 0;">No identifier, distribution, redundancy, leakage or proxy issues were detected.</div>';
+        return;
+      }
+      el.innerHTML = findings.map(f => {
+        const sev = EDA_SEVERITY_COLOR[f.severity] || '#8a8a8a';
+        const cols = (f.columns || []).map(escHtml).join(', ');
+        let outcomes = '';
+        if (withOutcomes && f.outcomes && f.outcomes.length) {
+          const chips = f.outcomes.map(o => {
+            const style = EDA_STATUS_STYLE[o.status] || EDA_STATUS_STYLE.pending;
+            return `<span style="font-size: 0.72rem; color: ${style[0]}; background: ${style[1]}; border-radius: 3px; padding: 3px 8px;">${escHtml(o.stage)}: ${escHtml(String(o.status).replace(/_/g, ' '))}</span>`;
+          }).join('');
+          const details = f.outcomes.map(o =>
+            `<div style="font-size: 0.74rem; color: var(--text-dark); margin-top: 3px;">${escHtml(o.stage)} — ${escHtml(o.detail)}</div>`
+          ).join('');
+          outcomes = `<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;">${chips}</div>${details}`;
+        }
+        return `<div style="border: 1px solid var(--card-border); border-left: 3px solid ${sev}; border-radius: 3px; padding: 12px 14px; margin-bottom: 10px; background: rgba(0, 0, 0, 0.25);">
+          <div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline;">
+            <strong style="font-size: 0.88rem;">${escHtml(String(f.type).replace(/_/g, ' '))}${cols ? ' — ' + cols : ''}</strong>
+            <span style="font-size: 0.72rem; color: ${sev}; text-transform: uppercase; white-space: nowrap;">${escHtml(f.severity)} · ${escHtml(EDA_ROUTE_LABEL[f.route] || f.route)}</span>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">${escHtml(f.evidence)}</div>
+          <div style="font-size: 0.8rem; color: var(--text-main); margin-top: 4px;">${escHtml(f.recommendation)}</div>
+          ${outcomes}
+        </div>`;
+      }).join('');
     }
 
     function renderEDAReport(eda) {
@@ -966,6 +1227,8 @@
       document.getElementById('eda-total-cols').innerText = sum.total_columns || 0;
       document.getElementById('eda-missing-pct').innerText = (sum.missing_pct || 0) + '%';
       document.getElementById('eda-outliers-cnt').innerText = sum.outlier_columns_count || 0;
+
+      renderEDAFindings(eda.findings || [], 'eda-findings-list', false);
 
       // Render Visual Charts
       if (eda.charts) {
@@ -994,7 +1257,7 @@
         <tr>
           <td><strong>${r.feature_a}</strong></td>
           <td><strong>${r.feature_b}</strong></td>
-          <td style="color: #60a5fa; font-weight: 700;">${r.correlation}</td>
+          <td style="color: #ededed; font-weight: 700;">${r.correlation}</td>
         </tr>
       `).join('') : '<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 20px;">No high feature correlations (|r| ≥ 0.20)</td></tr>';
 
@@ -1029,17 +1292,125 @@
 
       updateDAGTopologyNodes(data);
 
+      // Declared before first use. This is a `const`, so reading it earlier in the
+      // function hits the temporal dead zone and throws a ReferenceError, which
+      // aborted the whole render on the approved path (banner shown, artifact path
+      // and artifacts panel silently never populated).
+      // A finished run has no live gate payload; show the one the reviewer decided on,
+      // so its evaluation tabs are not empty.
+      const payload = data.review_payload || data.last_review_payload || {};
+
       if (data.status === 'paused') {
         document.getElementById('decision-card').style.display = 'block';
+        // Policy may refuse approval (fairness not measured): disable the option and say why.
+        approvalBlockedReason = payload.approval_blocked_reason || null;
+        const approveOpt = document.getElementById('opt-approve');
+        let blockNote = document.getElementById('approval-blocked-note');
+        if (!blockNote) {
+          blockNote = document.createElement('div');
+          blockNote.id = 'approval-blocked-note';
+          blockNote.style.cssText = 'font-size: 0.78rem; color: #b8b8b8; padding: 8px 12px; border-left: 2px dashed var(--silver-dim); margin-top: 6px;';
+          approveOpt.insertAdjacentElement('afterend', blockNote);
+        }
+        if (approvalBlockedReason) {
+          approveOpt.style.opacity = '0.45';
+          approveOpt.style.cursor = 'not-allowed';
+          blockNote.innerText = 'Approval blocked by policy: ' + approvalBlockedReason;
+          blockNote.style.display = 'block';
+          if (selectedDecision === 'approve') { selectedDecision = null; approveOpt.classList.remove('selected'); }
+        } else {
+          approveOpt.style.opacity = '';
+          approveOpt.style.cursor = '';
+          blockNote.style.display = 'none';
+        }
+        renderSignoffState(payload);
         document.getElementById('approved-banner').style.display = 'none';
+        document.getElementById('terminated-banner').style.display = 'none';
+        document.getElementById('artifacts-card').style.display = 'none';
       } else {
         document.getElementById('decision-card').style.display = 'none';
         const vals = data.values || {};
-        if (vals.human_decision === 'approve' || data.status === 'completed') {
+
+        // A completed run is NOT necessarily an approved one. A run that hit the
+        // data-quality retry cap or the human-rejection cap also reports
+        // status === 'completed', and previously fell into the branch below and
+        // rendered "Model Formally Approved & Saved to Disk" — presenting a run
+        // that was rejected and terminated as a successful deployment.
+        const terminated = vals.unresolved_human_rejection || vals.unresolved_quality_issue
+          || vals.unresolved_training_failure || vals.unresolved_approval_blocked;
+        const approved = vals.human_decision === 'approve' && !terminated;
+
+        document.getElementById('terminated-banner').style.display = terminated ? 'block' : 'none';
+        if (terminated) {
+          document.getElementById('approved-banner').style.display = 'none';
+          document.getElementById('artifacts-card').style.display = 'none';
+          document.getElementById('terminated-reason').innerText = vals.unresolved_approval_blocked
+            ? 'Approval was refused by the governance policy: the model\'s fairness was not measured (NOT EVALUATED or NOT FULLY EVALUATED), and the policy blocks approving such a model.'
+            : vals.unresolved_quality_issue
+            ? 'The Data Agent quality gate never passed and the automatic retry cap was reached. Training data the pipeline itself flagged as deficient was never approved for deployment.'
+            : vals.unresolved_training_failure
+              ? 'No model could be trained: every remaining candidate failed to fit, so there was nothing to present for approval.'
+              : 'The human reviewer rejected the model and the rejection reroute cap was reached. Execution stopped without an approved model.';
+        }
+
+        if (approved) {
           const approvedBanner = document.getElementById('approved-banner');
           approvedBanner.style.display = 'block';
-          document.getElementById('approved-model-title').innerText = payload.selected_model_name || 'Selected Winner Model';
-          document.getElementById('approved-model-path').innerText = data.model_saved_path || vals.model_saved_path || `saved_models/${currentThreadId}_model.joblib`;
+          // review_payload is null once the run completes, so fall back to the
+          // value carried in `values` rather than a generic placeholder.
+          document.getElementById('approved-model-title').innerText =
+            payload.selected_model_name || vals.selected_model_name || 'Selected Winner Model';
+          // Show ONLY the path the backend actually wrote. Falling back to a
+          // constructed string would display an artifact location that does not
+          // exist on disk.
+          const approvals = (vals.reviewer_decisions || []).filter(d => d.decision === 'approve');
+          const signoffEl = document.getElementById('approved-signoff');
+          if (approvals.length) {
+            signoffEl.innerHTML = (approvals.length > 1
+              ? 'Dual sign-off by ' : 'Approved by ')
+              + approvals.map(d => escHtml(d.reviewer_id || 'an unidentified reviewer')
+                + (d.reviewer_role ? ' (' + escHtml(d.reviewer_role) + ')' : '')).join(' and ')
+              + (approvals.every(d => d.authenticated) ? '.'
+                 : '. Identity UNVERIFIED: no reviewer roster was configured.');
+          } else {
+            signoffEl.innerText = '';
+          }
+          const savedPath = data.model_saved_path || vals.model_saved_path;
+          const pathEl = document.getElementById('approved-model-path');
+          if (savedPath) {
+            pathEl.innerText = savedPath;
+            pathEl.style.color = '#b8b8b8';
+          } else {
+            pathEl.innerText = vals.model_save_error
+              ? `NOT SAVED — ${vals.model_save_error}`
+              : 'NOT SAVED';
+            pathEl.style.color = '#f5f5f5';
+          }
+          // The numbers to report: the approved model scored once on test rows that no
+          // gate decision looked at. Everything at the gate used validation rows.
+          let finalEl = document.getElementById('approved-final-eval');
+          if (!finalEl) {
+            finalEl = document.createElement('div');
+            finalEl.id = 'approved-final-eval';
+            finalEl.style.cssText = 'font-size: 0.82rem; margin-top: 10px; color: var(--text-muted);';
+            pathEl.parentElement.appendChild(finalEl);
+          }
+          const fe = vals.final_evaluation;
+          if (fe && fe.metrics) {
+            const fv = (fe.fairness || {}).overall_fairness_passed;
+            const cov = (fe.fairness || {}).fairness_coverage;
+            const verdict = fv === true ? 'PASSED' : fv === false ? 'VIOLATION DETECTED'
+              : (cov === 'partial' ? 'NOT FULLY EVALUATED' : 'NOT EVALUATED');
+            const m = fe.metrics;
+            const shown = Object.entries(m).filter(([, v]) => v !== null && v !== undefined)
+              .map(([k, v]) => `${escHtml(k)} ${escHtml(v)}`).join(' · ');
+            finalEl.innerHTML = `<strong>Final evaluation on ${escHtml(fe.rows)} untouched test rows:</strong> ${shown} · fairness ${escHtml(verdict)}`;
+          } else if (fe && fe.error) {
+            finalEl.innerHTML = `<strong style="color: #f5f5f5;">Final test evaluation failed:</strong> ${escHtml(fe.error)}`;
+          } else {
+            finalEl.innerHTML = '';
+          }
+          fetchArtifacts(currentThreadId);
         }
       }
 
@@ -1047,27 +1418,33 @@
         renderEDAReport(data.eda_report);
       }
 
-      const payload = data.review_payload || {};
       const plan = payload.plan_summary || {};
       const quality = payload.quality_report || {};
 
       // Render Planner
       document.getElementById('plan-reasoning').innerText = plan.reasoning || 'N/A';
-      document.getElementById('plan-concerns').innerHTML = (plan.data_quality_concerns || []).map(c => `<li>${c}</li>`).join('') || '<li>None</li>';
-      document.getElementById('plan-models').innerHTML = (plan.recommended_models || []).map(m => `<li>${m}</li>`).join('') || '<li>None</li>';
-      document.getElementById('plan-steps').innerHTML = (plan.recommended_preprocessing_steps || []).map(s => `<li>${s}</li>`).join('') || '<li>None</li>';
-      document.getElementById('plan-sensitive').innerHTML = (plan.sensitive_attribute_candidates || []).map(a => `<li>${a}</li>`).join('') || '<li style="color: var(--text-muted);">None identified</li>';
+      // Planner text is LLM output: untrusted, so escaped before it becomes markup.
+      document.getElementById('plan-concerns').innerHTML = (plan.data_quality_concerns || []).map(c => `<li>${escHtml(c)}</li>`).join('') || '<li>None</li>';
+      document.getElementById('plan-models').innerHTML = (plan.recommended_models || []).map(m => `<li>${escHtml(m)}</li>`).join('') || '<li>None</li>';
+      document.getElementById('plan-steps').innerHTML = (plan.recommended_preprocessing_steps || []).map(s => `<li>${escHtml(s)}</li>`).join('') || '<li>None</li>';
+      document.getElementById('plan-sensitive').innerHTML = (plan.sensitive_attribute_candidates || []).map(a => `<li>${escHtml(a)}</li>`).join('') || '<li style="color: var(--text-muted);">None identified</li>';
 
       // Render Data
       document.getElementById('data-missing').innerText = (quality.missing_pct_after_cleaning || 0) + '%';
       document.getElementById('data-rows-dropped').innerText = quality.rows_dropped || 0;
       document.getElementById('data-cols-dropped').innerText = (quality.columns_dropped || []).length;
-      document.getElementById('data-actions').innerHTML = (payload.data_agent_actions || []).map(a => `<li>${a}</li>`).join('');
+      // Actions quote uploaded column names and planner text: escape before rendering.
+      document.getElementById('data-actions').innerHTML = (payload.data_agent_actions || []).map(a => `<li>${escHtml(a)}</li>`).join('');
 
       // Render Leaderboard & KPI Block
       const selectedModel = payload.selected_model_name;
       const leaderboard = payload.leaderboard || [];
-      const isReg = selectedTaskType === 'regression';
+      // Decide from the run's own metrics, not the upload form's toggle: after a reload
+      // the toggle is back at its default, and a regression run showed "ACCURACY N/A".
+      const metricsOf = leaderboard.filter(m => m.metrics && Object.keys(m.metrics).length);
+      const isReg = metricsOf.length
+        ? metricsOf.some(m => m.metrics.rmse !== undefined && m.metrics.rmse !== null)
+        : selectedTaskType === 'regression';
 
       if (selectedModel) {
         document.getElementById('kpi-block').style.display = 'flex';
@@ -1099,7 +1476,7 @@
         document.getElementById('leaderboard-tbody').innerHTML = `
           <tr>
             <td colspan="7" style="text-align: center; color: var(--accent-red); font-weight: 600; padding: 20px;">
-              ⚠️ ${errMsg}<br>
+              ${escHtml(errMsg)}<br>
               <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">
                 Hint: If your target column contains continuous decimal numbers (like Unemployment), please select <strong>Regression</strong> task type in Step 1.
               </span>
@@ -1114,7 +1491,7 @@
             <tr>
               <td>${idx + 1}</td>
               <td><strong>${m.model_name}</strong></td>
-              <td>${isWinner ? '<span class="badge badge-winner">⭐ Winner</span>' : ''}</td>
+              <td>${isWinner ? '<span class="badge badge-winner">SELECTED</span>' : ''}</td>
               <td>${isReg ? (met.rmse ?? 'N/A') : (met.accuracy ?? 'N/A')}</td>
               <td>${isReg ? (met.mae ?? 'N/A') : (met.f1 ?? 'N/A')}</td>
               <td>${isReg ? (met.r2 ?? 'N/A') : (met.auc_roc ?? 'N/A')}</td>
@@ -1125,43 +1502,299 @@
       }
 
       // Render Fairness
+      // Three states, not two. `overall_fairness_passed === null` means fairness
+      // was never measured (regression task, or no resolvable subgroup column).
+      // That is NOT a pass, and must never render as a green badge.
       const fairness = payload.fairness_report || [];
       const overallPassed = payload.overall_fairness_passed;
-      if (fairness.length === 0) {
-        document.getElementById('fairness-status-badge').innerHTML =
-          '<span class="badge" style="background: rgba(107, 114, 128, 0.2); color: #9ca3af; padding: 6px 12px; font-size: 0.85rem;">FAIRNESS ASSESSMENT: NO SENSITIVE ATTRIBUTES EVALUATED</span>';
+      const badgeEl = document.getElementById('fairness-status-badge');
+      // A null verdict with audited attributes means a protected attribute in the data
+      // could not be audited: amber, and never a pass (invariant 4).
+      const unauditedProtected = (payload.protected_attributes_unaudited || []).map(p => p.attribute);
+      const unauditedNames = unauditedProtected.map(escHtml).join(', ');
+      const amberStyle = 'background: rgba(255, 255, 255, 0.1); color: #b8b8b8; border: 1px dashed #8a8a8a; padding: 6px 12px; font-size: 0.85rem;';
+      if (fairness.length === 0 || payload.fairness_coverage === 'none') {
+        badgeEl.innerHTML =
+          `<span class="badge" style="${amberStyle}">OVERALL FAIRNESS: NOT EVALUATED — no protected attribute could be audited${unauditedNames ? ` (not audited: ${unauditedNames})` : ''}</span>`;
+      } else if (overallPassed === null || overallPassed === undefined) {
+        badgeEl.innerHTML =
+          `<span class="badge" style="${amberStyle}">OVERALL FAIRNESS: NOT FULLY EVALUATED — no violation among audited attributes, but protected attribute(s) not audited: ${unauditedNames || 'unknown'}</span>`;
+      } else if (overallPassed) {
+        badgeEl.innerHTML =
+          '<span class="badge badge-pass" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: PASSED (ALL PROTECTED ATTRIBUTES CLEARED)</span>';
       } else {
-        document.getElementById('fairness-status-badge').innerHTML = overallPassed ?
-          '<span class="badge badge-pass" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: PASSED (ALL ATTRIBUTES CLEARED)</span>' :
-          '<span class="badge badge-fail" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: VIOLATION DETECTED</span>';
+        badgeEl.innerHTML =
+          '<span class="badge badge-fail" style="padding: 6px 12px; font-size: 0.85rem;">OVERALL FAIRNESS: VIOLATION DETECTED</span>'
+          + (unauditedNames ? `<div style="font-size: 0.78rem; color: #b8b8b8; margin-top: 6px;">Also not audited (protected): ${unauditedNames}</div>` : '');
+      }
+      // The verdict covers protected attributes only; say so, and list advisory findings.
+      const advisory = (payload.advisory_violations || []).map(escHtml).join(', ');
+      const declaredNames = (payload.declared_protected_attributes || []).map(escHtml).join(', ');
+      badgeEl.innerHTML +=
+        `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">The verdict covers protected attributes only${declaredNames ? ` (including those declared by the reviewer: ${declaredNames})` : ''}.</div>`
+        + (advisory ? `<div style="font-size: 0.78rem; color: #b8b8b8; margin-top: 4px;">Advisory — violations on attributes that are not protected, not counted in the verdict: ${advisory}</div>` : '');
+
+      const minGroupSize = payload.fairness_min_group_size ?? 30;
+      document.getElementById('fairness-tbody').innerHTML = fairness.length ? fairness.map(f => {
+        const gd = f.group_details || {};
+        const tags = [
+          f.protected === true ? 'protected attribute — counts toward the verdict' : (f.protected === false ? 'not protected — advisory only' : ''),
+          f.source === 'auto' ? 'added automatically' : (f.source === 'planner' ? 'proposed by planner' : (f.source === 'declared' ? 'declared by reviewer' : '')),
+          f.grouping || '',
+        ].filter(Boolean).map(escHtml).join(' · ');
+        const excluded = Object.entries(f.excluded_groups || {});
+        const excludedNote = excluded.length
+          ? `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">Excluded (under ${escHtml(minGroupSize)} rows): ${excluded.map(([g, n]) => `${escHtml(g)} (${escHtml(n)})`).join(', ')}</div>`
+          : '';
+        const eod = (f.equal_opportunity_difference === null || f.equal_opportunity_difference === undefined)
+          ? 'n/a' : f.equal_opportunity_difference;
+        return `<tr>
+          <td><strong>${escHtml(f.attribute)}</strong><div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">${tags}</div></td>
+          <td>${(() => {
+            const counts = f.counts_toward_verdict ?? f.protected;
+            if (!f.violation) return '<span class="badge badge-pass">PASSED</span>';
+            return counts === false
+              ? '<span class="badge" style="background: rgba(255, 255, 255, 0.1); color: #b8b8b8; border: 1px dashed #8a8a8a;">ADVISORY</span>'
+              : '<span class="badge badge-fail">VIOLATION</span>';
+          })()}</td>
+          <td>${escHtml(f.disparate_impact)}</td>
+          <td>${escHtml(f.demographic_parity_difference)}</td>
+          <td>${escHtml(eod)}</td>
+          <td>Max: ${escHtml(gd.group_a)} (n=${escHtml(gd.group_a_n ?? '?')}) vs Min: ${escHtml(gd.group_b)} (n=${escHtml(gd.group_b_n ?? '?')})${excludedNote}</td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No attribute could be audited — see the reasons below</td></tr>';
+
+      // Attributes that were proposed or detected but could not be audited, and why.
+      // Previously computed but never shown.
+      const skipped = payload.attributes_skipped || [];
+      const skippedEl = document.getElementById('fairness-skipped');
+      if (skippedEl) {
+        skippedEl.innerHTML = skipped.length
+          ? (unauditedNames ? `<div style="color: #b8b8b8; margin-bottom: 6px;"><strong>Protected attributes not audited:</strong> ${unauditedNames} — no overall pass can be recorded while these are unmeasured.</div>` : '')
+            + `<strong>Not audited:</strong><ul style="margin: 6px 0 0 18px;">${skipped.map(s => `<li>${escHtml(s)}</li>`).join('')}</ul>`
+          : '';
       }
 
-      document.getElementById('fairness-tbody').innerHTML = fairness.length ? fairness.map(f => `
-        <tr>
-          <td><strong>${f.attribute}</strong></td>
-          <td><span class="badge ${f.violation ? 'badge-fail' : 'badge-pass'}">${f.violation ? 'VIOLATION' : 'PASSED'}</span></td>
-          <td>${f.disparate_impact}</td>
-          <td>${f.demographic_parity_difference}</td>
-          <td>${f.group_details ? `Max: ${f.group_details.group_a} vs Min: ${f.group_details.group_b}` : 'N/A'}</td>
-        </tr>
-      `).join('') : '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No sensitive attribute violations evaluated</td></tr>';
+      // Intersectional subgroups: pairs of protected attributes audited together.
+      // Reported only — they never change the verdict above.
+      const intersections = payload.intersectional_report || [];
+      const intersectionSkips = payload.intersections_skipped || [];
+      const interEl = document.getElementById('fairness-intersectional');
+      if (interEl) {
+        interEl.innerHTML = (intersections.length || intersectionSkips.length) ? `
+          <div style="margin-top: 16px; padding: 12px 14px; border: 1px solid var(--card-border); border-radius: 3px;">
+            <strong style="font-size: 0.85rem;">Intersectional subgroups (reported only, not in the verdict)</strong>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 8px;">
+              Pairs of protected attributes audited together. A model can treat every group of each attribute alike and still treat some combinations very differently.
+            </div>
+            ${intersections.length ? `<div style="overflow-x: auto;"><table style="font-size: 0.8rem;">
+              <thead><tr><th>Combination</th><th>Status</th><th>Disparate impact</th><th>Parity difference</th><th>Groups compared</th></tr></thead>
+              <tbody>${intersections.map(e => {
+                const gd = e.group_details || {};
+                const excl = Object.entries(e.excluded_groups || {});
+                return `<tr>
+                  <td><strong>${escHtml(e.attribute)}</strong></td>
+                  <td>${e.violation
+                    ? '<span class="badge" style="background: rgba(255, 255, 255, 0.1); color: #b8b8b8; border: 1px dashed #8a8a8a;">GAP (REPORTED)</span>'
+                    : '<span class="badge badge-pass">WITHIN THRESHOLDS</span>'}</td>
+                  <td>${escHtml(e.disparate_impact)}</td>
+                  <td>${escHtml(e.demographic_parity_difference)}</td>
+                  <td>Max: ${escHtml(gd.group_a)} (n=${escHtml(gd.group_a_n)}) vs Min: ${escHtml(gd.group_b)} (n=${escHtml(gd.group_b_n)})${excl.length
+                    ? `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">Excluded (small): ${excl.map(([g, n]) => `${escHtml(g)} (${escHtml(n)})`).join(', ')}</div>` : ''}</td>
+                </tr>`;
+              }).join('')}</tbody></table></div>` : ''}
+            ${intersectionSkips.length ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Not compared: ${intersectionSkips.map(escHtml).join('; ')}</div>` : ''}
+          </div>` : '';
+      }
+
+      // Mitigation: what was reweighted, and the latest before against now, so the
+      // reviewer sees the cost (AUC) next to the effect (disparate impact).
+      const mitigation = payload.mitigation;
+      const mitigationEl = document.getElementById('fairness-mitigation');
+      if (mitigationEl) {
+        if (!mitigation) {
+          mitigationEl.innerHTML = '';
+        } else {
+          const b = mitigation.before || {}, a = mitigation.after || {};
+          const num = v => (v === null || v === undefined) ? 'n/a' : escHtml(v);
+          const verdict = v => v === true ? 'passed' : (v === false ? 'violation' : 'not (fully) evaluated');
+          const attrRows = (mitigation.attributes || []).map(name => {
+            const ba = (b.attributes || {})[name] || {}, aa = (a.attributes || {})[name] || {};
+            return `<tr><td>${escHtml(name)}: disparate impact</td><td>${num(ba.disparate_impact)}</td><td>${num(aa.disparate_impact)}</td></tr>
+                    <tr><td>${escHtml(name)}: parity difference</td><td>${num(ba.demographic_parity_difference)}</td><td>${num(aa.demographic_parity_difference)}</td></tr>`;
+          }).join('');
+          const apps = (mitigation.applications || []).map(p => p.status === 'applied'
+            ? `<li>Reweighed on <strong>${escHtml(p.attribute)}</strong> (${escHtml(p.cells)} group-label cells, weights ${num(p.weight_min)}–${num(p.weight_max)})</li>`
+            : `<li>Skipped${p.attribute ? ` <strong>${escHtml(p.attribute)}</strong>` : ''}: ${escHtml(p.reason)}</li>`).join('');
+          mitigationEl.innerHTML = `
+            <div style="margin-top: 16px; padding: 12px 14px; border: 1px solid var(--card-border); border-radius: 3px;">
+              <strong style="font-size: 0.85rem;">Bias mitigation (${escHtml(mitigation.method)})</strong>
+              <ul style="margin: 6px 0 8px 18px; font-size: 0.8rem;">${apps}</ul>
+              <div style="overflow-x: auto;"><table style="font-size: 0.8rem;">
+                <thead><tr><th></th><th>Before mitigation</th><th>Now</th></tr></thead>
+                <tbody>
+                  <tr><td>Selected model</td><td>${num(b.model)}</td><td>${num(a.model)}</td></tr>
+                  <tr><td>AUC</td><td>${num(b.auc_roc)}</td><td>${num(a.auc_roc)}</td></tr>
+                  <tr><td>Accuracy</td><td>${num(b.accuracy)}</td><td>${num(a.accuracy)}</td></tr>
+                  <tr><td>Violated attributes</td><td>${num(b.violated_attributes)}</td><td>${num(a.violated_attributes)}</td></tr>
+                  <tr><td>Overall verdict</td><td>${verdict(b.overall_fairness_passed)}</td><td>${verdict(a.overall_fairness_passed)}</td></tr>
+                  ${attrRows}
+                </tbody>
+              </table></div>
+            </div>`;
+        }
+      }
+
+      // EDA findings, each annotated with how every stage used it
+      const insights = payload.eda_findings || [];
+      renderEDAFindings(insights, 'eda-insights-list', true);
+      const insightCount = document.getElementById('eda-insights-count');
+      if (insightCount) insightCount.innerText = insights.length ? `(${insights.length})` : '';
+
+      // Proxy warnings: informational, shown under the fairness verdict
+      const proxies = payload.proxy_warnings || [];
+      const proxyEl = document.getElementById('fairness-proxy-warnings');
+      if (proxyEl) {
+        proxyEl.innerHTML = proxies.length ? `
+          <div style="margin-top: 16px; padding: 12px 14px; border: 1px dashed #8a8a8a; border-radius: 3px; background: rgba(255, 255, 255, 0.04);">
+            <strong style="color: #b8b8b8; font-size: 0.85rem;">Proxy variables detected by exploratory analysis</strong>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin: 4px 0 8px;">
+              These columns carry information about a protected attribute, so disparities by that attribute can
+              persist through them even if the attribute itself is removed. Informational only: they do not change
+              the verdict above.
+            </div>
+            ${proxies.map(p => {
+              const m = p.metric || {};
+              const note = p.protected_attribute_audited ? '' : ' — <span style="color: #f5f5f5;">this protected attribute was not in the audited set</span>';
+              return `<div style="font-size: 0.8rem; margin-top: 3px;"><code>${escHtml(p.proxy)}</code> &rarr; <code>${escHtml(p.protected_attribute)}</code> (${escHtml(m.name)} ${escHtml(m.value)}, ${escHtml(p.severity)})${note}</div>`;
+            }).join('')}
+          </div>` : '';
+      }
 
       // Fetch Audit Log
       fetchAuditTrail(currentThreadId);
     }
+
+    async function fetchArtifacts(threadId) {
+      const card = document.getElementById('artifacts-card');
+      try {
+        const res = await fetch(`/api/pipeline/artifacts/${threadId}`);
+        if (!res.ok) { card.style.display = 'none'; return; }
+        const data = await res.json();
+        card.style.display = 'block';
+
+        const ok = data.verified === true && data.chain && data.chain.verified;
+        document.getElementById('artifacts-integrity').innerHTML = ok
+          ? `<div style="background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 3px; padding: 10px 14px; font-size: 0.82rem;">
+               <strong style="color:#ededed;">INTEGRITY VERIFIED</strong>
+               <span style="color: var(--text-muted);"> — ${data.detail}</span>
+             </div>`
+          : `<div style="background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 3px; padding: 10px 14px; font-size: 0.82rem;">
+               <strong style="color:#f5f5f5;">INTEGRITY CHECK FAILED</strong>
+               <span style="color:#f5f5f5;"> — ${data.detail}</span>
+             </div>`;
+
+        document.getElementById('artifacts-list').innerHTML = (data.files || []).map(f => {
+          const bad = f.status !== 'OK';
+          return `<button onclick="viewArtifact('${threadId}', '${f.file}')"
+            style="cursor: pointer; text-align: left; background: rgba(255, 255, 255, 0.07);
+                   border: 1px solid ${bad ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.22)'};
+                   border-radius: 3px; padding: 10px 14px; color: var(--text-main);
+                   font-size: 0.82rem; font-family: inherit;">
+            <strong>${f.file}</strong>
+            <div style="font-size: 0.7rem; color: ${bad ? '#f5f5f5' : 'var(--text-dark)'}; margin-top: 4px; font-family: monospace;">
+              ${f.status} &nbsp; ${f.actual_sha256 ? f.actual_sha256.slice(0, 16) + '...' : 'no digest'}
+            </div></button>`;
+        }).join('') || '<span style="font-size:0.82rem; color: var(--text-muted);">No artifacts recorded.</span>';
+      } catch (err) {
+        console.error('Artifacts error:', err);
+        card.style.display = 'none';
+      }
+    }
+
+    async function viewArtifact(threadId, filename) {
+      const viewer = document.getElementById('artifact-viewer');
+      viewer.style.display = 'block';
+      viewer.textContent = `Loading ${filename}...`;
+      try {
+        const res = await fetch(`/api/pipeline/artifact/${threadId}/${filename}`);
+        const data = await res.json();
+        viewer.textContent = res.ok
+          ? data.content
+          : `Could not load ${filename}: ${data.detail || res.status}`;
+      } catch (err) {
+        viewer.textContent = `Could not load ${filename}: ${err}`;
+      }
+    }
+
+    // Deep link: #run=<thread id>&page=<setup|profile|review|audit>&tab=<tab id>&scroll=<element id>
+    // opens a recorded run directly, so a run can be linked to, reviewed later, or documented.
+    async function openFromHash() {
+      const params = new URLSearchParams(location.hash.slice(1));
+      const runId = params.get('run');
+      if (!runId) return;
+      const status = await fetch('/api/pipeline/status/' + encodeURIComponent(runId))
+        .then(r => r.ok ? r.json() : null).catch(() => null);
+      if (!status) return;
+      const eda = await fetch('/api/pipeline/eda/' + encodeURIComponent(runId))
+        .then(r => r.ok ? r.json() : null).catch(() => null);
+      renderPipelineResults(eda ? {...status, eda_report: eda} : status);
+
+      const pages = {
+        setup: ['page-home', 'btn-nav-home'], profile: ['page-eda', 'btn-nav-eda'],
+        review: ['page-results', 'btn-nav-results'], audit: ['page-audit', 'btn-nav-audit'],
+      };
+      const [pageId, buttonId] = pages[params.get('page')] || pages.review;
+      showPage(pageId, document.getElementById(buttonId));
+      if (pageId === 'page-audit') await fetchAuditTrail(runId);
+
+      const tab = params.get('tab');
+      if (tab) document.querySelector(`button[onclick*="'${CSS.escape(tab)}'"]`)?.click();
+      const target = params.get('scroll') && document.getElementById(params.get('scroll'));
+      if (target) {
+        target.scrollIntoView({block: 'start'});
+        window.scrollBy(0, -70);  // clear the sticky header
+      }
+    }
+    loadReviewerMode();
+    window.addEventListener('hashchange', openFromHash);
+    openFromHash();
 
     async function fetchAuditTrail(threadId) {
       try {
         const res = await fetch(`/api/pipeline/audit/${threadId}`);
         const data = await res.json();
         const entries = data.entries || [];
+        const chain = data.chain || {};
+
+        // Chain verdict banner
+        const chainEl = document.getElementById('audit-chain-badge');
+        if (chainEl && entries.length) {
+          if (chain.verified) {
+            chainEl.innerHTML = `
+              <div style="background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 3px; padding: 12px 16px;">
+                <strong style="color: #ededed;">HASH CHAIN VERIFIED</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">${chain.detail || ''}</div>
+                ${chain.head_hash ? `<div style="font-size: 0.72rem; color: var(--text-dark); margin-top: 6px;">Head: <code>${chain.head_hash.slice(0, 32)}...</code></div>` : ''}
+              </div>`;
+          } else {
+            chainEl.innerHTML = `
+              <div style="background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 3px; padding: 12px 16px;">
+                <strong style="color: #f5f5f5;">HASH CHAIN BROKEN — AUDIT TRAIL NOT TRUSTWORTHY</strong>
+                <div style="font-size: 0.8rem; color: #f5f5f5; margin-top: 4px;">${chain.detail || ''}</div>
+              </div>`;
+          }
+        }
+
+        const brokenSeq = chain.broken_at ? chain.broken_at.seq : null;
         document.getElementById('audit-trail-list').innerHTML = entries.map(e => `
-          <div class="audit-item">
+          <div class="audit-item" ${e.seq === brokenSeq ? 'style="border-color: rgba(255, 255, 255, 0.7);"' : ''}>
             <div class="audit-header">
               <strong>${e.event_source === 'human_reviewer' ? 'User Decision' : 'Agent Event'} — ${e.event_type}</strong>
               <span class="audit-time">${e.timestamp}</span>
             </div>
             <div>${e.summary}</div>
+            ${e.entry_hash ? `<div style="font-size: 0.68rem; color: var(--text-dark); margin-top: 6px; font-family: monospace;">#${e.seq} &nbsp; hash ${String(e.entry_hash).slice(0, 16)}... &nbsp;&larr;&nbsp; prev ${String(e.prev_hash).slice(0, 16)}...</div>` : ''}
           </div>
         `).join('');
       } catch (err) {
