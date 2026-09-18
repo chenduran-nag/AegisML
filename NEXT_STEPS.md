@@ -1,6 +1,6 @@
 # AegisML — Next Steps
 
-Work plan picked up after commit `cc22712` on `chenduran-nag/AegisML` `main`. Read
+Work plan picked up after commit `a5b1c8a` on `chenduran-nag/AegisML` `main`. Read
 `CLAUDE.md` first for context and the invariants; `PROJECT_REVIEW.md` has the
 reasoning behind this ordering.
 
@@ -320,7 +320,7 @@ the numbers above and corrects the first caveat.
   overprinted each other, and labels overprinted points. Mean labels now sit in a
   leader-line column, and an absent arm is explained in its panel.
 
-**Provenance.** Recorded on top of `91544dc` with the evaluation code uncommitted. Its
+**Provenance.** Recorded on top of `05b2d65` with the evaluation code uncommitted. Its
 manifest predates the `git_dirty` flag that now records this.
 
 The original specification follows, for reference.
@@ -568,10 +568,10 @@ properly.
   manifest records the base policy's version and hash; blocked runs get the status
   `terminated_approval_blocked`.
 
-**Re-run under the policy** (80 runs, 0 errors, 80/80 from cache, from `b2fd32b`): all 20
+**Re-run under the policy** (80 runs, 0 errors, 80/80 from cache, from `6353146`): all 20
 German Credit runs now end `terminated_approval_blocked` — the gate verdict was NOT
 EVALUATED on every seed, not just the 8 whose test rows were unmeasurable, because the block
-acts on the gate's validation-row verdict. The other 60 runs are identical to `d81faa2`
+acts on the gate's validation-row verdict. The other 60 runs are identical to `e8e9d77`
 (one AUC differs in the fourth decimal); all 60 approved models violate. Found along the
 way: the harness's `git_dirty` flag counted its own result files, so it was true for every
 run writing into `experiments/results/` (#31, fixed).

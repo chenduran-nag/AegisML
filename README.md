@@ -324,14 +324,14 @@ measured; see finding 4.
    audited at the gate on any of the 5 seeds (the age bands never reached 30 rows, and `job`
    is advisory), so every gate verdict was NOT EVALUATED. Before the approval block, all four
    arms approved those models anyway, and the untouched test rows then showed age violations
-   on 3 of 5 seeds (results at `d81faa2`): reviewers had approved blind. Under the governance
+   on 3 of 5 seeds (results at `e8e9d77`): reviewers had approved blind. Under the governance
    policy's default, approving a model whose fairness was not measured is refused, so all 20
    German Credit runs end without an approved model. The underlying problem — a validation
    split too small to audit a small dataset's protected groups — is still open.
 5. **Gate numbers are optimistic, as they should be expected to be.** Models are chosen on the
    validation rows, so the gate overstates the test result: COMPAS 0.735 at the gate against
    0.724 on test (arms A/B), and German Credit 0.805 against 0.780 in the run before the
-   approval block. Compared with `75b96c9`, which ranked models on the test rows, ranking on
+   approval block. Compared with `132e0c2`, which ranked models on the test rows, ranking on
    validation rows changed the selected model in 16 of 40 arm A/B runs.
 6. **The automatic data-quality retry never engaged.** Benchmark data passes the quality
    gate first time, so arms A and B coincide. That loop is exercised only by the synthetic
@@ -372,7 +372,7 @@ slightly (0.771 → 0.798) once a 5-row `job` group was excluded.
   status is a protected characteristic in some jurisdictions; a reviewer can declare it
   protected at run start.
 - **The previous results used the test rows at the gate and counted every audited
-  attribute.** They are in git history at `75b96c9`; the numbers above are not comparable
+  attribute.** They are in git history at `132e0c2`; the numbers above are not comparable
   with them one-for-one.
 - **Small datasets are hard to audit at all.** German Credit's age bands reach 30 rows in the
   200-row test split on only 3 of 5 seeds, and never in the 160-row validation split.
@@ -416,17 +416,17 @@ saved CSVs, in seconds:
 python experiments/run_governance_eval.py --summarise-only
 ```
 
-These results were produced from commit `c31f06a` on a clean working tree, under `policy.yaml`
+These results were produced from commit `9973484` on a clean working tree, under `policy.yaml`
 version 1.1.0 (SHA-256 `cbed6975…`, recorded in the manifest). Dual sign-off applies to them:
 the scripted reviewer signs with two identities, and `runs.csv` records both in `approvers`.
 **Every one of the 60 approvals is an approval of a model with a fairness violation, and every
 one of them now took two reviewers** — the rule slows the decision down; it does not, on this
 evidence, change it. Compared with the run before reviewer identity existed, all 80 runs are
 identical except one AUC in the fourth decimal (COMPAS arm C, seed 42: 0.6671 → 0.6670).
-Earlier results remain in git history: the first run at `363ce53`, the corrected-metrics run at
-`ab2d12f`, the first arm-D run (test rows at the gate, every audited attribute in the verdict)
-at `75b96c9`, the run before the approval block at `d81faa2`, and the first run under the policy
-at `f420d48` — whose manifest says `git_dirty: true` because the harness then checked the tree
+Earlier results remain in git history: the first run at `e28b237`, the corrected-metrics run at
+`332e28b`, the first arm-D run (test rows at the gate, every audited attribute in the verdict)
+at `132e0c2`, the run before the approval block at `e8e9d77`, and the first run under the policy
+at `8ebab26` — whose manifest says `git_dirty: true` because the harness then checked the tree
 after writing its own result files, which is fixed here.
 
 ---

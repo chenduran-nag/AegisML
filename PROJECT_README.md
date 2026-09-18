@@ -4,7 +4,7 @@
 every remaining next step.**
 
 *Status as of 18 September 2026 · fork [`chenduran-nag/AegisML`](https://github.com/chenduran-nag/AegisML)
-`main` at `8f762be` plus reviewer identity and dual sign-off · original
+`main` at `9cd4161` plus reviewer identity and dual sign-off · original
 [`ruhannpn/AegisML`](https://github.com/ruhannpn/AegisML) at `01c8c7d` · Semester 7 academic
 project*
 
@@ -517,7 +517,7 @@ GitHub Actions runs them on every push.
 flowchart"). The original repository has had **no new commits since**. All work is on the fork
 `chenduran-nag/AegisML`; nothing has been pushed to the original.
 
-**Totals through `8f762be`:** 18 commits, 70 files changed, **+13,764 / −750 lines**; tests went from 0
+**Totals through `9cd4161`:** 18 commits, 70 files changed, **+13,764 / −750 lines**; tests went from 0
 automated (8 manual scripts needing a live API key and network) to **251 offline tests**. Reviewer
 identity and dual sign-off add two further commits and take the suite to **279 tests**.
 
@@ -525,23 +525,23 @@ identity and dual sign-off add two further commits and take the suite to **279 t
 
 | Commit | Date | Change |
 |---|---|---|
-| `cc22712` | 11 Sep | Fix train/test leakage, save approved models, add hash-chained audit log |
-| `f2c4742` | 11 Sep | Add `CLAUDE.md` project context and `NEXT_STEPS.md` work plan |
-| `3cbba6e` | 14 Sep | Generate compliance artifacts on approval (model card, AIBOM, Annex IV draft) |
-| `9111bbb` | 14 Sep | Fix three dashboard bugs found by live verification |
-| `91544dc` | 14 Sep | Feed EDA insights into the pipeline via routed findings |
-| `363ce53` | 14 Sep | Add quantitative governance evaluation |
-| `ab2d12f` | 14 Sep | Make fairness metrics trustworthy and re-run the evaluation |
-| `abff370` | 15 Sep | Do not record a fairness pass while a protected attribute is unaudited |
-| `14e2fe0` | 15 Sep | Add reweighing mitigation as a gate decision, and arm D |
-| `75b96c9` | 15 Sep | Re-run the evaluation with arm D |
-| `e19c7bd` | 15 Sep | Base the fairness verdict on protected attributes, and let reviewers declare them |
-| `8909818` | 15 Sep | Decide at the gate on validation rows; score the approved model once on test rows |
-| `426f41b` | 15 Sep | Report intersectional subgroups; fix completed-run tabs, regression KPI and escaping |
-| `d81faa2` | 15 Sep | Re-run the evaluation with the validation gate and protected-only verdict |
-| `b2fd32b` | 15 Sep | Add policy-as-code, and block approving a model whose fairness was not measured |
-| `f420d48` | 15 Sep | Re-run the evaluation under the governance policy; fix the dirty-tree check |
-| `ec83f65` | 15 Sep | Restyle the dashboard in black, white and silver, and remove template UI |
+| `a5b1c8a` | 11 Sep | Fix train/test leakage, save approved models, add hash-chained audit log |
+| `fd57268` | 11 Sep | Add `CLAUDE.md` project context and `NEXT_STEPS.md` work plan |
+| `214c1c2` | 14 Sep | Generate compliance artifacts on approval (model card, AIBOM, Annex IV draft) |
+| `cdd3e27` | 14 Sep | Fix three dashboard bugs found by live verification |
+| `05b2d65` | 14 Sep | Feed EDA insights into the pipeline via routed findings |
+| `e28b237` | 14 Sep | Add quantitative governance evaluation |
+| `332e28b` | 14 Sep | Make fairness metrics trustworthy and re-run the evaluation |
+| `14bfb55` | 15 Sep | Do not record a fairness pass while a protected attribute is unaudited |
+| `a4278f3` | 15 Sep | Add reweighing mitigation as a gate decision, and arm D |
+| `132e0c2` | 15 Sep | Re-run the evaluation with arm D |
+| `3cfe590` | 15 Sep | Base the fairness verdict on protected attributes, and let reviewers declare them |
+| `e19f84c` | 15 Sep | Decide at the gate on validation rows; score the approved model once on test rows |
+| `93889ce` | 15 Sep | Report intersectional subgroups; fix completed-run tabs, regression KPI and escaping |
+| `e8e9d77` | 15 Sep | Re-run the evaluation with the validation gate and protected-only verdict |
+| `6353146` | 15 Sep | Add policy-as-code, and block approving a model whose fairness was not measured |
+| `8ebab26` | 15 Sep | Re-run the evaluation under the governance policy; fix the dirty-tree check |
+| `2c846b5` | 15 Sep | Restyle the dashboard in black, white and silver, and remove template UI |
 
 ### 10.2 Defects fixed
 
