@@ -416,16 +416,18 @@ saved CSVs, in seconds:
 python experiments/run_governance_eval.py --summarise-only
 ```
 
-These results were produced from commit `b2fd32b` under `policy.yaml` version 1.0.0 (SHA-256
-`3c05c76e…`, recorded in the manifest). The manifest's `git_dirty: true` is an artifact of the
-harness, not a change to the code: it checked the working tree after writing its own result
-files into the tracked `experiments/results/`, so every manifest produced this way reports
-dirty (fixed for future runs; earlier manifests overstate it too). No tracked code file was
-modified during this run. Compared with the previous results, every run outside German
-Credit is identical except one AUC that differs in the fourth decimal (COMPAS arm C, seed 42:
-0.6670 → 0.6671). Earlier results remain in git history: the first run at `363ce53`, the
-corrected-metrics run at `ab2d12f`, the first arm-D run (test rows at the gate, every audited
-attribute in the verdict) at `75b96c9`, and the run before the approval block at `d81faa2`.
+These results were produced from commit `c31f06a` on a clean working tree, under `policy.yaml`
+version 1.1.0 (SHA-256 `cbed6975…`, recorded in the manifest). Dual sign-off applies to them:
+the scripted reviewer signs with two identities, and `runs.csv` records both in `approvers`.
+**Every one of the 60 approvals is an approval of a model with a fairness violation, and every
+one of them now took two reviewers** — the rule slows the decision down; it does not, on this
+evidence, change it. Compared with the run before reviewer identity existed, all 80 runs are
+identical except one AUC in the fourth decimal (COMPAS arm C, seed 42: 0.6671 → 0.6670).
+Earlier results remain in git history: the first run at `363ce53`, the corrected-metrics run at
+`ab2d12f`, the first arm-D run (test rows at the gate, every audited attribute in the verdict)
+at `75b96c9`, the run before the approval block at `d81faa2`, and the first run under the policy
+at `f420d48` — whose manifest says `git_dirty: true` because the harness then checked the tree
+after writing its own result files, which is fixed here.
 
 ---
 

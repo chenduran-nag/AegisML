@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-15T17:54:18.292561+00:00",
+  "generated_at": "2026-09-18T18:18:56.826706+00:00",
   "mode": "replay",
   "quick": false,
-  "git_commit": "b2fd32b27b69e22581bfd5f1397726a92cdf5960",
-  "git_dirty": true,
+  "git_commit": "c31f06a3b99e4584643dc317e63bca956b7df9c4",
+  "git_dirty": false,
   "python": "3.13.9",
   "platform": "Windows-10-10.0.19045-SP0",
   "seeds": [
@@ -39,8 +39,8 @@
   "max_human_reroutes": 2,
   "min_group_size": 30,
   "policy": {
-    "version": "1.0.0",
-    "sha256": "3c05c76e2105de9c2e708b937575a78bbca18008aa1baef6d10572ac20b40be9",
+    "version": "1.1.0",
+    "sha256": "cbed6975efaaae89cb972351fcc7a02cc479357eb93ff8637adb82acaf33ef62",
     "source": "C:\\Users\\chenduran\\Sem7_proj\\policy.yaml"
   },
   "datasets": {
@@ -84,5 +84,5 @@
   "planner_cache_hits": 80,
   "runs": 80,
   "errors": 0,
-  "wall_clock_s": 991.6
+  "wall_clock_s": 1325.8
 }
