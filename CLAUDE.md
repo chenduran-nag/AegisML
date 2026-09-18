@@ -26,7 +26,7 @@ protect it.
 python -m venv .venv
 # Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-pytest                      # 251 offline tests, no API key or network needed
+pytest                      # 278 offline tests, no API key or network needed
 python experiments/run_governance_eval.py                  # reproduce the evaluation from the committed cache, no Groq key
 python experiments/run_governance_eval.py --summarise-only # rebuild its tables + figure from the saved CSVs
 ```
@@ -48,6 +48,7 @@ never commit it), then `python server.py` → http://localhost:8000.
 | `fairness_agent.py` | DI + parity difference (the verdict) and TPR/FPR gaps (reported only) on held-out rows. Groups from raw values; age banded; groups under 30 rows excluded |
 | `mitigation.py` | Reweighing mitigation for the `reject_and_mitigate` decision: attribute choice, train-only cell weights, before/after summary |
 | `policy.py`, `policy.yaml` | Policy-as-code: validated thresholds and governance rules, version + SHA-256 recorded per run |
+| `reviewers.py`, `reviewers.yaml` | Reviewer roster: bearer token → id + role, hashed in memory. `reviewers.yaml` is gitignored; `reviewers.example.yaml` is the committed template |
 | `audit_log.py` | Append-only, SHA-256 hash-chained audit log + `verify_audit_chain()` |
 | `compliance_artifacts.py` | Model card, AIBOM and Annex IV draft; digests chained into the audit log + `verify_artifacts()` |
 | `server.py` | FastAPI: `/api/pipeline/{start,resume,status,audit,eda,artifacts}` |
@@ -57,6 +58,9 @@ never commit it), then `python server.py` → http://localhost:8000.
 | `tests/` | The real, offline pytest suite |
 | `experiments/run_governance_eval.py` | Governance evaluation: the real graph with a scripted reviewer, arms A–D (D = mitigation) × datasets × split seeds |
 | `experiments/planner_cache/`, `experiments/results/` | **Committed.** Recorded planner responses, and the results they reproduce |
+
+Hold (not a loop): approving a model whose fairness verdict is a violation returns to the gate
+awaiting a **second sign-off** from a different reviewer. Costs no reroute, retrains nothing.
 
 Loops: **1** data-quality auto-retry → planner (max 2). **2** human "reject data
 quality" → planner with feedback injected into the prompt (max 2). **3** human
@@ -148,6 +152,17 @@ Loops 2–4 share one rejection cap (`MAX_HUMAN_REROUTES`).
     (`block_approval_when_fairness_not_evaluated`): the payload withholds `approve`, the
     API returns 409, and the graph routes a stray approve to `mark_approval_blocked`.
     Regression is exempt.
+18. **Every decision names its reviewer; a violating approval takes two of them.**
+    `human_approval_node` records `reviewer_id` / `reviewer_role` / `authenticated` from the resume
+    payload into `reviewer_decisions` and the `human_decision` audit event — for rejections too. Only
+    the server may set `reviewer_authenticated`, and only from a roster token (`reviewers.py`);
+    anything a caller merely claims is UNVERIFIED, and the model card says so. When the verdict is a
+    violation (`require_dual_signoff_for_violating_approval`), the first approval routes to
+    `record_first_approval`, which holds it in `first_approval` and re-opens the gate; the same
+    reviewer approving again, or an approval with no id, routes to `reject_signoff`. Nothing is
+    written on a held approval, and any reroute clears it (`_clear_pending_signoff`). With
+    `dual_signoff_can_override_approval_block` on, the block of invariant 17 becomes this two-person
+    decision instead of a refusal.
 
 ## Conventions
 

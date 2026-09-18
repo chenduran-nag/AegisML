@@ -255,7 +255,10 @@ def test_technical_documentation_states_the_known_gaps(approved_state):
     assert "OUT OF SCOPE" in doc          # declaration of conformity
     assert "NOT IMPLEMENTED" in doc       # post-market monitoring
     assert "no post-deployment monitoring" in doc.lower()
-    assert "reviewer identity is not yet authenticated" in doc
+    # Reviewer identity IS recorded now, so the honest statement is about how weakly
+    # it is authenticated — not that it is missing.
+    assert "reviewer authentication is a shared-secret bearer token" in doc.lower()
+    assert "not an identity-management system" in doc
 
 
 # ---------------------------------------------------------------------------

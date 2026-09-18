@@ -49,6 +49,8 @@ def test_the_committed_policy_file_equals_the_code_defaults():
     assert governance["max_retries"] == pipeline_graph.MAX_RETRIES
     assert governance["max_human_reroutes"] == pipeline_graph.MAX_HUMAN_REROUTES
     assert governance["block_approval_when_fairness_not_evaluated"] is True
+    assert governance["require_dual_signoff_for_violating_approval"] is True
+    assert governance["dual_signoff_can_override_approval_block"] is False
 
 
 @pytest.mark.parametrize("text,match", [
@@ -149,6 +151,7 @@ pytest.importorskip("langgraph", reason="langgraph not installed")
 from langgraph.types import Command  # noqa: E402
 
 from tests.test_graph_end_to_end import _initial_state, graph  # noqa: E402,F401
+from tests.conftest import approve, decide
 
 
 def _state(df, policy=None, **extra):
@@ -166,7 +169,8 @@ def _run(env, state, thread):
 
 
 def _decide(env, config, decision):
-    env.g.invoke(Command(resume={"decision": decision, "human_feedback": ""}), config=config)
+    """One decision, one reviewer — enough unless the run asks for a second sign-off."""
+    decide(env.g, config, decision)
 
 
 def test_the_governing_policy_is_recorded_in_the_audit_trail(graph, toy_df):
@@ -174,7 +178,7 @@ def test_the_governing_policy_is_recorded_in_the_audit_trail(graph, toy_df):
 
     policy = with_overrides(default_policy(), {"fairness": {"min_group_size": 25}})
     config = _run(graph, _state(toy_df, policy), "t-policy-audit")
-    _decide(graph, config, "approve")
+    approve(graph.g, config)
 
     trail = get_audit_trail("t-policy-audit", db_path=graph.audit_db)
     (applied,) = [e for e in trail if e["event_type"] == "policy_applied"]

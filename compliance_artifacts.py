@@ -240,7 +240,23 @@ def build_model_card(
                 "timestamp": entry.get("timestamp"),
                 "decision": details.get("human_decision"),
                 "feedback": details.get("human_feedback") or "",
+                # Read from the logged event, not from live state: the card has to
+                # show who made each decision, not only who made the last one.
+                "reviewer_id": details.get("reviewer_id") or NOT_RECORDED,
+                "reviewer_role": details.get("reviewer_role") or NOT_RECORDED,
+                "reviewer_authenticated": details.get("reviewer_authenticated", False),
+                "signoff_stage": details.get("signoff_stage") or NOT_RECORDED,
             })
+
+    # Identities that approved, in order, from recorded state. One entry is a single
+    # sign-off; two are a dual sign-off by different reviewers (invariant 18).
+    approvers = [
+        {k: record.get(k) for k in ("reviewer_id", "reviewer_role", "authenticated",
+                                    "stage", "timestamp")}
+        for record in (state.get("reviewer_decisions") or [])
+        if record.get("decision") == "approve"
+    ]
+    unverified_approvers = [a for a in approvers if not a.get("authenticated")]
 
     # Limitations are stated unconditionally where they are properties of the
     # implementation, and conditionally where they depend on this run.
@@ -290,6 +306,16 @@ def build_model_card(
             "positive-rate gap for the reweighted attribute(s) only: other attributes "
             "and error-rate gaps are not targeted, and the fairness results in this "
             "document are measured after mitigation, on held-out rows."
+        )
+    if unverified_approvers:
+        limitations.append(
+            "Reviewer identity was NOT verified for "
+            + ", ".join(a.get("reviewer_id") or "an unnamed approver"
+                        for a in unverified_approvers)
+            + ": no reviewer roster was configured, so the identity recorded is the "
+              "one the caller stated. Even with a roster, authentication is a "
+              "shared-secret token over a local connection — it distinguishes two "
+              "reviewers from one, and claims nothing more."
         )
     if state.get("unresolved_quality_issue"):
         limitations.append(
@@ -363,9 +389,13 @@ def build_model_card(
             "verdict": fairness_verdict(fair_res),
             "evaluated": fair_res.get("fairness_evaluated", False),
             "evaluated_rows": fair_res.get("evaluated_rows"),
+            # Recorded from the audit, not hard-coded: under a policy with different
+            # thresholds, a fixed 0.80 here would misstate what the verdict measured.
             "thresholds": {
-                "disparate_impact_min": 0.80,
-                "demographic_parity_difference_max": 0.10,
+                "disparate_impact_min": (fair_res.get("thresholds") or {}).get(
+                    "disparate_impact_min", NOT_RECORDED),
+                "demographic_parity_difference_max": (fair_res.get("thresholds") or {}).get(
+                    "demographic_parity_difference_max", NOT_RECORDED),
                 "min_group_size": fair_res.get("min_group_size"),
             },
             "report": fair_res.get("fairness_report", []),
@@ -394,6 +424,9 @@ def build_model_card(
         "human_governance": {
             "final_decision": state.get("human_decision", NOT_RECORDED),
             "final_feedback": state.get("human_feedback") or "",
+            "approvers": approvers,
+            "dual_signoff": len(approvers) > 1,
+            "reviewer_identities_verified": bool(approvers) and not unverified_approvers,
             "decision_history": decisions,
             "automated_quality_retries": state.get("retry_count", 0),
             "human_reroutes": state.get("rejection_reroute_count", 0),
@@ -443,8 +476,14 @@ def render_model_card_md(card: dict) -> str:
     ]
     shap_rows = [[e.get("feature"), e.get("importance")]
                  for e in expl.get("top_features", [])]
-    decision_rows = [[d.get("timestamp"), d.get("decision"), d.get("feedback")]
+    decision_rows = [[d.get("timestamp"), d.get("decision"),
+                      d.get("reviewer_id"), d.get("reviewer_role"),
+                      "yes" if d.get("reviewer_authenticated") else "no",
+                      d.get("feedback")]
                      for d in gov.get("decision_history", [])]
+    approver_rows = [[a.get("stage"), a.get("reviewer_id"), a.get("reviewer_role"),
+                      "yes" if a.get("authenticated") else "no", a.get("timestamp")]
+                     for a in gov.get("approvers", [])]
     insight_rows = [
         [f.get("severity"), f.get("type"), ", ".join(f.get("columns") or []),
          f.get("evidence"),
@@ -574,15 +613,23 @@ Method: {expl['method']}
 | Field | Value |
 |---|---|
 | Final decision | **{gov['final_decision']}** |
+| Approved by | {' and '.join(a.get('reviewer_id') or 'unnamed' for a in gov.get('approvers', [])) or NOT_RECORDED} |
+| Dual sign-off | {'yes — two different reviewers' if gov.get('dual_signoff') else 'no — a single reviewer'} |
+| Reviewer identities verified against a roster | {'yes' if gov.get('reviewer_identities_verified') else 'no'} |
 | Automated quality retries | {gov['automated_quality_retries']} |
 | Human reroutes | {gov['human_reroutes']} |
 | Unresolved quality issue | {gov['unresolved_quality_issue']} |
 | Unresolved human rejection | {gov['unresolved_human_rejection']} |
 | Governance policy | {gov.get('policy_version', NOT_RECORDED)} (SHA-256 `{gov.get('policy_sha256', NOT_RECORDED)}`) |
 
+### Sign-off
+
+{_md_table(["Stage", "Reviewer", "Role", "Authenticated", "Timestamp"], approver_rows)}
+
 ### Decision history
 
-{_md_table(["Timestamp", "Decision", "Feedback"], decision_rows)}
+{_md_table(["Timestamp", "Decision", "Reviewer", "Role", "Authenticated", "Feedback"],
+           decision_rows)}
 
 ---
 
@@ -649,7 +696,15 @@ def build_aibom(state: dict, run_id: str, chain: Optional[dict] = None) -> dict:
         },
 
         "governance": {
-            "approver": state.get("reviewer_id", NOT_RECORDED),
+            # Every identity that approved, from recorded state. This previously read a
+            # `reviewer_id` field that no node ever wrote, so it always said "not
+            # recorded" — a plausible blank of exactly the kind invariant 12 forbids.
+            "approvers": [
+                {k: record.get(k) for k in ("reviewer_id", "reviewer_role",
+                                            "authenticated", "stage", "timestamp")}
+                for record in (state.get("reviewer_decisions") or [])
+                if record.get("decision") == "approve"
+            ] or NOT_RECORDED,
             "final_decision": state.get("human_decision", NOT_RECORDED),
             "policy_version": state.get("policy_version") or NOT_RECORDED,
             "policy_sha256": state.get("policy_sha256") or NOT_RECORDED,
@@ -745,12 +800,20 @@ Generated: {card['generated_at']}
   OUT OF SCOPE for this tool** — they are properties of the data supplier.
 - **(e) Human oversight measures.** Execution suspends at a governance gate before
   any model is treated as approved. The reviewer may approve, reject on data
-  quality (returning to the planner with written directives), or reject the model
-  or its fairness (returning to training with that model excluded). This run:
-  {gov['human_reroutes']} human reroute(s), {gov['automated_quality_retries']}
-  automated retry/retries, final decision **{gov['final_decision']}**.
-  **Limitation: reviewer identity is not yet authenticated** — see `NEXT_STEPS.md`
-  Step 5. An approval currently records the decision but not a verified approver.
+  quality (returning to the planner with written directives), reject the model
+  or its fairness (returning to training with that model excluded), or reject and
+  mitigate (retraining with reweighing). Every decision is recorded against the
+  identity that submitted it. Approving a model whose fairness audit found a
+  violation takes two different reviewers; approving one whose fairness could not be
+  measured is refused outright unless the policy delegates that to the same two-person
+  rule. This run: {gov['human_reroutes']} human reroute(s),
+  {gov['automated_quality_retries']} automated retry/retries, final decision
+  **{gov['final_decision']}**, approved by
+  {' and '.join(a.get('reviewer_id') or 'an unnamed reviewer' for a in gov.get('approvers', [])) or 'nobody (not an approved run)'}.
+  **Limitation: reviewer authentication is a shared-secret bearer token from a local
+  file, with no expiry, revocation or transport security, and identities are recorded
+  as UNVERIFIED when no roster is configured.** It establishes that two sign-offs came
+  from two different token holders; it is not an identity-management system.
 - **(f) Pre-determined changes and continuous compliance.** None. Each run is
   independent; the system performs no online learning.
 - **(g) Validation and testing procedures.** Stratified train / validation / test
@@ -760,9 +823,12 @@ Generated: {card['generated_at']}
   `{json.dumps(card['evaluation']['metrics'])}`); the approved model is scored once on
   the untouched test rows (see the model card, section 4). **No cross-validation**:
   each estimate rests on a single split.
-- **(h) Cybersecurity measures.** None implemented. The API is unauthenticated and
-  intended for localhost research use. Uploaded data is processed in memory and
-  checkpointed to a local SQLite file. **Not suitable for deployment as-is.**
+- **(h) Cybersecurity measures.** Minimal and stated as such. Governance decisions
+  require a reviewer token when a roster is configured (shared secret, no expiry, no
+  revocation, no transport security); every other endpoint is unauthenticated, and
+  browser origins are restricted to an explicit list. Uploaded data is processed in
+  memory and checkpointed to a local SQLite file. Anyone with write access to that
+  file or to `audit_log.db` can alter a run. **Not suitable for deployment as-is.**
 
 ---
 

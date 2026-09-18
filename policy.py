@@ -57,6 +57,8 @@ _SCHEMA: dict[str, dict[str, tuple]] = {
         "max_retries": (int, 0, 10),
         "max_human_reroutes": (int, 0, 10),
         "block_approval_when_fairness_not_evaluated": (bool, None, None),
+        "require_dual_signoff_for_violating_approval": (bool, None, None),
+        "dual_signoff_can_override_approval_block": (bool, None, None),
     },
     "training": {
         "allowed_models": (list, None, None),
@@ -71,7 +73,8 @@ class PolicyError(ValueError):
 def default_policy() -> dict:
     """The policy the code enforces when none is supplied."""
     return {
-        "version": "1.0.0",
+        # Tracks policy.yaml's version; a test pins the two together.
+        "version": "1.1.0",
         "data": {
             "column_drop_null_threshold": data_agent.COLUMN_DROP_NULL_THRESHOLD,
             "column_high_null_warning_threshold": data_agent.COLUMN_HIGH_NULL_WARNING_THRESHOLD,
@@ -93,6 +96,8 @@ def default_policy() -> dict:
             "max_retries": 2,
             "max_human_reroutes": 2,
             "block_approval_when_fairness_not_evaluated": True,
+            "require_dual_signoff_for_violating_approval": True,
+            "dual_signoff_can_override_approval_block": False,
         },
         "training": {
             "allowed_models": None,

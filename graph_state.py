@@ -173,6 +173,26 @@ class PipelineState(TypedDict, total=False):
         Columns the reviewer declared protected at run start. They are audited, count
         toward the fairness verdict, and feed EDA proxy detection, in addition to the
         columns detected by name.
+    reviewer_decisions : Optional[list[dict]]
+        Every governance decision this run received, in order, each with the identity
+        it was submitted under: {timestamp, decision, feedback, reviewer_id,
+        reviewer_role, authenticated, stage}. `authenticated` is False when no reviewer
+        roster was configured, so the identity is the caller's word (see reviewers.py).
+    current_reviewer : Optional[dict]
+        The identity attached to the most recent decision. Read by the router, which
+        must compare it with `first_approval` without trusting either to exist.
+    first_approval : Optional[dict]
+        Set when a model with a fairness violation received its first approval and the
+        run needs a second, different reviewer (policy
+        `require_dual_signoff_for_violating_approval`). Cleared on any reroute, since
+        the next gate reviews a different model.
+    awaiting_second_approval : bool
+        True while the gate is re-opened for that second sign-off. The run is NOT
+        approved in this state and nothing has been written to disk.
+    signoff_error : Optional[str]
+        Why the last approval attempt did not count as the second sign-off (no
+        reviewer id, or the same reviewer twice). Shown at the re-opened gate and
+        logged; cleared as soon as any decision is submitted.
     final_evaluation : Optional[dict]
         Written by audit_log_node on approval only: the approved model scored once on
         the untouched test rows ({split, rows, metrics, fairness}). Everything before
@@ -200,6 +220,11 @@ class PipelineState(TypedDict, total=False):
     selected_model_bytes: Optional[bytes]
     fairness_result: Optional[dict]
     human_decision: Optional[str]
+    reviewer_decisions: Optional[list[dict]]
+    current_reviewer: Optional[dict]
+    first_approval: Optional[dict]
+    awaiting_second_approval: bool
+    signoff_error: Optional[str]
     rejection_reroute_count: int
     unresolved_human_rejection: bool
     unresolved_training_failure: bool

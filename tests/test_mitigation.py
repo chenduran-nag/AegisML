@@ -158,6 +158,7 @@ pytest.importorskip("langgraph", reason="langgraph not installed")
 from langgraph.types import Command  # noqa: E402
 
 from tests.test_graph_end_to_end import _run_to_gate, graph  # noqa: E402,F401
+from tests.conftest import approve, decide
 
 
 def _payload(env, config):
@@ -172,8 +173,7 @@ def test_mitigation_reweights_retrains_and_repauses(graph, toy_df):
     expected = choose_attribute({"fairness_report": first["fairness_report"]}, [])
     assert expected is not None, "toy_df should produce a fairness violation to mitigate"
 
-    graph.g.invoke(Command(resume={"decision": "reject_and_mitigate", "human_feedback": ""}),
-                   config=config)
+    decide(graph.g, config, "reject_and_mitigate")
 
     snapshot = graph.g.get_state(config)
     assert "human_approval_node" in snapshot.next
@@ -205,8 +205,7 @@ def test_mitigation_counts_against_the_rejection_cap(graph, toy_df):
     for _ in range(3):
         if "human_approval_node" not in graph.g.get_state(config).next:
             break
-        graph.g.invoke(Command(resume={"decision": "reject_and_mitigate", "human_feedback": ""}),
-                       config=config)
+        decide(graph.g, config, "reject_and_mitigate")
 
     values = graph.g.get_state(config).values
     assert values["unresolved_human_rejection"] is True
@@ -216,9 +215,8 @@ def test_mitigation_counts_against_the_rejection_cap(graph, toy_df):
 
 def test_an_approved_mitigated_model_says_so_in_its_model_card(graph, toy_df):
     config = _run_to_gate(graph, toy_df, "t-mitigate-card")
-    graph.g.invoke(Command(resume={"decision": "reject_and_mitigate", "human_feedback": ""}),
-                   config=config)
-    graph.g.invoke(Command(resume={"decision": "approve", "human_feedback": ""}), config=config)
+    decide(graph.g, config, "reject_and_mitigate")
+    approve(graph.g, config)
 
     run_dir = os.path.join(graph.artifacts_dir, "t-mitigate-card")
     with open(os.path.join(run_dir, "model_card.json"), encoding="utf-8") as fh:

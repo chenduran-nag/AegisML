@@ -40,3 +40,7 @@ static/adult_*.csv
 # reproduce the published numbers without a Groq key.
 experiments/.data_cache/
 experiments/results_quick/
+
+# Reviewer roster: bearer tokens for governance decisions. reviewers.example.yaml
+# IS committed; the real roster never is.
+reviewers.yaml

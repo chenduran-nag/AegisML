@@ -97,3 +97,43 @@ def fake_plan() -> dict:
 def audit_db(tmp_path) -> str:
     """An isolated audit database path, torn down with the tmp_path fixture."""
     return str(tmp_path / "audit_test.db")
+
+
+# ---------------------------------------------------------------------------
+# Governance decisions
+#
+# Every decision now carries the identity that made it, and approving a model with a
+# fairness violation takes two different reviewers (policy
+# `require_dual_signoff_for_violating_approval`). toy_df has a genuine disparity, so
+# most tests in this suite approve a violating model — they go through `approve()`,
+# which supplies the second sign-off only when the run actually asks for one.
+# ---------------------------------------------------------------------------
+
+REVIEWER_A = {"reviewer_id": "test.first", "reviewer_role": "ml_engineer",
+              "reviewer_authenticated": True}
+REVIEWER_B = {"reviewer_id": "test.second", "reviewer_role": "compliance_officer",
+              "reviewer_authenticated": True}
+
+
+def decide(g, config, decision: str, feedback: str = "", reviewer: dict | None = REVIEWER_A):
+    """Submit one decision at the gate. `reviewer=None` submits an anonymous one."""
+    from langgraph.types import Command
+
+    g.invoke(Command(resume={"decision": decision, "human_feedback": feedback,
+                             **(reviewer or {})}), config=config)
+    return g.get_state(config)
+
+
+def awaiting_second_approval(g, config) -> bool:
+    snapshot = g.get_state(config)
+    if not (snapshot.tasks and snapshot.tasks[0].interrupts):
+        return False
+    return bool((snapshot.tasks[0].interrupts[0].value or {}).get("awaiting_second_approval"))
+
+
+def approve(g, config, feedback: str = "", first: dict = REVIEWER_A, second: dict = REVIEWER_B):
+    """Approve, adding the second sign-off if the policy requires one for this run."""
+    decide(g, config, "approve", feedback, first)
+    if awaiting_second_approval(g, config):
+        decide(g, config, "approve", feedback, second)
+    return g.get_state(config)

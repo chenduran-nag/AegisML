@@ -18,6 +18,7 @@ pytest.importorskip("langgraph", reason="langgraph not installed")
 import pipeline_graph
 from graph_state import df_to_bytes
 from langgraph.types import Command
+from tests.conftest import approve, decide
 
 
 @pytest.fixture
@@ -137,8 +138,7 @@ def test_planner_provenance_is_recorded(graph, toy_df):
 
 def test_approval_serialises_the_model_to_disk(graph, toy_df):
     config = _run_to_gate(graph, toy_df, "t-approve")
-    graph.g.invoke(Command(resume={"decision": "approve", "human_feedback": ""}),
-                   config=config)
+    approve(graph.g, config)
 
     values = graph.g.get_state(config).values
     saved = values.get("model_saved_path")
@@ -154,10 +154,7 @@ def test_approval_serialises_the_model_to_disk(graph, toy_df):
 def test_rejected_run_writes_no_model_and_no_artifacts(graph, toy_df):
     """Only approved models become artifacts — paperwork included."""
     config = _run_to_gate(graph, toy_df, "t-reject")
-    graph.g.invoke(
-        Command(resume={"decision": "reject_model_or_fairness", "human_feedback": ""}),
-        config=config,
-    )
+    decide(graph.g, config, "reject_model_or_fairness")
 
     values = graph.g.get_state(config).values
     assert values.get("model_saved_path") is None
@@ -174,8 +171,7 @@ def test_rejected_run_writes_no_model_and_no_artifacts(graph, toy_df):
 
 def test_approval_generates_the_artifact_set(graph, toy_df):
     config = _run_to_gate(graph, toy_df, "t-artifacts")
-    graph.g.invoke(Command(resume={"decision": "approve", "human_feedback": "looks fine"}),
-                   config=config)
+    approve(graph.g, config, "looks fine")
 
     manifest = graph.g.get_state(config).values["artifacts_manifest"]
     assert manifest is not None
@@ -195,8 +191,7 @@ def test_artifact_digests_are_logged_and_verify(graph, toy_df):
     from audit_log import get_audit_trail
 
     config = _run_to_gate(graph, toy_df, "t-verify")
-    graph.g.invoke(Command(resume={"decision": "approve", "human_feedback": ""}),
-                   config=config)
+    approve(graph.g, config)
 
     trail = get_audit_trail("t-verify", db_path=graph.audit_db)
     events = [e for e in trail if e["event_type"] == ARTIFACT_EVENT_TYPE]
@@ -217,8 +212,7 @@ def test_editing_an_artifact_is_detected(graph, toy_df):
     from compliance_artifacts import verify_artifacts
 
     config = _run_to_gate(graph, toy_df, "t-tamper")
-    graph.g.invoke(Command(resume={"decision": "approve", "human_feedback": ""}),
-                   config=config)
+    approve(graph.g, config)
 
     card = os.path.join(graph.artifacts_dir, "t-tamper", "model_card.md")
     with open(card, "a", encoding="utf-8") as fh:
@@ -235,8 +229,7 @@ def test_deleting_an_artifact_is_detected(graph, toy_df):
     from compliance_artifacts import verify_artifacts
 
     config = _run_to_gate(graph, toy_df, "t-del")
-    graph.g.invoke(Command(resume={"decision": "approve", "human_feedback": ""}),
-                   config=config)
+    approve(graph.g, config)
 
     os.remove(os.path.join(graph.artifacts_dir, "t-del", "aibom.json"))
     result = verify_artifacts("t-del", audit_db_path=graph.audit_db)
@@ -248,11 +241,7 @@ def test_deleting_an_artifact_is_detected(graph, toy_df):
 def test_artifacts_record_the_real_run_content(graph, toy_df):
     """Spot-check that the paperwork describes this run rather than placeholders."""
     config = _run_to_gate(graph, toy_df, "t-content")
-    graph.g.invoke(
-        Command(resume={"decision": "approve",
-                        "human_feedback": "approved with reservations"}),
-        config=config,
-    )
+    approve(graph.g, config, "approved with reservations")
     values = graph.g.get_state(config).values
     out = os.path.join(graph.artifacts_dir, "t-content")
 
@@ -293,10 +282,7 @@ def test_model_rejection_excludes_the_model_and_repauses(graph, toy_df):
     config = _run_to_gate(graph, toy_df, "t-loop3")
     first_choice = graph.g.get_state(config).values["training_result"]["selected_model_name"]
 
-    graph.g.invoke(
-        Command(resume={"decision": "reject_model_or_fairness", "human_feedback": ""}),
-        config=config,
-    )
+    decide(graph.g, config, "reject_model_or_fairness")
 
     values = graph.g.get_state(config).values
     assert first_choice in values["rejected_models"]
@@ -307,13 +293,7 @@ def test_model_rejection_excludes_the_model_and_repauses(graph, toy_df):
 
 def test_data_quality_rejection_reroutes_to_planner(graph, toy_df):
     config = _run_to_gate(graph, toy_df, "t-loop2")
-    graph.g.invoke(
-        Command(resume={
-            "decision": "reject_data_quality",
-            "human_feedback": "Drop the notes column entirely.",
-        }),
-        config=config,
-    )
+    decide(graph.g, config, "reject_data_quality", "Drop the notes column entirely.")
 
     values = graph.g.get_state(config).values
     assert values["rejection_reroute_count"] == 1
@@ -352,8 +332,7 @@ def test_rejecting_the_last_trainable_model_ends_instead_of_offering_nothing(
     config = _run_to_gate(graph, toy_df, "t-last-model")
     assert "human_approval_node" in graph.g.get_state(config).next
 
-    graph.g.invoke(Command(resume={"decision": "reject_model_or_fairness",
-                                   "human_feedback": ""}), config=config)
+    decide(graph.g, config, "reject_model_or_fairness")
     snapshot = graph.g.get_state(config)
 
     assert snapshot.next == (), "must not present an empty approval gate"
@@ -375,11 +354,7 @@ def test_rejection_cap_terminates_without_approval_or_artifacts(graph, toy_df):
     config = _run_to_gate(graph, toy_df, "t-cap")
 
     for _ in range(3):
-        graph.g.invoke(
-            Command(resume={"decision": "reject_model_or_fairness",
-                            "human_feedback": "not acceptable"}),
-            config=config,
-        )
+        decide(graph.g, config, "reject_model_or_fairness", "not acceptable")
 
     values = graph.g.get_state(config).values
     assert graph.g.get_state(config).next == (), "run should have ended"
@@ -450,8 +425,7 @@ def test_full_run_produces_a_verified_audit_chain(graph, toy_df):
     from audit_log import get_audit_trail, verify_audit_chain
 
     config = _run_to_gate(graph, toy_df, "t-audit")
-    graph.g.invoke(Command(resume={"decision": "approve", "human_feedback": ""}),
-                   config=config)
+    approve(graph.g, config)
 
     trail = get_audit_trail("t-audit", db_path=graph.audit_db)
     event_types = [e["event_type"] for e in trail]

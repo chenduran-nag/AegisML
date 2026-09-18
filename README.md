@@ -18,6 +18,7 @@
 - **Honest fairness measurement**: groups come from raw uploaded values, the verdict covers protected attributes only, pairs of protected attributes are audited together, and a verdict that could not be measured is never shown as a pass.
 - **No leakage, and an untouched test set**: train / validation / test rows are separated before anything is fitted. Every gate decision uses the validation rows; the approved model is scored once on the test rows.
 - **Policy as code**: every threshold and rule lives in [`policy.yaml`](policy.yaml), validated at startup and recorded with a SHA-256 on every run. By default, a model whose fairness was not measured cannot be approved.
+- **Named reviewers and dual sign-off**: every decision records who made it, and approving a model with a fairness violation takes two different reviewers. The second sign-off is a hold, not a loop: nothing is written until it arrives.
 - **Tamper-evident audit log**: each entry in `audit_log.db` is SHA-256 hashed together with its predecessor. `verify_audit_chain()` names the first entry that was edited, deleted or reordered. See [Audit Chain Guarantees](#-audit-chain-what-is-and-is-not-guaranteed) for what this does and does not prove.
 
 ---
@@ -44,10 +45,13 @@ flowchart TD
 
     GATE --> DECISION{"Reviewer decision"}
 
-    DECISION -- "approve" --> BLOCK{"Fairness measured?<br/>(policy.yaml)"}
-    BLOCK -- "yes, or regression" --> SAVE["Save model, score once on test rows,<br/>write model card / AIBOM / Annex IV"]
-    SAVE --> DONE(["END: approved"])
+    DECISION -- "approve<br/>(recorded against the reviewer)" --> BLOCK{"Fairness measured?<br/>(policy.yaml)"}
+    BLOCK -- "yes, or regression" --> SIGN{"Violation, and<br/>is this the first approval?"}
     BLOCK -- "no (default policy)" --> BLOCKED(["END: approval blocked<br/>by policy"])
+    SIGN -- "first of two<br/>HOLD: awaiting a second reviewer" --> GATE
+    SIGN -- "same reviewer again,<br/>or no reviewer id" --> GATE
+    SIGN -- "no violation, or a second,<br/>different reviewer signed off" --> SAVE["Save model, score once on test rows,<br/>write model card / AIBOM / Annex IV"]
+    SAVE --> DONE(["END: approved"])
     DECISION -- "reject: data quality<br/>LOOP 2: notes to the planner" --> PLAN
     DECISION -- "reject: model<br/>LOOP 3: exclude this model" --> TRAIN
     DECISION -- "reject: mitigate bias<br/>LOOP 4: reweighing" --> MIT["Mitigation<br/>train-only reweighing weights"]
@@ -62,7 +66,7 @@ flowchart TD
 
     class START startNode;
     class EDA,PLAN,DATA,TRAIN,FAIR,MIT,SAVE agentNode;
-    class GATE,CHECK,TRAINED,DECISION,BLOCK gateNode;
+    class GATE,CHECK,TRAINED,DECISION,BLOCK,SIGN gateNode;
     class DONE endNode;
     class QCAP,TFAIL,HCAP,BLOCKED stopNode;
 ```
@@ -84,9 +88,10 @@ flowchart TD
    - An attribute violates when disparate impact is below 0.80 or demographic parity difference is above 0.10. Equal-opportunity and equalized-odds gaps are reported alongside.
    - **Combined subgroups**: every pair of protected attributes (for example `sex × race`) is audited with the same rules and reported, but does not change the verdict.
    - The verdict has three states: passed, violation, or `None`. `None` is **NOT EVALUATED** (nothing protected could be measured) or **NOT FULLY EVALUATED** (a protected attribute in the data could not be audited), and it is never shown as a pass.
-6. **Governance gate (`pipeline_graph.py`).** Calls `interrupt(payload)` and waits. The reviewer can approve, reject for data quality, reject the model, or ask for mitigation. Approving saves the model, scores it once on the untouched test rows, and writes the compliance artifacts.
+6. **Governance gate (`pipeline_graph.py`).** Calls `interrupt(payload)` and waits. The reviewer can approve, reject for data quality, reject the model, or ask for mitigation. Every decision is recorded against the identity that submitted it. Approving saves the model, scores it once on the untouched test rows, and writes the compliance artifacts — unless the model violates fairness, in which case the first approval only opens the gate again for a second, different reviewer.
 7. **Mitigation (`mitigation.py`).** Triggered only by the reviewer. It reweights training rows so the label is independent of the worst-violating protected attribute (reweighing: P(group) × P(label) / P(group, label), computed on train rows only), then retrains the same candidates. The next gate shows before against now. A second mitigation reweights the intersection of both attributes.
-8. **Governance policy (`policy.py`, `policy.yaml`).** Validated at startup, recorded per run, and read by every stage above; see the Governance Policy section below.
+8. **Reviewer identity (`reviewers.py`, `reviewers.yaml`).** Optional roster mapping a bearer token to a reviewer id and role. With it, the `X-Reviewer-Token` header decides who a decision belongs to; without it the caller's stated id is recorded as **unverified**. Either way an id is required, and the same reviewer cannot supply both sign-offs. See "Who approved" below for the threat model.
+9. **Governance policy (`policy.py`, `policy.yaml`).** Validated at startup, recorded per run, and read by every stage above; see the Governance Policy section below.
 
 ### Feedback loops and endings
 
@@ -94,6 +99,12 @@ flowchart TD
 - **Loop 2: reject — data quality.** Back to the Planner, with the reviewer's notes injected into the prompt.
 - **Loop 3: reject — model.** The selected model is excluded and training runs again on the remaining candidates.
 - **Loop 4: reject — mitigate bias.** Reweighing on the worst-violating protected attribute, then training runs again on the same candidates.
+
+**Not a loop: the second sign-off.** Approving a model with a fairness violation sends the run
+back to the same gate marked *awaiting a second sign-off*. It costs no reroute, excludes no
+model and retrains nothing — the same model and the same evidence are shown to a second
+reviewer, who may approve or reject. An approval from the first approver again, or one with no
+reviewer id, is logged and refused.
 
 Loops 2–4 share one rejection cap (2 by default). A run ends in one of five ways: **approved**, or terminated by the **quality cap**, a **training failure**, the **rejection cap**, or the **approval block**: if a classification model's fairness could not be measured, the policy refuses the approval and the run ends without a model. Every terminated run shows a "Run ended without approval" banner with its reason, never an approved one.
 
@@ -132,7 +143,8 @@ and the attributes it considers sensitive. The Data Agent applies only its uncon
 
 ### 4. Leaderboard and your decision
 Models ranked on the validation rows. The run is paused until you approve, reject for data
-quality, reject the model, or ask for bias mitigation.
+quality, reject the model, or ask for bias mitigation. Every decision is submitted under a
+reviewer id — and a token, if this server has a roster.
 
 ![Leaderboard and decision panel](images/review_gate.png)
 
@@ -150,13 +162,21 @@ mitigation against now.
 
 ![Mitigation before and after](images/review_mitigation.png)
 
-### 7. Approved
-Approving saves the model, scores it once on the untouched test rows, and writes its model card,
-AIBOM and Annex IV draft. Each artifact's SHA-256 is checked against the audit chain.
+### 7. Second sign-off
+This model violates fairness on a protected attribute, so the first approval did not finish the
+run. The gate re-opens naming who approved and when; nothing has been saved, and the second
+sign-off has to come from a different reviewer.
+
+![Gate awaiting a second sign-off](images/review_signoff.png)
+
+### 8. Approved
+The second reviewer's approval saves the model, scores it once on the untouched test rows, and
+writes its model card, AIBOM and Annex IV draft. Each artifact's SHA-256 is checked against the
+audit chain, and the banner names both approvers.
 
 ![Approved run with compliance artifacts](images/approved.png)
 
-### 8. Audit log
+### 9. Audit log
 Every event for the run, starting with the governance policy that applied, each hashed together
 with its predecessor. The banner re-verifies the chain.
 
@@ -193,7 +213,15 @@ Create a `.env` file in the root directory:
 GROQ_API_KEY=your_groq_api_key_here
 ```
 
-### 3. Run Web Application
+### 3. Optional: authenticate reviewers
+
+Copy `reviewers.example.yaml` to `reviewers.yaml` (gitignored) and give each reviewer a token
+from `python reviewers.py --new-token`. Decisions then require an `X-Reviewer-Token` header and
+are recorded under the id that token belongs to. Without this file the pipeline still requires
+a reviewer id and still needs two different ones to approve a violating model — it simply
+records them as unverified.
+
+### 4. Run Web Application
 
 ```bash
 python server.py
@@ -223,9 +251,11 @@ http://localhost:8000
 ├── compliance_artifacts.py     # Model card, AIBOM, Annex IV draft, artifact verification
 ├── policy.py                   # Policy loader: validation, version, SHA-256
 ├── policy.yaml                 # Thresholds and governance rules
+├── reviewers.py                # Reviewer roster: token to id/role, strict validation
+├── reviewers.example.yaml      # Template roster (the real one, reviewers.yaml, is gitignored)
 ├── static/
 │   └── index.html              # Dashboard (vanilla JS + Chart.js)
-├── tests/                      # Offline pytest suite (251 tests)
+├── tests/                      # Offline pytest suite (278 tests)
 ├── experiments/
 │   ├── run_governance_eval.py  # Governance evaluation harness (record / replay / --summarise-only)
 │   ├── planner_cache/          # Recorded planner responses, so results reproduce without a key
@@ -235,7 +265,7 @@ http://localhost:8000
 └── test_*.py                   # Original manual scripts (live Groq and network; not run by pytest)
 ```
 
-Created at runtime and gitignored: `.env`, `pipeline_state.db`, `audit_log.db`, `saved_models/`, `artifacts/`.
+Created at runtime and gitignored: `.env`, `reviewers.yaml`, `pipeline_state.db`, `audit_log.db`, `saved_models/`, `artifacts/`.
 
 ---
 
@@ -468,6 +498,36 @@ may be approved.
   and reviewers approved models whose fairness had never been measured. Set
   `block_approval_when_fairness_not_evaluated: false` to allow it. Regression has no
   fairness definition and is exempt.
+- **Approving a violating model takes two reviewers.**
+  `require_dual_signoff_for_violating_approval` (on by default) holds the run at the gate after
+  the first approval. `dual_signoff_can_override_approval_block` (off by default) decides
+  whether two reviewers may instead sign off a model whose fairness could not be measured — the
+  only way to get past the block, and off unless someone chooses otherwise.
+
+---
+
+## 🖊️ Who Approved: Reviewer Identity and Dual Sign-Off
+
+An approval with no approver is not an audit trail. Every decision now carries a `reviewer_id`
+and an optional role, both written into the `human_decision` audit event, the model card's
+decision history and the AIBOM.
+
+- **Two people for a violating model.** If the fairness verdict is a violation, the first
+  approval is logged as `signoff_first_approval` and the gate re-opens. The API refuses a second
+  approval from the same reviewer (HTTP 409), and so does the graph, which logs the attempt as
+  `signoff_rejected` and returns to the gate. An approval with no reviewer id is refused the same
+  way. Both identities appear in the final outcome and the model card's sign-off table.
+- **Authentication, stated honestly.** With a `reviewers.yaml` roster, a decision must carry the
+  `X-Reviewer-Token` header; the token decides the identity, and a `reviewer_id` in the body has
+  to agree with it. Tokens are held only as SHA-256 digests and compared with `compare_digest`.
+  **This is a shared secret in a local file over HTTP: no expiry, no revocation, no rotation, no
+  transport security, and anyone who can read the file or write to the databases can defeat it.**
+  It establishes that two sign-offs came from two different token holders, and claims nothing
+  more. Without a roster, identities are recorded as UNVERIFIED and the model card says so in its
+  limitations.
+- **CORS.** Browser origins are restricted to an explicit list (override with
+  `AEGISML_ALLOWED_ORIGINS`), and credentialed CORS stays off because the token travels in a
+  header rather than a cookie.
 
 ---
 
@@ -477,7 +537,7 @@ may be approved.
 pytest
 ```
 
-The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. **251 tests**, and a GitHub Actions workflow runs them on every push.
+The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, no Groq key and no network. **278 tests**, and a GitHub Actions workflow runs them on every push.
 
 | File | Tests | Covers |
 |---|---:|---|
@@ -485,6 +545,7 @@ The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, n
 | `test_governance_eval.py` | 44 | Record/replay cache, scripted reviewers for all four arms, metrics, CSV round trip, summaries, charts |
 | `test_fairness_groups.py` | 29 | Minimum group size, raw-value groups, age bands, protected-only verdict, declared attributes, coverage rule |
 | `test_policy.py` | 25 | Policy validation and hashing, thresholds changing behaviour, approval block, regression exemption |
+| `test_reviewers.py` | 15 | Roster validation, duplicate ids and reused tokens, hashed tokens, identification |
 | `test_graph_end_to_end.py` | 19 | Interrupt/resume, every reroute loop, caps, training failure, model saving, artifacts, audit chain |
 | `test_compliance_artifacts.py` | 18 | Artifact contents, NOT EVALUATED wording, digests, tamper detection |
 | `test_leakage.py` | 13 | Split before fit; parameters learned from train rows only |
@@ -494,6 +555,7 @@ The suite in `tests/` is fully offline: synthetic fixtures, a stubbed planner, n
 | `test_intersectional.py` | 6 | Combined subgroups: hidden disparities, small combinations, never in the verdict |
 | `test_feature_names.py` | 5 | XGBoost-safe one-hot column names |
 | `test_fairness_honesty.py` | 3 | Unmeasured fairness never reported as passed |
+| `test_dual_signoff.py` | 12 | One approval is not an approval, self sign-off refused, two reviewers in the artifacts, the policy switches |
 | `test_completed_run.py` | 2 | A finished run keeps the payload its reviewer decided on |
 
 The `test_*.py` scripts in the repository root are the original manual integration walkthroughs — they download the UCI Adult dataset and call the live Groq API, so they are run by hand and are excluded from `pytest` collection.

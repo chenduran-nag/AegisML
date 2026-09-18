@@ -113,7 +113,7 @@
     /* Forms */
     .form-group { margin-bottom: 16px; }
     label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--silver); margin-bottom: 6px; }
-    input[type="text"], select, textarea {
+    input[type="text"], input[type="password"], select, textarea {
       width: 100%;
       background: var(--bg);
       border: 1px solid var(--line-strong);
@@ -124,8 +124,8 @@
       font-size: 0.88rem;
       outline: none;
     }
-    input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--silver); }
-    textarea::placeholder { color: var(--silver-faint); }
+    input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:focus { border-color: var(--silver); }
+    input::placeholder, textarea::placeholder { color: var(--silver-faint); }
 
     .upload-zone { border: 1px dashed var(--line-strong); border-radius: 3px; padding: 18px 16px; cursor: pointer; }
     .upload-zone:hover { border-color: var(--silver); }
@@ -220,6 +220,15 @@
     .status-panel__head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 6px; }
     .status-panel__title { font-size: 1.05rem; font-weight: 600; color: var(--white); }
     .decision-panel { border-color: var(--silver-dim); }
+    .identity-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .identity-row > * { flex: 1 1 160px; }
+    /* Sign-off notices: state by form, not hue — a dashed rule, like every other
+       "read this before you click" note on the page. */
+    .signoff-note {
+      font-size: 0.8rem; color: var(--silver); padding: 10px 12px; margin-bottom: 14px;
+      border: 1px dashed var(--silver-dim); border-radius: 3px;
+    }
+    .signoff-note strong { color: var(--text); }
 
     /* Tabs */
     .tabs-header { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 18px; overflow-x: auto; }
@@ -557,6 +566,7 @@
         <span class="badge badge-pass">APPROVED</span>
       </div>
       <div class="small">Saved to <code id="approved-model-path">—</code>. The decision is recorded in <code>audit_log.db</code>.</div>
+      <div class="small" id="approved-signoff" style="margin-top: 6px; color: var(--silver-dim);"></div>
     </div>
 
     <!-- Compliance Artifacts -->
@@ -691,6 +701,20 @@
       <p class="muted small" style="margin-bottom: 14px;">
         The run is paused. Nothing is saved until you approve.
       </p>
+
+      <div class="signoff-note" id="signoff-note" style="display: none;"></div>
+
+      <div class="form-group">
+        <label>Who is deciding</label>
+        <div class="identity-row">
+          <input type="text" id="reviewer-id" placeholder="reviewer id, e.g. a.kumar" autocomplete="off">
+          <select id="reviewer-role">
+            <option value="">role (optional)</option>
+          </select>
+          <input type="password" id="reviewer-token" placeholder="reviewer token" autocomplete="off" style="display: none;">
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;" id="reviewer-identity-note"></div>
+      </div>
 
       <div class="form-group">
         <div class="radio-group" style="flex-direction: column;">
@@ -844,6 +868,38 @@
 
     let approvalBlockedReason = null;
 
+    // How this server treats identities. Asked once, at load: the dashboard must not
+    // guess whether a token is required.
+    let reviewerMode = { roster_configured: false, roles: [], token_header: 'X-Reviewer-Token' };
+
+    async function loadReviewerMode() {
+      try {
+        const res = await fetch('/api/reviewers');
+        if (res.ok) reviewerMode = await res.json();
+      } catch (err) { /* keep the defaults; the resume call will say what is missing */ }
+
+      const roleSelect = document.getElementById('reviewer-role');
+      (reviewerMode.roles || []).forEach(role => {
+        const option = document.createElement('option');
+        option.value = role;
+        option.textContent = role.replace(/_/g, ' ');
+        roleSelect.appendChild(option);
+      });
+      const tokenInput = document.getElementById('reviewer-token');
+      const note = document.getElementById('reviewer-identity-note');
+      if (reviewerMode.roster_configured) {
+        tokenInput.style.display = '';
+        note.innerText = 'This server has a reviewer roster (version '
+          + (reviewerMode.roster_version || '?')
+          + '). Your token identifies you; the id and role are checked against it. '
+          + 'The token is sent with this decision and is not stored by the page.';
+      } else {
+        note.innerText = 'No reviewer roster is configured, so your identity is recorded '
+          + 'as UNVERIFIED — it is whatever you type here. Add reviewers.yaml '
+          + '(see reviewers.example.yaml) to authenticate decisions with tokens.';
+      }
+    }
+
     function setDecision(dec) {
       if (dec === 'approve' && approvalBlockedReason) return;
       selectedDecision = dec;
@@ -906,14 +962,30 @@
       const fbInput = document.getElementById('human-feedback');
       const feedbackText = (selectedDecision === 'reject_data_quality' && fbInput) ? fbInput.value.trim() : "";
 
+      const reviewerId = (document.getElementById('reviewer-id')?.value || '').trim();
+      const reviewerRole = (document.getElementById('reviewer-role')?.value || '').trim();
+      const reviewerToken = (document.getElementById('reviewer-token')?.value || '').trim();
+      if (!reviewerId && !reviewerMode.roster_configured) {
+        document.getElementById('loading-overlay').style.display = 'none';
+        alert('Enter your reviewer id: a governance decision has to name who made it.');
+        return;
+      }
+
+      // The token goes in a header, never in the body or the URL, and is held only in
+      // this form field — nothing persists it.
+      const headers = { 'Content-Type': 'application/json' };
+      if (reviewerToken) headers[reviewerMode.token_header || 'X-Reviewer-Token'] = reviewerToken;
+
       try {
         const res = await fetch('/api/pipeline/resume', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify({
             thread_id: currentThreadId,
             decision: selectedDecision,
-            human_feedback: feedbackText
+            human_feedback: feedbackText,
+            reviewer_id: reviewerId || null,
+            reviewer_role: reviewerRole || null
           })
         });
         const data = await res.json();
@@ -925,6 +997,40 @@
       } finally {
         document.getElementById('loading-overlay').style.display = 'none';
       }
+    }
+
+    function renderSignoffState(payload) {
+      const note = document.getElementById('signoff-note');
+      const lines = [];
+
+      if (payload.signoff_error) {
+        lines.push('<strong>That approval was not accepted as a sign-off.</strong> '
+          + escHtml(payload.signoff_error) + '.');
+      }
+      if (payload.awaiting_second_approval) {
+        const first = payload.first_approval || {};
+        lines.push('<strong>Awaiting a second sign-off.</strong> '
+          + escHtml(first.reviewer_id || 'a reviewer')
+          + (first.reviewer_role ? ' (' + escHtml(first.reviewer_role) + ')' : '')
+          + ' approved this model at ' + escHtml(first.timestamp || 'an unrecorded time')
+          + (first.authenticated ? '' : ', with an UNVERIFIED identity')
+          + '. The run is not approved and nothing has been written. A different '
+          + 'reviewer must approve, or reject.');
+      } else if (payload.dual_signoff_required_reason) {
+        lines.push('<strong>Approving takes two reviewers.</strong> '
+          + escHtml(payload.dual_signoff_required_reason)
+          + '. Your approval will be recorded and the gate will re-open for the second.');
+      }
+
+      const decisions = payload.reviewer_decisions || [];
+      if (decisions.length) {
+        lines.push('Decisions so far: ' + decisions.map(d =>
+          escHtml(d.reviewer_id || 'unidentified') + ' &rarr; ' + escHtml(d.decision)
+        ).join(', ') + '.');
+      }
+
+      note.innerHTML = lines.join('<br><br>');
+      note.style.display = lines.length ? 'block' : 'none';
     }
 
     function updateDAGTopologyNodes(data) {
@@ -1217,6 +1323,7 @@
           approveOpt.style.cursor = '';
           blockNote.style.display = 'none';
         }
+        renderSignoffState(payload);
         document.getElementById('approved-banner').style.display = 'none';
         document.getElementById('terminated-banner').style.display = 'none';
         document.getElementById('artifacts-card').style.display = 'none';
@@ -1256,6 +1363,18 @@
           // Show ONLY the path the backend actually wrote. Falling back to a
           // constructed string would display an artifact location that does not
           // exist on disk.
+          const approvals = (vals.reviewer_decisions || []).filter(d => d.decision === 'approve');
+          const signoffEl = document.getElementById('approved-signoff');
+          if (approvals.length) {
+            signoffEl.innerHTML = (approvals.length > 1
+              ? 'Dual sign-off by ' : 'Approved by ')
+              + approvals.map(d => escHtml(d.reviewer_id || 'an unidentified reviewer')
+                + (d.reviewer_role ? ' (' + escHtml(d.reviewer_role) + ')' : '')).join(' and ')
+              + (approvals.every(d => d.authenticated) ? '.'
+                 : '. Identity UNVERIFIED: no reviewer roster was configured.');
+          } else {
+            signoffEl.innerText = '';
+          }
           const savedPath = data.model_saved_path || vals.model_saved_path;
           const pathEl = document.getElementById('approved-model-path');
           if (savedPath) {
@@ -1637,6 +1756,7 @@
         window.scrollBy(0, -70);  // clear the sticky header
       }
     }
+    loadReviewerMode();
     window.addEventListener('hashchange', openFromHash);
     openFromHash();
 

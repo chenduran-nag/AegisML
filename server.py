@@ -20,7 +20,7 @@ import io
 import pandas as pd
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, Header, UploadFile, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -57,10 +57,24 @@ from pipeline_graph import graph
 from audit_log import get_audit_trail, verify_audit_chain
 from compliance_artifacts import verify_artifacts
 from policy import load_policy
+from reviewers import KNOWN_ROLES, identify, load_reviewers
 
 # Loaded once, at startup. An invalid policy raises PolicyError here and the server does
 # not start: running under a silently defaulted policy would be worse than not running.
 POLICY = load_policy()
+
+# The reviewer roster, or None when no reviewers.yaml exists. Same rule as the policy:
+# a roster that is present but invalid stops startup, because a quietly ignored roster
+# would make unverified decisions look authenticated. Without a roster the API still
+# requires a reviewer id on every decision and records it as unverified.
+REVIEWERS = load_reviewers()
+if REVIEWERS:
+    print(f"[server] Reviewer roster {REVIEWERS['source']} (version {REVIEWERS['version']}): "
+          f"{len(REVIEWERS['reviewers'])} reviewer(s); X-Reviewer-Token is required on "
+          "every governance decision.")
+else:
+    print("[server] No reviewers.yaml — governance decisions are recorded under the "
+          "reviewer id the caller states, marked UNVERIFIED. See reviewers.example.yaml.")
 
 app = FastAPI(
     title="AI Multi-Agent Governance API",
@@ -68,17 +82,27 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# NOTE: allow_credentials=True is INVALID alongside allow_origins=["*"] — the
-# spec forbids the wildcard on credentialed requests and browsers reject the
-# response outright. This API uses no cookies or auth headers, so credentials are
-# simply off. If authentication is added later, replace the wildcard with an
-# explicit origin list and only then re-enable credentials.
+# Governance decisions now carry a reviewer token, so the wildcard origin is gone: any
+# page on any origin could otherwise read this API's responses from a browser that has
+# the dashboard open. The list is explicit and overridable for a different host
+# (AEGISML_ALLOWED_ORIGINS="http://10.0.0.5:8000,https://aegis.example").
+# allow_credentials stays False deliberately: the token travels in the X-Reviewer-Token
+# header, never in a cookie, so nothing needs credentialed CORS — and turning it on
+# would be the thing that makes a stolen origin dangerous.
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "AEGISML_ALLOWED_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-Reviewer-Token"],
 )
 
 
@@ -86,6 +110,64 @@ class ResumeRequest(BaseModel):
     thread_id: str
     decision: str
     human_feedback: Optional[str] = None
+    # Who is deciding. With a roster configured these are derived from the token and
+    # only checked against what the caller sent; without one they ARE the identity,
+    # recorded as unverified.
+    reviewer_id: Optional[str] = None
+    reviewer_role: Optional[str] = None
+
+
+def _resolve_reviewer(req: ResumeRequest, token: Optional[str]) -> dict:
+    """
+    The identity to record for this decision, or an HTTP error.
+
+    Authenticated mode (reviewers.yaml present): the token decides, and a reviewer_id
+    in the body has to agree with it — a mismatch is a bug or an attempt, never
+    something to silently prefer one side of.
+    Open mode: the caller's stated id is recorded, marked unverified. It is still
+    required: an approval with no approver is not an audit trail.
+    """
+    stated_id = (req.reviewer_id or "").strip()
+    stated_role = (req.reviewer_role or "").strip()
+
+    if REVIEWERS:
+        if not token:
+            raise HTTPException(
+                status_code=401,
+                detail="This server has a reviewer roster: send your token in the "
+                       "X-Reviewer-Token header with every governance decision.",
+            )
+        who = identify(REVIEWERS, token)
+        if who is None:
+            raise HTTPException(status_code=403, detail="Unknown reviewer token.")
+        if stated_id and stated_id != who["reviewer_id"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"reviewer_id '{stated_id}' does not match the reviewer this "
+                       f"token belongs to ('{who['reviewer_id']}').",
+            )
+        if stated_role and stated_role != who["reviewer_role"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"reviewer_role '{stated_role}' does not match the roster role "
+                       f"for '{who['reviewer_id']}' ('{who['reviewer_role']}').",
+            )
+        return {**who, "reviewer_authenticated": True}
+
+    if not stated_id:
+        raise HTTPException(
+            status_code=400,
+            detail="reviewer_id is required: a governance decision has to name the "
+                   "reviewer who made it. No reviewer roster is configured, so the "
+                   "identity is recorded as UNVERIFIED (see reviewers.example.yaml).",
+        )
+    if stated_role and stated_role not in KNOWN_ROLES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"reviewer_role must be one of {list(KNOWN_ROLES)}.",
+        )
+    return {"reviewer_id": stated_id, "reviewer_role": stated_role or None,
+            "reviewer_authenticated": False}
 
 
 def _build_pipeline_response(thread_id: str) -> dict:
@@ -122,6 +204,9 @@ def _build_pipeline_response(thread_id: str) -> dict:
             "unresolved_quality_issue": values.get("unresolved_quality_issue", False),
             "unresolved_training_failure": values.get("unresolved_training_failure", False),
             "unresolved_approval_blocked": values.get("unresolved_approval_blocked", False),
+            "awaiting_second_approval": values.get("awaiting_second_approval", False),
+            "first_approval": values.get("first_approval"),
+            "reviewer_decisions": values.get("reviewer_decisions") or [],
             "policy_version": values.get("policy_version"),
             "policy_sha256": values.get("policy_sha256"),
             "human_decision": values.get("human_decision"),
@@ -255,7 +340,10 @@ async def get_eda_report(thread_id: str):
 
 
 @app.post("/api/pipeline/resume")
-async def resume_pipeline(req: ResumeRequest):
+async def resume_pipeline(
+    req: ResumeRequest,
+    x_reviewer_token: Optional[str] = Header(default=None, alias="X-Reviewer-Token"),
+):
     """
     Submit human governance decision to resume graph execution.
     """
@@ -263,20 +351,32 @@ async def resume_pipeline(req: ResumeRequest):
     if req.decision not in allowed:
         raise HTTPException(status_code=400, detail=f"Decision must be one of {allowed}")
 
+    reviewer = _resolve_reviewer(req, x_reviewer_token)
     config = {"configurable": {"thread_id": req.thread_id}}
 
-    # Refuse a policy-blocked approval here, so the run stays paused and the reviewer can
-    # choose another action. The graph also enforces it, for any other caller.
+    # Refuse a policy-blocked approval, and a second sign-off from the first approver,
+    # here — so the run stays paused and the reviewer can choose another action. The
+    # graph enforces both again, for any other caller.
     if req.decision == "approve":
         snapshot = graph.get_state(config)
         if snapshot.tasks and snapshot.tasks[0].interrupts:
-            reason = (snapshot.tasks[0].interrupts[0].value or {}).get("approval_blocked_reason")
+            payload = snapshot.tasks[0].interrupts[0].value or {}
+            reason = payload.get("approval_blocked_reason")
             if reason:
                 raise HTTPException(status_code=409, detail=f"Approval blocked by policy: {reason}")
+            first = payload.get("first_approval") or {}
+            if payload.get("awaiting_second_approval") and \
+                    first.get("reviewer_id") == reviewer["reviewer_id"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"'{reviewer['reviewer_id']}' gave the first approval. The "
+                           "second sign-off has to come from a different reviewer.",
+                )
 
     resume_payload = {
         "decision": req.decision,
         "human_feedback": req.human_feedback or "",
+        **reviewer,
     }
 
     try:
@@ -287,6 +387,23 @@ async def resume_pipeline(req: ResumeRequest):
         raise HTTPException(status_code=500, detail=f"Error resuming graph execution: {exc}")
 
     return _build_pipeline_response(req.thread_id)
+
+
+@app.get("/api/reviewers")
+async def get_reviewer_mode():
+    """
+    Whether decisions are authenticated here, and the roles one may be recorded under.
+
+    The dashboard asks the SERVER rather than assuming: it has to know whether to ask
+    for a token, and whether to tell the reviewer their identity will be recorded as
+    unverified. Reviewer ids are not returned — the roster is not a directory.
+    """
+    return {
+        "roster_configured": REVIEWERS is not None,
+        "roster_version": (REVIEWERS or {}).get("version"),
+        "roles": list(KNOWN_ROLES),
+        "token_header": "X-Reviewer-Token",
+    }
 
 
 @app.get("/api/pipeline/status/{thread_id}")

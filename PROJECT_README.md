@@ -3,8 +3,8 @@
 **Project README: everything built so far, what changed from the original repository, and
 every remaining next step.**
 
-*Status as of 16 September 2026 · fork [`chenduran-nag/AegisML`](https://github.com/chenduran-nag/AegisML)
-`main` at `ec83f65` plus this documentation update · original
+*Status as of 18 September 2026 · fork [`chenduran-nag/AegisML`](https://github.com/chenduran-nag/AegisML)
+`main` at `8f762be` plus reviewer identity and dual sign-off · original
 [`ruhannpn/AegisML`](https://github.com/ruhannpn/AegisML) at `01c8c7d` · Semester 7 academic
 project*
 
@@ -36,7 +36,9 @@ Upload a CSV, pick a target column, and AegisML runs a chain of agents over it:
    train rows only,
 4. **trains** a model leaderboard ranked on the validation rows and explains the winner with SHAP,
 5. **audits fairness** on protected attributes, and reports combined subgroups,
-6. **stops for a human decision**: approve, reject, or ask for bias mitigation.
+6. **stops for a human decision**: approve, reject, or ask for bias mitigation — recorded against
+   the reviewer who made it, and needing **two different reviewers** to approve a model that
+   violates fairness.
 
 Approving saves the model, scores it **once on the untouched test rows**, and writes a **model
 card, an AI Bill of Materials and a draft EU AI Act Annex IV pack**. Every step is written to a
@@ -45,8 +47,8 @@ card, an AI Bill of Materials and a draft EU AI Act Annex IV pack**. Every step 
 
 The machine learning is deliberately ordinary. **The contribution is the governance layer**: a hard
 trust boundary around the LLM, fairness measurement that does not overstate what it measured, typed
-human feedback loops, a real mitigation option, evidence that can be verified, policy as code, and a
-quantitative evaluation of whether any of it changes outcomes.
+human feedback loops, a real mitigation option, accountable reviewers, evidence that can be verified,
+policy as code, and a quantitative evaluation of whether any of it changes outcomes.
 
 ---
 
@@ -97,6 +99,10 @@ A run ends **approved**, or terminated by the **quality cap**, a **training fail
 not be measured cannot be approved under the default policy). Counters live in their own graph
 nodes, because LangGraph re-executes a node on resume. Every terminated run shows a "Run ended
 without approval" banner with its reason.
+
+There is also a **hold**, which is not an ending: approving a model with a fairness violation
+returns the run to the same gate *awaiting a second sign-off*. It costs no reroute and changes no
+model — the same evidence goes to a second reviewer, who may approve or reject.
 
 ---
 
@@ -176,7 +182,7 @@ reviewer chooses:
 
 | Decision | Effect |
 |---|---|
-| **Approve** | Refused if fairness was not measured (default policy). Otherwise: model saved, scored once on test rows, compliance artifacts written |
+| **Approve** | Refused if fairness was not measured (default policy). If the verdict is a violation, the first approval only holds the run for a second, different reviewer. Otherwise: model saved, scored once on test rows, compliance artifacts written |
 | **Reject — data quality** | Loop 2: back to the planner with the reviewer's notes |
 | **Reject — model** | Loop 3: retrain without the current model |
 | **Reject — mitigate bias** | Loop 4: reweighing, then retrain the same candidates |
@@ -192,11 +198,37 @@ P(group, label), computed on **train rows only** with the Fairness Agent's own g
   prediction time.
 - Only per-cell weights are stored; the next gate shows **before against now**.
 
+### 3.6b Reviewer identity and dual sign-off — `reviewers.py`, `pipeline_graph.py`
+
+Every decision carries the identity that made it: `reviewer_id`, an optional role, and whether that
+identity was authenticated. All three go into the `human_decision` audit event, the model card's
+decision history and sign-off table, and the AIBOM.
+
+- **Two people for a violating model.** The first approval is logged as `signoff_first_approval` and
+  the gate re-opens marked *awaiting a second sign-off*; nothing is written. The API refuses an
+  approval from the first approver (HTTP 409), and the graph refuses it too, logging
+  `signoff_rejected` and returning to the gate. An approval with no reviewer id is refused the same
+  way, so "two reviewers" cannot be satisfied by two anonymous clicks. A reroute clears the pending
+  sign-off, because the next gate reviews a different model.
+- **Authentication, and its limits.** `reviewers.yaml` (gitignored; `reviewers.example.yaml` is the
+  template) maps a bearer token to an id and a role, validated strictly: duplicate ids, reused
+  tokens, unknown roles and short tokens all fail at startup. Tokens are kept only as SHA-256
+  digests and compared with `hmac.compare_digest`. The token travels in the `X-Reviewer-Token`
+  header; a `reviewer_id` in the body must agree with it. **Threat model: a shared secret in a local
+  file over HTTP — no expiry, no revocation, no rotation, no transport security, and anyone who can
+  read the file or write to the databases defeats it.** With no roster, identities are recorded as
+  UNVERIFIED and the model card lists that as a limitation.
+- **CORS** is now an explicit origin list (`AEGISML_ALLOWED_ORIGINS`), with credentialed CORS off
+  because the token is a header and not a cookie.
+
 ### 3.7 Governance policy — `policy.py`, `policy.yaml`
 
 - **Controls** the Data Agent's missing-value and quality limits, the test and validation sizes, the
   fairness thresholds and minimum group size, the retry and rejection caps, an allowed-models list,
-  and `block_approval_when_fairness_not_evaluated` (on by default).
+  `block_approval_when_fairness_not_evaluated` (on by default),
+  `require_dual_signoff_for_violating_approval` (on by default) and
+  `dual_signoff_can_override_approval_block` (off by default — the only way past the block, and only
+  if someone chooses it).
 - **Fails loudly.** Unknown keys, wrong types, out-of-range values and unknown model names raise
   `PolicyError`; the server refuses to start.
 - **Recorded per run.** The validated policy, its `version` and a SHA-256 of its values live in state;
@@ -248,7 +280,8 @@ API refuses (409) to serve a file that fails verification.
 | Method | Route | Purpose |
 |---|---|---|
 | POST | `/api/pipeline/start` | Upload CSV (with optional `protected_attributes`), start a run under the loaded policy |
-| POST | `/api/pipeline/resume` | Submit a decision; 409 if the policy blocks the approval |
+| POST | `/api/pipeline/resume` | Submit a decision with the reviewer's identity (`X-Reviewer-Token` when a roster exists); 409 if the policy blocks the approval or the same reviewer tries to sign off twice |
+| GET | `/api/reviewers` | Whether decisions are authenticated here, and the roles available |
 | GET | `/api/pipeline/status/{thread_id}` | State, gate payload (or the last one), outcome, final test evaluation, policy |
 | GET | `/api/pipeline/eda/{thread_id}` | EDA report and findings |
 | GET | `/api/pipeline/audit/{thread_id}` | Audit trail and chain verification |
@@ -326,6 +359,11 @@ pip install -r requirements.txt
 pytest
 ```
 
+**Optional — authenticate reviewers.** Copy `reviewers.example.yaml` to `reviewers.yaml`
+(gitignored) and give each reviewer a token from `python reviewers.py --new-token`. Without it,
+decisions still need a reviewer id and a violating model still needs two different ones; the
+identities are simply recorded as unverified.
+
 **Run the dashboard.** Create `.env` at the repository root (gitignored — never commit it):
 
 ```env
@@ -374,10 +412,12 @@ into the gitignored `experiments/results_quick/`, with `--cache-dir` pointing at
 ├── mitigation.py                Reweighing mitigation
 ├── policy.py                    Policy loader: validation, version, SHA-256
 ├── policy.yaml                  Thresholds and governance rules
+├── reviewers.py                 Reviewer roster: token to id/role, hashed tokens, strict validation
+├── reviewers.example.yaml       Roster template (the real reviewers.yaml is gitignored)
 ├── audit_log.py                 Hash-chained audit log and verification
 ├── compliance_artifacts.py      Model card, AIBOM, Annex IV draft, artifact verification
 ├── static/index.html            Dashboard
-├── tests/                       Offline pytest suite (251 tests)
+├── tests/                       Offline pytest suite (278 tests)
 ├── .github/workflows/tests.yml  Runs pytest on every push
 ├── experiments/
 │   ├── run_governance_eval.py   Evaluation harness
@@ -395,14 +435,14 @@ into the gitignored `experiments/results_quick/`, with `--cache-dir` pointing at
 └── test_*.py                    Original manual scripts (live Groq and network; not run by pytest)
 ```
 
-Created at runtime and gitignored: `.env`, `pipeline_state.db`, `audit_log.db`, `saved_models/`,
-`artifacts/`, `experiments/.data_cache/`, `experiments/results_quick/`.
+Created at runtime and gitignored: `.env`, `reviewers.yaml`, `pipeline_state.db`, `audit_log.db`,
+`saved_models/`, `artifacts/`, `experiments/.data_cache/`, `experiments/results_quick/`.
 
 ---
 
 ## 7. Tests
 
-`pytest` runs **251 offline tests**: synthetic fixtures, a stubbed planner, no API key, no network.
+`pytest` runs **278 offline tests**: synthetic fixtures, a stubbed planner, no API key, no network.
 GitHub Actions runs them on every push.
 
 | File | Tests | Covers |
@@ -411,6 +451,7 @@ GitHub Actions runs them on every push.
 | `test_governance_eval.py` | 44 | Record/replay cache, scripted reviewers for all arms, metrics, CSV round trip, summaries, charts |
 | `test_fairness_groups.py` | 29 | Minimum group size, raw-value groups, age bands, protected-only verdict, declared attributes, coverage rule |
 | `test_policy.py` | 25 | Policy validation and hashing, thresholds changing behaviour, approval block, regression exemption |
+| `test_reviewers.py` | 15 | Roster validation, duplicate ids and reused tokens, hashed tokens, identification |
 | `test_graph_end_to_end.py` | 19 | Interrupt/resume, every reroute loop, caps, training failure, model saving, artifacts, audit chain |
 | `test_compliance_artifacts.py` | 18 | Artifact contents, NOT EVALUATED wording, digests, tamper detection |
 | `test_leakage.py` | 13 | Split before fit; parameters learned from train rows only |
@@ -420,6 +461,7 @@ GitHub Actions runs them on every push.
 | `test_intersectional.py` | 6 | Combined subgroups: hidden disparities, small combinations, never in the verdict |
 | `test_feature_names.py` | 5 | XGBoost-safe one-hot names |
 | `test_fairness_honesty.py` | 3 | Unmeasured fairness never reported as passed |
+| `test_dual_signoff.py` | 12 | One approval is not an approval, self sign-off refused, both approvers in the artifacts, the policy switches |
 | `test_completed_run.py` | 2 | A finished run keeps the payload its reviewer decided on |
 
 ---
@@ -445,6 +487,7 @@ GitHub Actions runs them on every push.
 16. **Gate decisions use validation rows; test rows are scored once, after approval.**
 17. **The run's policy governs it and is recorded**, and approving an unevaluated classification model
     is refused by default.
+18. **Every decision names its reviewer, and approving a violating model takes two different ones.**
 
 `CLAUDE.md` explains each rule and the defect that motivated it.
 
@@ -457,7 +500,10 @@ GitHub Actions runs them on every push.
   IV document is a draft input, and says so.
 - **The audit chain does not detect truncation, whole-run deletion or recomputation** (unsigned,
   unanchored).
-- **No reviewer identity yet.** Anyone who can reach the resume endpoint can decide.
+- **Reviewer authentication is weak, by design and by admission.** Identity is required and recorded,
+  and two different reviewers are needed to approve a violating model — but the tokens are shared
+  secrets in a local file over HTTP, with no expiry, revocation or rotation, and no roster at all
+  unless one is configured. It separates two reviewers from one; it is not an identity system.
 - **Fairness coverage is limited.** Protected attributes are recognised by column name unless declared;
   only age is banded; high-cardinality protected columns (Adult `native-country`) are not audited;
   combined subgroups do not affect the verdict; small datasets may not be auditable at the gate at all.
@@ -471,9 +517,9 @@ GitHub Actions runs them on every push.
 flowchart"). The original repository has had **no new commits since**. All work is on the fork
 `chenduran-nag/AegisML`; nothing has been pushed to the original.
 
-**Totals through `ec83f65`:** 17 commits, 50 files changed, **+12,950 / −660 lines**; tests went from 0
-automated (8 manual scripts needing a live API key and network) to **251 offline tests**. This
-documentation update adds one commit and replaces the dashboard screenshots.
+**Totals through `8f762be`:** 18 commits, 70 files changed, **+13,764 / −750 lines**; tests went from 0
+automated (8 manual scripts needing a live API key and network) to **251 offline tests**. Reviewer
+identity and dual sign-off add one further commit and take the suite to **278 tests**.
 
 ### 10.1 Commits
 
@@ -551,18 +597,22 @@ documentation update adds one commit and replaces the dashboard screenshots.
   three-state verdict
 - **Reject and mitigate** (reweighing) with a before/after view
 - **Policy as code** with strict validation, per-run provenance and the approval block
+- **Reviewer identity and dual sign-off**: named decisions, optional token roster, two different
+  reviewers to approve a violating model, both recorded in the audit trail and the paperwork
 - Training-failure and approval-blocked endings
 - Quantitative governance evaluation: 4 datasets × 4 arms × 5 seeds, committed results, replayable without a key
-- 251 offline tests and a GitHub Actions workflow
+- 278 offline tests and a GitHub Actions workflow
 - Dashboard: black / white / silver restyle, deep links to runs, terminated and approved banners,
   artifacts panel, EDA insights, fairness table with protected and advisory labels, combined-subgroup
-  table, mitigation card, disabled Approve with the policy's reason, HTML escaping throughout
+  table, mitigation card, disabled Approve with the policy's reason, reviewer identity fields and the
+  awaiting-second-sign-off notice, HTML escaping throughout
 
 ### 10.4 Files
 
 **New:** `eda_insights.py`, `compliance_artifacts.py`, `mitigation.py`, `policy.py`, `policy.yaml`,
+`reviewers.py`, `reviewers.example.yaml`,
 `experiments/run_governance_eval.py`, `experiments/planner_cache/`, `experiments/results/`, `tests/`
-(14 test files + `conftest.py`), `pytest.ini`, `.github/workflows/tests.yml`, `CLAUDE.md`,
+(16 test files + `conftest.py`), `pytest.ini`, `.github/workflows/tests.yml`, `CLAUDE.md`,
 `NEXT_STEPS.md`, `PROJECT_REVIEW.md`, `PROJECT_README.md`, and new dashboard screenshots in `images/`.
 
 **Substantially changed:** `pipeline_graph.py`, `fairness_agent.py`, `data_agent.py`, `training_agent.py`,
@@ -587,15 +637,14 @@ documentation update adds one commit and replaces the dashboard screenshots.
 
 Recommended order. `NEXT_STEPS.md` has the full design and acceptance criteria for each.
 
-### Step 5 — reviewer identity and dual sign-off
+### Step 5 — reviewer identity and dual sign-off — **done**
 
-- `reviewer_id` / `reviewer_role` on decisions, authenticated with per-reviewer tokens from a gitignored
-  config, with the threat model stated honestly.
-- Log the reviewer in the audit trail, the model card and the AIBOM (the approver is still `not recorded`).
-- **Dual sign-off:** approving a model with a fairness violation requires a second, different reviewer.
-  This is also the natural override for the approval block (a second reviewer accepting an unmeasured
-  verdict, recorded as such). Make both policy flags.
-- Replace `allow_origins=["*"]` with an explicit list before enabling credentials.
+Delivered: `reviewer_id` / `reviewer_role` on every decision, an optional token roster
+(`reviewers.py`), the reviewer in the audit trail, model card and AIBOM, dual sign-off for a
+violating approval with the same-reviewer case refused, `dual_signoff_can_override_approval_block`
+as the documented override for the approval block, and an explicit CORS origin list. Left for
+later: per-decision expiry or revocation, real authentication, and a policy key for which *roles*
+may sign off (today any two different reviewers qualify).
 
 ### Fairness and evaluation
 

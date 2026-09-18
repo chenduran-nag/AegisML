@@ -1,0 +1,22 @@
+# Reviewer roster — copy to `reviewers.yaml` (gitignored) to enable authenticated
+# reviewer identities. With no `reviewers.yaml`, the server still records the id and
+# role the caller states, marked UNVERIFIED, and dual sign-off still needs two
+# different ids.
+#
+# Generate a token with:  python reviewers.py --new-token
+# Send it on every decision:  X-Reviewer-Token: <token>
+#
+# Threat model (see the module docstring in reviewers.py): shared secrets in a local
+# file over HTTP, no expiry, no revocation, no rotation. Enough to make dual sign-off
+# mean two people; not an authentication system.
+
+version: "1.0.0"
+
+reviewers:
+  - id: a.kumar
+    role: ml_engineer          # ml_engineer | data_scientist | compliance_officer |
+    token: "REPLACE-ME-with-python-reviewers.py---new-token"   # domain_expert | product_owner
+
+  - id: r.mehta
+    role: compliance_officer
+    token: "REPLACE-ME-too-each-token-must-be-unique-24-chars"

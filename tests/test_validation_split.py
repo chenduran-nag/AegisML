@@ -58,10 +58,11 @@ pytest.importorskip("langgraph", reason="langgraph not installed")
 from langgraph.types import Command  # noqa: E402
 
 from tests.test_graph_end_to_end import _run_to_gate, graph  # noqa: E402,F401
+from tests.conftest import approve, decide
 
 
 def _approve(env, config):
-    env.g.invoke(Command(resume={"decision": "approve", "human_feedback": ""}), config=config)
+    approve(env.g, config)
 
 
 def test_the_gate_is_decided_on_validation_rows_and_test_rows_stay_untouched(graph, toy_df):
@@ -102,8 +103,7 @@ def test_a_rejected_run_never_scores_the_test_rows(graph, toy_df):
     from audit_log import get_audit_trail
 
     config = _run_to_gate(graph, toy_df, "t-val-reject")
-    graph.g.invoke(Command(resume={"decision": "reject_model_or_fairness", "human_feedback": ""}),
-                   config=config)
+    decide(graph.g, config, "reject_model_or_fairness")
     trail = get_audit_trail("t-val-reject", db_path=graph.audit_db)
     assert "final_test_evaluation" not in [e["event_type"] for e in trail]
     assert not graph.g.get_state(config).values.get("final_evaluation")

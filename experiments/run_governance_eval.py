@@ -282,6 +282,17 @@ ARMS: dict[str, Arm] = {
 # own first-gate vs approved-model table.
 REROUTE_ARMS = {"C": "rerouting to the next model", "D": "mitigation"}
 
+# The scripted reviewer's identities. Two of them, because approving a model with a
+# fairness violation takes two different reviewers under the committed policy. The
+# second one exists to satisfy that rule mechanically — which is exactly the point
+# being measured: the arms differ in what the reviewer DOES, never in who signs.
+EVAL_REVIEWERS = (
+    {"reviewer_id": "eval.reviewer.1", "reviewer_role": "ml_engineer",
+     "reviewer_authenticated": True},
+    {"reviewer_id": "eval.reviewer.2", "reviewer_role": "compliance_officer",
+     "reviewer_authenticated": True},
+)
+
 
 def scripted_decision(arm: Arm, payload: dict, reroutes_used: int,
                       max_reroutes: int) -> dict:
@@ -435,9 +446,16 @@ def _final_metrics(values: dict, gates: int) -> dict:
     else:
         status = "ended_without_decision"
 
+    approvers = [record.get("reviewer_id")
+                 for record in (values.get("reviewer_decisions") or [])
+                 if record.get("decision") == "approve"]
+
     return {
         "status": status,
         "gates": gates,
+        # Who signed, so a results file can show that no approval had a single author.
+        "approvers": ";".join(a or "unnamed" for a in approvers),
+        "n_signoffs": len(approvers),
         "final_model": training.get("selected_model_name"),
         "accuracy": metrics.get("accuracy"),
         "f1": metrics.get("f1"),
@@ -517,13 +535,29 @@ def run_single(dataset: LoadedDataset, arm: Arm, seed: int,
                 }, config=config)
 
                 gates = 0
+                second_signoffs = 0
                 while True:
                     snapshot = graph.get_state(config)
                     if "human_approval_node" not in snapshot.next:
                         break
+                    payload = snapshot.tasks[0].interrupts[0].value
+
+                    # A re-opened gate awaiting the second sign-off is not a new review:
+                    # the model and the evidence are unchanged, so it is not counted as
+                    # a gate and adds no trajectory row.
+                    if payload.get("awaiting_second_approval"):
+                        if second_signoffs >= MAX_GATES_PER_RUN:
+                            raise RuntimeError("exceeded second sign-offs")
+                        second_signoffs += 1
+                        graph.invoke(Command(resume={
+                            "decision": "approve",
+                            "human_feedback": "Second sign-off (scripted reviewer).",
+                            **EVAL_REVIEWERS[1],
+                        }), config=config)
+                        continue
+
                     if gates >= MAX_GATES_PER_RUN:
                         raise RuntimeError(f"exceeded {MAX_GATES_PER_RUN} gates")
-                    payload = snapshot.tasks[0].interrupts[0].value
                     decision = scripted_decision(
                         arm, payload,
                         snapshot.values.get("rejection_reroute_count", 0),
@@ -535,6 +569,7 @@ def run_single(dataset: LoadedDataset, arm: Arm, seed: int,
                     graph.invoke(Command(resume={
                         "decision": decision["decision"],
                         "human_feedback": decision["human_feedback"],
+                        **EVAL_REVIEWERS[0],
                     }), config=config)
 
                 row.update(_final_metrics(graph.get_state(config).values, gates))

@@ -29,8 +29,14 @@ Graph structure:
       │                       ▼
       │                 [route_after_human_approval]  ← conditional edge
       │                       │
-      │                       ├─ "approve"                   ►►►►► END
+      │                       ├─ "approve", fairness passed  ►►►►► audit_log_node ► END
+      │                       ├─ "approve", violation, 1st   ►►►►► record_first_approval
+      │                       │                                    ► back to the gate
+      │                       ├─ "approve", same reviewer /
+      │                       │   no reviewer id             ►►►►► reject_signoff ► the gate
+      │                       ├─ "approve", 2nd reviewer     ►►►►► audit_log_node ► END
       │                       ├─ "reject_data_quality"       ►►►►► planner_node
+      │                       ├─ "reject_and_mitigate"       ►►►►► mitigation_node
       │                       └─ "reject_model_or_fairness"  ►►►►► training_node
       │
       ├─ quality FAIL, retry_count < MAX_RETRIES ──► increment_retry node ──► planner_node
@@ -50,6 +56,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+from datetime import datetime, timezone
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import interrupt
@@ -106,9 +113,9 @@ def _fairness_limits(state: PipelineState) -> dict:
     return {arg: fairness[key] for key, arg in mapping.items() if key in fairness}
 
 
-def _approval_block_reason(state: PipelineState) -> str | None:
+def _fairness_not_measured_reason(state: PipelineState) -> str | None:
     """
-    Why approving this model is refused by policy, or None if it is allowed.
+    Why this run's fairness verdict does not support an approval, or None.
 
     A classification model whose fairness verdict is None — NOT EVALUATED, or NOT
     FULLY EVALUATED — cannot be approved while block_approval_when_fairness_not_evaluated
@@ -133,6 +140,104 @@ def _approval_block_reason(state: PipelineState) -> str | None:
           "Reject to try another model or to fix the data, or start a new run that "
           "declares the protected attributes."
     )
+
+
+def _approval_block_reason(state: PipelineState) -> str | None:
+    """
+    Why approving this model is refused outright, or None if some approval is possible.
+
+    Unmeasured fairness blocks the approval unless the policy lets two reviewers sign
+    it off instead (`dual_signoff_can_override_approval_block`), in which case this
+    returns None and `_dual_signoff_reason` takes over: the route is open, but not to
+    one reviewer alone.
+    """
+    reason = _fairness_not_measured_reason(state)
+    if reason and _policy_value(state, "governance", "dual_signoff_can_override_approval_block",
+                                DEFAULT_POLICY["governance"]["dual_signoff_can_override_approval_block"]):
+        return None
+    return reason
+
+
+def _dual_signoff_reason(state: PipelineState) -> str | None:
+    """
+    Why approving this model takes two different reviewers, or None if one suffices.
+
+    Approving a model the pipeline itself found to discriminate is the decision most
+    worth slowing down: the evaluation approved 60 violating models, every one of them
+    on a single click. Regression never reaches the first branch — it has no verdict.
+    """
+    fairness = state.get("fairness_result") or {}
+    if fairness.get("overall_fairness_passed") is False and _policy_value(
+            state, "governance", "require_dual_signoff_for_violating_approval",
+            DEFAULT_POLICY["governance"]["require_dual_signoff_for_violating_approval"]):
+        return ("the fairness audit recorded a violation on a protected attribute, so "
+                "the policy requires a second, different reviewer to sign off this "
+                "approval")
+    if _fairness_not_measured_reason(state) and _policy_value(
+            state, "governance", "dual_signoff_can_override_approval_block",
+            DEFAULT_POLICY["governance"]["dual_signoff_can_override_approval_block"]):
+        return ("fairness was not measured for this run, and the policy allows two "
+                "different reviewers to sign that off in place of refusing it")
+    return None
+
+
+def _reviewer_from_resume(raw: object) -> dict:
+    """
+    The identity attached to a resume payload, normalised — never assumed present.
+
+    `reviewer_authenticated` is set by the server when the caller's token matched the
+    reviewer roster. Nothing else may set it: a caller that simply claims a role is
+    recorded as unverified (see reviewers.py for the threat model).
+    """
+    if not isinstance(raw, dict):
+        return {"reviewer_id": None, "reviewer_role": None, "authenticated": False}
+
+    def text(value):
+        cleaned = str(value).strip() if value is not None else ""
+        return cleaned or None
+
+    return {
+        "reviewer_id": text(raw.get("reviewer_id")),
+        "reviewer_role": text(raw.get("reviewer_role")),
+        "authenticated": bool(raw.get("reviewer_authenticated")),
+    }
+
+
+def _reviewer_label(reviewer: dict | None) -> str:
+    """How a reviewer is named in audit summaries, including when they are not."""
+    reviewer = reviewer or {}
+    if not reviewer.get("reviewer_id"):
+        return "an unidentified reviewer (no reviewer id supplied)"
+    return (f"{reviewer['reviewer_id']} ({reviewer.get('reviewer_role') or 'role not stated'}, "
+            f"{'authenticated' if reviewer.get('authenticated') else 'UNVERIFIED identity'})")
+
+
+def _signoff_shortfall(state: PipelineState) -> str | None:
+    """
+    Why the approval in hand does not complete a dual sign-off, or None if it does.
+
+    Covers both halves of "two people": an approval with no name at all, and the same
+    reviewer approving twice.
+    """
+    reviewer_id = (state.get("current_reviewer") or {}).get("reviewer_id")
+    first = state.get("first_approval") or {}
+    if not reviewer_id:
+        return ("this approval carries no reviewer id, and the policy requires two named "
+                "reviewers — submit the decision with a reviewer id")
+    if first and reviewer_id == first.get("reviewer_id"):
+        return (f"'{reviewer_id}' already gave the first approval; the second sign-off has "
+                "to come from a different reviewer")
+    return None
+
+
+def _approvers(state: PipelineState) -> list[dict]:
+    """The identities that approved this run, in order. Identity only, no feedback."""
+    return [
+        {k: record.get(k) for k in
+         ("reviewer_id", "reviewer_role", "authenticated", "stage", "timestamp")}
+        for record in (state.get("reviewer_decisions") or [])
+        if record.get("decision") == "approve"
+    ]
 
 # Directory approved models are serialised into by audit_log_node.
 SAVED_MODELS_DIR = "saved_models"
@@ -643,8 +748,15 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
     train_res = state.get("training_result") or {}
     fair_res = state.get("fairness_result") or {}
 
+    awaiting_second = bool(state.get("awaiting_second_approval"))
+
     payload = {
-        "question": "Governance Review: Please evaluate pipeline outputs and select a decision.",
+        "question": (
+            "Second sign-off required: a reviewer other than the first approver must "
+            "confirm this approval, or reject it."
+            if awaiting_second else
+            "Governance Review: Please evaluate pipeline outputs and select a decision."
+        ),
         # Approve is withheld when policy blocks it; the reason is shown to the reviewer.
         "allowed_decisions": [
             d for d in ("approve", "reject_data_quality", "reject_model_or_fairness",
@@ -652,6 +764,13 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
             if not (d == "approve" and _approval_block_reason(state))
         ],
         "approval_blocked_reason": _approval_block_reason(state),
+        # Dual sign-off (policy). The reason is shown before the first approval, so a
+        # reviewer knows the click will not finish the run.
+        "dual_signoff_required_reason": _dual_signoff_reason(state),
+        "awaiting_second_approval": awaiting_second,
+        "first_approval": state.get("first_approval"),
+        "signoff_error": state.get("signoff_error"),
+        "reviewer_decisions": state.get("reviewer_decisions") or [],
         "policy_version": state.get("policy_version"),
         "policy_sha256": state.get("policy_sha256"),
         # Pure function of recorded state, so safe before interrupt() (invariant 6).
@@ -698,17 +817,35 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
         decision = str(raw_decision)
         human_feedback = ""
 
-    print(f"[human_approval_node] RESUMED! Human decision received = '{decision}', feedback = '{human_feedback}'")
+    # Who submitted it. Recorded for every decision, not only approvals: a rejection
+    # nobody is named for is as unaccountable as an approval nobody is named for.
+    reviewer = _reviewer_from_resume(raw_decision)
+    stage = "second" if awaiting_second else "first"
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "decision": decision,
+        "feedback": human_feedback,
+        "stage": stage,
+        **reviewer,
+    }
+
+    print(f"[human_approval_node] RESUMED! Human decision received = '{decision}', "
+          f"feedback = '{human_feedback}', reviewer = {_reviewer_label(reviewer)}")
 
     log_audit_event(
         run_id=run_id,
         db_path=AUDIT_DB_PATH,
         event_type="human_decision",
         event_source="human_reviewer",
-        summary=f"Human reviewer submitted decision: '{decision}'" + (f" (Feedback: '{human_feedback}')" if human_feedback else ""),
+        summary=(f"Reviewer {_reviewer_label(reviewer)} submitted decision: '{decision}'"
+                 + (f" (Feedback: '{human_feedback}')" if human_feedback else "")),
         details={
             "human_decision": decision,
             "human_feedback": human_feedback,
+            "reviewer_id": reviewer["reviewer_id"],
+            "reviewer_role": reviewer["reviewer_role"],
+            "reviewer_authenticated": reviewer["authenticated"],
+            "signoff_stage": stage,
             "rejection_reroute_count": state.get("rejection_reroute_count", 0),
         },
     )
@@ -716,6 +853,10 @@ def human_approval_node(state: PipelineState, config: RunnableConfig) -> dict:
     # The payload the reviewer decided on, kept so a completed run can still show its
     # evaluation tabs. Written after interrupt() returns, so re-execution is harmless.
     return {"human_decision": decision, "human_feedback": human_feedback,
+            "current_reviewer": reviewer,
+            "reviewer_decisions": [*(state.get("reviewer_decisions") or []), record],
+            # Any new decision supersedes the previous sign-off complaint.
+            "signoff_error": None,
             "last_review_payload": payload}
 
 
@@ -827,6 +968,7 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
             print(f"[audit_log_node] FAILED to save model: {save_error}")
 
     final_evaluation = _final_test_evaluation(state, run_id)
+    approvers = _approvers(state)
 
     log_audit_event(
         run_id=run_id,
@@ -834,13 +976,18 @@ def audit_log_node(state: PipelineState, config: RunnableConfig) -> dict:
         event_type="final_outcome",
         event_source="automated",
         summary=(
-            "Pipeline execution completed successfully with human approval."
+            "Pipeline execution completed successfully with human approval by "
+            + (" and ".join(_reviewer_label(a) for a in approvers) if approvers
+               else "an unidentified reviewer")
+            + "."
             + (f" Model artifact saved to '{saved_path}'." if saved_path
                else f" Model artifact NOT saved ({save_error}).")
         ),
         details={
             "status": "APPROVED",
             "selected_model": selected_name,
+            "approvers": approvers,
+            "dual_signoff": len(approvers) > 1,
             "overall_fairness_passed": fairness_passed,
             "fairness_evaluated": fairness_result.get("fairness_evaluated", False),
             "fairness_coverage": fairness_result.get("fairness_coverage"),
@@ -933,6 +1080,9 @@ def route_after_human_approval(state: PipelineState) -> str:
       "reroute_planner"   — human rejected data quality ("reject_data_quality")
       "reroute_training"  — human rejected model/fairness ("reject_model_or_fairness")
       "human_cap_failure" — human rejected, but rejection cap reached
+      "record_first_approval" — approved, but the policy wants a second reviewer
+      "signoff_rejected" — approved without a usable second identity; back to the gate
+      "approval_blocked" — approve refused outright by policy
     """
     decision = state.get("human_decision")
     reroute_count = state.get("rejection_reroute_count", 0)
@@ -942,6 +1092,19 @@ def route_after_human_approval(state: PipelineState) -> str:
             print("[router] Human decision: APPROVE refused by governance policy → "
                   "END with unresolved_approval_blocked=True")
             return "approval_blocked"
+        if _dual_signoff_reason(state):
+            shortfall = _signoff_shortfall(state)
+            if shortfall:
+                print(f"[router] Human decision: APPROVE does not complete dual sign-off "
+                      f"({shortfall}) → back to the gate")
+                return "signoff_rejected"
+            if not state.get("first_approval"):
+                print("[router] Human decision: APPROVE is the FIRST of two required "
+                      "sign-offs → back to the gate for a second reviewer")
+                return "record_first_approval"
+            print("[router] Human decision: APPROVED by a second, different reviewer → "
+                  "audit_log_node")
+            return "audit_log_node"
         print(f"[router] Human decision: APPROVED → audit_log_node (human reroutes used: {reroute_count})")
         return "audit_log_node"
 
@@ -1023,6 +1186,8 @@ def _increment_human_reroute_planner(state: PipelineState) -> dict:
     return {
         "last_failure_reason": failure_context,
         "rejection_reroute_count": new_count,
+        # The next gate reviews a different pipeline, so a pending sign-off lapses.
+        **_clear_pending_signoff(),
     }
 
 
@@ -1040,6 +1205,7 @@ def _increment_human_reroute_training(state: PipelineState) -> dict:
     return {
         "rejection_reroute_count": new_count,
         "rejected_models": rejected,
+        **_clear_pending_signoff(),
     }
 
 
@@ -1051,7 +1217,7 @@ def _increment_human_reroute_mitigation(state: PipelineState) -> dict:
     """
     new_count = state.get("rejection_reroute_count", 0) + 1
     print(f"[increment_human_reroute_mitigation] rejection_reroute_count: {new_count - 1} → {new_count}")
-    return {"rejection_reroute_count": new_count}
+    return {"rejection_reroute_count": new_count, **_clear_pending_signoff()}
 
 
 def mitigation_node(state: PipelineState, config: RunnableConfig) -> dict:
@@ -1105,6 +1271,77 @@ def mitigation_node(state: PipelineState, config: RunnableConfig) -> dict:
     )
     return {"mitigation": {"method": MITIGATION_METHOD, "attributes": attributes,
                            "applications": applications}}
+
+
+def _clear_pending_signoff() -> dict:
+    """State reset for a reroute: a half-finished approval must not survive it."""
+    return {"awaiting_second_approval": False, "first_approval": None, "signoff_error": None}
+
+
+def _record_first_approval(state: PipelineState, config: RunnableConfig) -> dict:
+    """
+    Hold a first approval and send the run back to the gate for a second reviewer.
+
+    The run is NOT approved here: no model is written, no artifacts are generated, and
+    `human_decision` is cleared so nothing downstream can read a half-finished approval
+    as a completed one.
+    """
+    run_id = _get_run_id(config)
+    reviewer = state.get("current_reviewer") or {}
+    reason = _dual_signoff_reason(state) or "the governance policy requires dual sign-off"
+    record = {
+        **reviewer,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "feedback": state.get("human_feedback") or "",
+    }
+    print(f"[record_first_approval] First approval from {_reviewer_label(reviewer)}; "
+          "awaiting a second, different reviewer")
+    log_audit_event(
+        run_id=run_id,
+        db_path=AUDIT_DB_PATH,
+        event_type="signoff_first_approval",
+        event_source="automated",
+        summary=(f"First approval recorded from {_reviewer_label(reviewer)}. The run is "
+                 f"NOT approved: a second, different reviewer must sign off, because "
+                 f"{reason}."),
+        details={
+            "first_approval": record,
+            "reason": reason,
+            "policy_version": state.get("policy_version"),
+            "policy_sha256": state.get("policy_sha256"),
+        },
+    )
+    return {"first_approval": record, "awaiting_second_approval": True,
+            "human_decision": None}
+
+
+def _reject_signoff(state: PipelineState, config: RunnableConfig) -> dict:
+    """
+    An approval that cannot count as a sign-off, logged and returned to the gate.
+
+    Reached when an approval carries no reviewer id, or when the first approver tries
+    to supply the second sign-off as well. The attempt is recorded either way: a
+    refused self-approval is exactly the event a reviewer of the reviewers wants to see.
+    """
+    run_id = _get_run_id(config)
+    reviewer = state.get("current_reviewer") or {}
+    reason = _signoff_shortfall(state) or "the approval did not satisfy dual sign-off"
+    print(f"[reject_signoff] {reason} → back to the gate")
+    log_audit_event(
+        run_id=run_id,
+        db_path=AUDIT_DB_PATH,
+        event_type="signoff_rejected",
+        event_source="automated",
+        summary=(f"Approval from {_reviewer_label(reviewer)} was not accepted as a "
+                 f"sign-off: {reason}."),
+        details={
+            "reason": reason,
+            "attempted_by": reviewer,
+            "first_approval": state.get("first_approval"),
+            "policy_version": state.get("policy_version"),
+        },
+    )
+    return {"signoff_error": reason, "human_decision": None}
 
 
 def _mark_approval_blocked(state: PipelineState, config: RunnableConfig) -> dict:
@@ -1169,6 +1406,9 @@ def build_graph(db_path: str = "pipeline_state.db"):
       - Data Agent auto-retry loop: data_agent_node → planner_node
       - Human reject_data_quality: human_approval_node → planner_node
       - Human reject_model_or_fairness: human_approval_node → training_node (skips data agent)
+      - Dual sign-off: human_approval_node → record_first_approval / reject_signoff →
+        human_approval_node (the gate re-opens; nothing is written until a second,
+        different reviewer approves)
 
     Checkpointer Rationale:
       Switched from MemorySaver to SqliteSaver (persisted local SQLite file).
@@ -1194,6 +1434,8 @@ def build_graph(db_path: str = "pipeline_state.db"):
     builder.add_node("increment_human_reroute_training", _increment_human_reroute_training)
     builder.add_node("increment_human_reroute_mitigation", _increment_human_reroute_mitigation)
     builder.add_node("mitigation_node", mitigation_node)
+    builder.add_node("record_first_approval", _record_first_approval)
+    builder.add_node("reject_signoff", _reject_signoff)
     builder.add_node("mark_approval_blocked", _mark_approval_blocked)
     builder.add_node("mark_human_cap_failure", _mark_human_cap_failure)
     builder.add_node("mark_training_failure", _mark_training_failure)
@@ -1237,9 +1479,14 @@ def build_graph(db_path: str = "pipeline_state.db"):
             "reroute_mitigation": "increment_human_reroute_mitigation",
             "human_cap_failure": "mark_human_cap_failure",
             "approval_blocked": "mark_approval_blocked",
+            "record_first_approval": "record_first_approval",
+            "signoff_rejected": "reject_signoff",
         },
     )
     builder.add_edge("mark_approval_blocked", END)
+    # Dual sign-off: both paths re-open the gate rather than ending the run.
+    builder.add_edge("record_first_approval", "human_approval_node")
+    builder.add_edge("reject_signoff", "human_approval_node")
     builder.add_edge("increment_human_reroute_mitigation", "mitigation_node")
     builder.add_edge("mitigation_node", "training_node")
 

@@ -38,7 +38,7 @@ Remaining, in recommended order:
 | 3a | Trustworthy fairness metrics | **DONE** — re-run showed the first run *understated* disparity |
 | 3b | Verdict coverage, mitigation, protected-only verdict, validation gate, intersectional | **DONE** — re-run: no approval passes; reweighing beats model switching; small datasets leave the gate blind |
 | 4 | Policy-as-code | **DONE** — `policy.yaml`; approving an unevaluated model blocked by default |
-| 5 | Reviewer identity + dual sign-off | An approval with no approver identity is not an audit trail |
+| 5 | Reviewer identity + dual sign-off | **DONE** — named decisions, token roster, two reviewers for a violating approval |
 | 6 | Small cleanups | Anytime |
 
 Each step below lists the goal, design, files and acceptance criteria. **Every step
@@ -608,7 +608,27 @@ policy fails loudly at startup.
 
 ---
 
-## Step 5 — Reviewer identity and dual sign-off
+## Step 5 — Reviewer identity and dual sign-off — DONE
+
+**Built.** `reviewers.py` + gitignored `reviewers.yaml` (template: `reviewers.example.yaml`) map a
+bearer token to an id and role; `X-Reviewer-Token` decides who a decision belongs to, and without a
+roster the stated id is recorded as UNVERIFIED. Every decision carries `reviewer_id` /
+`reviewer_role` into the `human_decision` event, the model card (sign-off table and decision
+history) and the AIBOM's `approvers` — which previously read a `reviewer_id` state field no node
+ever wrote, so it always said "not recorded". Dual sign-off holds a violating approval at the gate
+(`signoff_first_approval`), refuses the first approver's second attempt and an approval with no id
+(`signoff_rejected`, HTTP 409), and completes only on a different reviewer. Policy keys:
+`require_dual_signoff_for_violating_approval` (on) and `dual_signoff_can_override_approval_block`
+(off — the documented override for the approval block). CORS is an explicit origin list
+(`AEGISML_ALLOWED_ORIGINS`) with credentials still off, because the token is a header. 27 new tests
+(`tests/test_reviewers.py`, `tests/test_dual_signoff.py`); the evaluation's scripted reviewer now
+signs off in two.
+
+**Left open:** which *roles* may sign off is not a policy key (any two different reviewers qualify);
+tokens have no expiry, revocation or rotation; and the model card states the unverified case rather
+than preventing it.
+
+**Original plan, for reference.**
 
 **Goal.** Record *who* approved, and require a second approver when a model with
 fairness violations is approved anyway.
